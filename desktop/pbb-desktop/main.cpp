@@ -2,6 +2,10 @@
 
 #include <QApplication>
 #include <QLabel>
+#include <QPushButton>
+#include <QMessageBox>
+
+void clickEvent();
 
 int main(int argc, char *argv[])
 {
@@ -14,6 +18,16 @@ int main(int argc, char *argv[])
     QLabel label{&widget};
     label.setText("Это самый лучший мессенджер на свете");
 
+    QPushButton btn{"Пойти нахуй", &widget};
+    QObject::connect(&btn, &QPushButton::clicked, clickEvent);
+
     widget.show();
     return a.exec();
+}
+
+void clickEvent()
+{
+    QMessageBox msgBox;
+    msgBox.setText("ты идешь нахой!");
+    msgBox.exec();
 }
