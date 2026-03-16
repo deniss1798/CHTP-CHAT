@@ -8,6 +8,14 @@ CREATE TABLE users (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE user_avatars (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    upload_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, /* Дата загрузки */
+    file_path VARCHAR(255) UNIQUE NOT NULL, /* Путь к файлу с аватаром */
+    is_main BOOLEAN NOT NULL DEFAULT true /* у юзера может быть много разных аватаров. один из них точно главный. когда юзер загружает новый аватар, он по умолчанию главный */
+)
+
 CREATE TABLE chats (
     id BIGSERIAL PRIMARY KEY,
     type VARCHAR(20) NOT NULL,
@@ -31,7 +39,9 @@ CREATE TABLE messages (
     chat_id BIGINT NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
     sender_id BIGINT NOT NULL REFERENCES users(id),
     text TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP /* дата обновления сообщения, возможно будем редактировать сообщения */
+    is_updated BOOLEAN DEFAULT false /* по умолчанию сообщение естественно не отредактировано. данный флаг нужен чтобы на UI проставлять метку к сообщению что его редактировали */
 );
 
 
