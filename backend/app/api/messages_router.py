@@ -9,11 +9,11 @@ from app.models.message import Message
 from app.models.user import User
 from app.schemas.message_schema import MessageCreate, MessageResponse, MessageUpdate
 from datetime import datetime
+from app.core.push_service import send_chat_message_push
 
 
 
 router = APIRouter(prefix="/messages", tags=["Messages"])
-
 
 @router.post("/", response_model=MessageResponse)
 async def send_message(
@@ -46,6 +46,25 @@ async def send_message(
     db.commit()
     db.refresh(new_message)
 
+    recipient_ids = [
+        row.user_id
+        for row in db.query(ChatMember)
+        .filter(
+            ChatMember.chat_id == message_data.chat_id,
+            ChatMember.user_id != current_user.id,
+        )
+        .all()
+    ]
+
+    if recipient_ids:
+        send_chat_message_push(
+            db,
+            sender_name=current_user.username,
+            chat_id=new_message.chat_id,
+            recipient_user_ids=recipient_ids,
+            message_text=new_message.text,
+        )
+
     await manager.broadcast(
         message_data.chat_id,
         {
@@ -65,6 +84,7 @@ async def send_message(
         updated_at=new_message.updated_at,
         is_updated=new_message.is_updated,
     )
+
 
     
 @router.patch("/{message_id}", response_model=MessageResponse)

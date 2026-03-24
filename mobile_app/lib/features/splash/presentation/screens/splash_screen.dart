@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import '../../../../app/app.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/storage/secure_storage_service.dart';
 import '../../../auth/presentation/screens/auth_screen.dart';
+import '../../../chats/presentation/screens/chat_detail_screen.dart';
 import '../../../chats/presentation/screens/chats_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -26,9 +28,28 @@ class _SplashScreenState extends State<SplashScreen> {
     if (!mounted) return;
 
     if (token != null && token.isNotEmpty) {
+      final pendingChatId = consumePendingPushChatId();
+
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const ChatsScreen()),
       );
+
+      if (pendingChatId != null) {
+        Future.delayed(const Duration(milliseconds: 150), () {
+          final navigator = appNavigatorKey.currentState;
+          if (navigator == null) return;
+
+          navigator.push(
+            MaterialPageRoute(
+              builder: (_) => ChatDetailScreen(
+                chatId: pendingChatId,
+                title: 'Чат',
+                chatType: 'private',
+              ),
+            ),
+          );
+        });
+      }
     } else {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const AuthScreen()),

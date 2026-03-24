@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../chats/presentation/screens/chats_screen.dart';
 import '../../data/services/auth_service.dart';
+import 'email_code_screen.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -55,24 +56,29 @@ class _AuthScreenState extends State<AuthScreen> {
           email: emailController.text.trim(),
           password: passwordController.text.trim(),
         );
+
+        if (!mounted) return;
+
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const ChatsScreen()),
+        );
       } else {
-        await _authService.register(
+        final email = emailController.text.trim();
+
+        await _authService.requestEmailCode(
           username: usernameController.text.trim(),
-          email: emailController.text.trim(),
+          email: email,
           password: passwordController.text.trim(),
         );
 
-        await _authService.login(
-          email: emailController.text.trim(),
-          password: passwordController.text.trim(),
+        if (!mounted) return;
+
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => EmailCodeScreen(email: email),
+          ),
         );
       }
-
-      if (!mounted) return;
-
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const ChatsScreen()),
-      );
     } catch (e) {
       if (!mounted) return;
 
@@ -219,7 +225,7 @@ class _AuthScreenState extends State<AuthScreen> {
                       Text(
                         isLoginMode
                             ? 'Войдите, чтобы продолжить общение'
-                            : 'Создайте аккаунт и начните общение',
+                            : 'Создайте аккаунт и подтвердите email',
                         style: textTheme.bodyMedium,
                       ),
                       const SizedBox(height: 32),
@@ -427,7 +433,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                           : Text(
                                               isLoginMode
                                                   ? 'Войти'
-                                                  : 'Создать аккаунт',
+                                                  : 'Регистрация',
                                               style: const TextStyle(
                                                 fontSize: 16,
                                                 fontWeight: FontWeight.w700,

@@ -5,3 +5,4 @@ __pycache__/
 .idea/
 .vscode/
 alembic/versions/__pycache__/
+backend/app/core/firebase-service-account.json

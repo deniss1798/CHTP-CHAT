@@ -1,23 +1,55 @@
 import 'package:dio/dio.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+
 import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/secure_storage_service.dart';
 
 class AuthService {
   final Dio _dio = ApiClient.dio;
 
-  Future<void> register({
+  Future<void> requestEmailCode({
     required String username,
     required String email,
     required String password,
   }) async {
     await _dio.post(
-      '/auth/register',
+      '/auth/request-email-code',
       data: {
         'username': username,
         'email': email,
         'password': password,
       },
     );
+  }
+
+  Future<void> verifyEmailCode({
+    required String email,
+    required String code,
+  }) async {
+    final response = await _dio.post(
+      '/auth/verify-email-code',
+      data: {
+        'email': email,
+        'code': code,
+      },
+    );
+
+    final data = response.data;
+
+    String? token;
+
+    if (data is Map<String, dynamic>) {
+      token = data['access_token']?.toString();
+    } else if (data is Map) {
+      token = data['access_token']?.toString();
+    }
+
+    if (token == null || token.isEmpty) {
+      throw Exception('Сервер не вернул access_token');
+    }
+
+    await SecureStorageService.saveAccessToken(token);
+    await _registerDeviceToken(token);
   }
 
   Future<void> login({
@@ -47,6 +79,50 @@ class AuthService {
     }
 
     await SecureStorageService.saveAccessToken(token);
+    await _registerDeviceToken(token);
+  }
+
+  Future<void> _registerDeviceToken(String accessToken) async {
+    final fcmToken = await FirebaseMessaging.instance.getToken();
+
+    if (fcmToken == null || fcmToken.isEmpty) {
+      print('FCM token is null or empty, skip device registration');
+      return;
+    }
+
+    await _dio.post(
+      '/devices/register',
+      data: {
+        'token': fcmToken,
+        'platform': 'android',
+        'device_name': 'android_emulator',
+      },
+      options: Options(
+        headers: {
+          'Authorization': 'Bearer $accessToken',
+        },
+      ),
+    );
+
+    FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
+      try {
+        await _dio.post(
+          '/devices/register',
+          data: {
+            'token': newToken,
+            'platform': 'android',
+            'device_name': 'android_emulator',
+          },
+          options: Options(
+            headers: {
+              'Authorization': 'Bearer $accessToken',
+            },
+          ),
+        );
+      } catch (e) {
+        print('Failed to refresh device token on backend: $e');
+      }
+    });
   }
 
   Future<Map<String, dynamic>> getMe() async {
