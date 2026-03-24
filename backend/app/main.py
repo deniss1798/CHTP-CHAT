@@ -1,19 +1,40 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
-from app.api.chats_router import router as chats_router
-from app.db.database import engine
-from app.api.users_router import router as users_router
-from app.api.auth_router import router as auth_router
-from app.api.messages_router import router as messages_router
-from app.api.ws_router import router as ws_router
-from app.api.devices_router import router as devices_router
 
-app = FastAPI()
+from app.api.auth_router import router as auth_router
+from app.api.chats_router import router as chats_router
+from app.api.devices_router import router as devices_router
+from app.api.messages_router import router as messages_router
+from app.api.users_router import router as users_router
+from app.api.ws_router import router as ws_router
+from app.core.config import get_settings
+from app.db.database import engine
+
+settings = get_settings()
+
+app = FastAPI(title=settings.app_name)
+
+origins = [item.strip() for item in settings.cors_origins.split(",") if item.strip()]
+
+if origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 
 @app.get("/")
 def root():
     return {"message": "Messenger backend is running"}
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 
 
 @app.get("/db-check")

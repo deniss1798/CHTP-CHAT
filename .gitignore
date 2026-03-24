@@ -1,8 +1,10 @@
 venv/
+.venv/
 __pycache__/
 *.pyc
 .env
 .idea/
 .vscode/
 alembic/versions/__pycache__/
-backend/app/core/firebase-service-account.json
+firebase-service-account.json
+app/core/firebase-service-account.json

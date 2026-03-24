@@ -1,37 +1,43 @@
-from pydantic import BaseModel
 from typing import Literal
-from pydantic import BaseModel
-from typing import Optional
+
+from pydantic import BaseModel, EmailStr, Field
 
 
 class UserShort(BaseModel):
     id: int
     username: str
-    email: str
+    email: EmailStr
 
-
-class ChatDetailResponse(BaseModel):
-    id: int
-    type: str
-    title: Optional[str]
-    created_by: int
-    other_user: Optional[UserShort] = None
-
-class ChatMemberResponse(BaseModel):
-    id: int
-    username: str
-    email: str
-    role: str
+    class Config:
+        from_attributes = True
 
 
 class ChatCreate(BaseModel):
     type: Literal["private", "group"]
-    title: str | None = None
-    member_ids: list[int]
+    title: str | None = Field(default=None, max_length=255)
+    member_ids: list[int] = Field(..., min_length=1, max_length=100)
 
 
 class ChatResponse(BaseModel):
     id: int
-    type: str
+    type: Literal["private", "group"]
     title: str | None
     created_by: int | None
+
+    class Config:
+        from_attributes = True
+
+
+class ChatMemberResponse(BaseModel):
+    id: int
+    username: str
+    email: EmailStr
+    role: str
+
+
+class ChatDetailResponse(BaseModel):
+    id: int
+    type: Literal["private", "group"]
+    title: str | None
+    created_by: int | None
+    members: list[UserShort]

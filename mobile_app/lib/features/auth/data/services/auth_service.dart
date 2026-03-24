@@ -91,7 +91,7 @@ class AuthService {
     }
 
     await _dio.post(
-      '/devices/register',
+      '/devices/register-token',
       data: {
         'token': fcmToken,
         'platform': 'android',
@@ -107,7 +107,7 @@ class AuthService {
     FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
       try {
         await _dio.post(
-          '/devices/register',
+          '/devices/register-token',
           data: {
             'token': newToken,
             'platform': 'android',

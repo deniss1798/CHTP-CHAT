@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func, case
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_user
@@ -7,7 +7,13 @@ from app.db.database import get_db
 from app.models.chat import Chat
 from app.models.chat_member import ChatMember
 from app.models.user import User
-from app.schemas.chat_schema import ChatCreate, ChatResponse, ChatMemberResponse,ChatDetailResponse, UserShort 
+from app.schemas.chat_schema import (
+    ChatCreate,
+    ChatDetailResponse,
+    ChatMemberResponse,
+    ChatResponse,
+    UserShort,
+)
 
 router = APIRouter(prefix="/chats", tags=["Chats"])
 
@@ -32,7 +38,7 @@ def create_chat(
             )
 
     if chat_data.type == "group":
-        if not chat_data.title:
+        if not chat_data.title or not chat_data.title.strip():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Group chat must have a title",
@@ -63,7 +69,8 @@ def create_chat(
                         (ChatMember.user_id.in_(member_ids), 1),
                         else_=0,
                     )
-                ) == len(member_ids)
+                )
+                == len(member_ids)
             )
             .first()
         )
@@ -79,7 +86,7 @@ def create_chat(
 
     new_chat = Chat(
         type=chat_data.type,
-        title=chat_data.title,
+        title=chat_data.title.strip() if chat_data.title else None,
         created_by=current_user.id,
     )
 
@@ -107,7 +114,7 @@ def create_chat(
     )
 
 
-@router.get("/")
+@router.get("/", response_model=list[ChatResponse])
 def get_my_chats(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -120,15 +127,37 @@ def get_my_chats(
         .all()
     )
 
-    return [
-        {
-            "id": chat.id,
-            "type": chat.type,
-            "title": chat.title,
-            "created_by": chat.created_by,
-        }
-        for chat in chats
-    ]
+    result = []
+
+    for chat in chats:
+        chat_title = chat.title
+
+        if chat.type == "private":
+            other_user = (
+                db.query(User)
+                .join(ChatMember, ChatMember.user_id == User.id)
+                .filter(
+                    ChatMember.chat_id == chat.id,
+                    User.id != current_user.id,
+                )
+                .first()
+            )
+
+            if other_user:
+                chat_title = other_user.username
+
+        result.append(
+            ChatResponse(
+                id=chat.id,
+                type=chat.type,
+                title=chat_title,
+                created_by=chat.created_by,
+            )
+        )
+
+    return result
+
+
 @router.get("/{chat_id}", response_model=ChatDetailResponse)
 def get_chat_detail(
     chat_id: int,
@@ -143,7 +172,6 @@ def get_chat_detail(
             detail="Chat not found",
         )
 
-    # Проверка участия
     chat_member = (
         db.query(ChatMember)
         .filter(
@@ -159,34 +187,31 @@ def get_chat_detail(
             detail="You are not a member of this chat",
         )
 
-    other_user_data = None
+    users = (
+        db.query(User)
+        .join(ChatMember, ChatMember.user_id == User.id)
+        .filter(ChatMember.chat_id == chat_id)
+        .order_by(User.username.asc())
+        .all()
+    )
 
-    # Если private-чат — найдём второго участника
-    if chat.type == "private":
-        other_member = (
-            db.query(User)
-            .join(ChatMember, ChatMember.user_id == User.id)
-            .filter(
-                ChatMember.chat_id == chat_id,
-                User.id != current_user.id,
-            )
-            .first()
+    members = [
+        UserShort(
+            id=user.id,
+            username=user.username,
+            email=user.email,
         )
-
-        if other_member:
-            other_user_data = UserShort(
-                id=other_member.id,
-                username=other_member.username,
-                email=other_member.email,
-            )
+        for user in users
+    ]
 
     return ChatDetailResponse(
         id=chat.id,
         type=chat.type,
         title=chat.title,
         created_by=chat.created_by,
-        other_user=other_user_data,
+        members=members,
     )
+
 
 @router.get("/{chat_id}/members", response_model=list[ChatMemberResponse])
 def get_chat_members(

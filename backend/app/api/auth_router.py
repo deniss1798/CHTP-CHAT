@@ -13,7 +13,7 @@ from app.schemas.email_verification import (
     RequestEmailCodeRequest,
     VerifyEmailCodeRequest,
 )
-from app.schemas.user_schema import UserRegister, UserLogin, TokenResponse, UserResponse
+from app.schemas.user_schema import UserLogin, TokenResponse
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -23,23 +23,26 @@ def request_email_code(
     payload: RequestEmailCodeRequest,
     db: Session = Depends(get_db),
 ):
-    existing_user_by_email = db.query(User).filter(User.email == payload.email).first()
-    if existing_user_by_email:
+    existing_user = db.query(User).filter(
+        (User.email == payload.email) | (User.username == payload.username)
+    ).first()
+
+    if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered",
+            detail="User already exists",
         )
 
-    existing_user_by_username = db.query(User).filter(User.username == payload.username).first()
-    if existing_user_by_username:
+    code = f"{random.randint(100000, 999999)}"
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+
+    try:
+        password_hash_value = hash_password(payload.password)
+    except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username already taken",
+            detail=str(e),
         )
-
-    code = f"{random.randint(0, 999999):06d}"
-    expires_at = datetime.utcnow() + timedelta(minutes=10)
-    password_hash_value = hash_password(payload.password)
 
     pending = (
         db.query(PendingRegistration)
@@ -53,7 +56,6 @@ def request_email_code(
         pending.verification_code = code
         pending.expires_at = expires_at
         pending.attempts_count = 0
-        db.commit()
     else:
         pending = PendingRegistration(
             username=payload.username,
@@ -64,7 +66,8 @@ def request_email_code(
             attempts_count=0,
         )
         db.add(pending)
-        db.commit()
+
+    db.commit()
 
     send_verification_code_email(payload.email, code)
 
@@ -88,7 +91,13 @@ def verify_email_code(
             detail="Verification request not found",
         )
 
-    if pending.expires_at < datetime.utcnow():
+    now = datetime.now(timezone.utc)
+    pending_expires_at = pending.expires_at
+
+    if pending_expires_at.tzinfo is None:
+        pending_expires_at = pending_expires_at.replace(tzinfo=timezone.utc)
+
+    if pending_expires_at < now:
         db.delete(pending)
         db.commit()
         raise HTTPException(
@@ -119,7 +128,9 @@ def verify_email_code(
             detail="Email already registered",
         )
 
-    existing_user_by_username = db.query(User).filter(User.username == pending.username).first()
+    existing_user_by_username = (
+        db.query(User).filter(User.username == pending.username).first()
+    )
     if existing_user_by_username:
         db.delete(pending)
         db.commit()
@@ -145,41 +156,11 @@ def verify_email_code(
     return TokenResponse(access_token=access_token)
 
 
-@router.post("/register", response_model=UserResponse)
-def register(user_data: UserRegister, db: Session = Depends(get_db)):
-    existing_user_by_email = db.query(User).filter(User.email == user_data.email).first()
-    if existing_user_by_email:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered",
-        )
-
-    existing_user_by_username = db.query(User).filter(User.username == user_data.username).first()
-    if existing_user_by_username:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username already taken",
-        )
-
-    new_user = User(
-        username=user_data.username,
-        email=user_data.email,
-        password_hash=hash_password(user_data.password),
-    )
-
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-
-    return UserResponse(
-        id=new_user.id,
-        username=new_user.username,
-        email=new_user.email,
-    )
-
-
 @router.post("/login", response_model=TokenResponse)
-def login(user_data: UserLogin, db: Session = Depends(get_db)):
+def login(
+    user_data: UserLogin,
+    db: Session = Depends(get_db),
+):
     user = db.query(User).filter(User.email == user_data.email).first()
 
     if not user or not verify_password(user_data.password, user.password_hash):
@@ -189,5 +170,4 @@ def login(user_data: UserLogin, db: Session = Depends(get_db)):
         )
 
     access_token = create_access_token({"sub": str(user.id)})
-
     return TokenResponse(access_token=access_token)
