@@ -16,64 +16,68 @@ from app.core.push_service import send_chat_message_push
 router = APIRouter(prefix="/messages", tags=["Messages"])
 
 @router.post("/", response_model=MessageResponse)
-async def send_message(
-    message_data: MessageCreate,
+def send_message(
+    message: MessageCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    chat_member = (
+    member = (
         db.query(ChatMember)
         .filter(
-            ChatMember.chat_id == message_data.chat_id,
+            ChatMember.chat_id == message.chat_id,
             ChatMember.user_id == current_user.id,
         )
         .first()
     )
 
-    if not chat_member:
+    if not member:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You are not a member of this chat",
         )
 
     new_message = Message(
-        chat_id=message_data.chat_id,
+        chat_id=message.chat_id,
         sender_id=current_user.id,
-        text=message_data.text,
+        text=message.text,
+        is_updated=False,
     )
 
     db.add(new_message)
     db.commit()
     db.refresh(new_message)
 
-    recipient_ids = [
-        row.user_id
-        for row in db.query(ChatMember)
-        .filter(
-            ChatMember.chat_id == message_data.chat_id,
-            ChatMember.user_id != current_user.id,
-        )
-        .all()
-    ]
-
-    if recipient_ids:
-        send_chat_message_push(
-            db,
-            sender_name=current_user.username,
-            chat_id=new_message.chat_id,
-            recipient_user_ids=recipient_ids,
-            message_text=new_message.text,
-        )
-
-    await manager.broadcast(
-        message_data.chat_id,
+    manager.broadcast(
+        message.chat_id,
         {
-            "id": new_message.id,
-            "chat_id": new_message.chat_id,
-            "sender_id": new_message.sender_id,
-            "text": new_message.text,
+            "type": "new_message",
+            "message": {
+                "id": new_message.id,
+                "chat_id": new_message.chat_id,
+                "sender_id": new_message.sender_id,
+                "text": new_message.text,
+                "created_at": new_message.created_at.isoformat()
+                if new_message.created_at
+                else None,
+                "updated_at": new_message.updated_at.isoformat()
+                if new_message.updated_at
+                else None,
+                "is_updated": new_message.is_updated,
+            },
         },
     )
+
+    try:
+        send_chat_message_push(
+            db,
+            chat_id=new_message.chat_id,
+            sender_id=current_user.id,
+            message_text=new_message.text,
+        )
+    except Exception as e:
+        print(f"Push sending skipped: {e}")
+
+    return new_message
 
     return MessageResponse(
         id=new_message.id,
