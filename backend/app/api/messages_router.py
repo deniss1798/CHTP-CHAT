@@ -67,10 +67,22 @@ async def send_message(
         },
     )
 
+    recipient_user_ids = [
+        row.user_id
+        for row in db.query(ChatMember)
+        .filter(ChatMember.chat_id == new_message.chat_id)
+        .all()
+        if row.user_id != current_user.id
+    ]
+
+    sender_name = current_user.username
+
     try:
         send_chat_message_push(
             db=db,
             chat_id=new_message.chat_id,
+            sender_name=sender_name,
+            recipient_user_ids=recipient_user_ids,
             message_text=new_message.text,
         )
     except Exception as e:
