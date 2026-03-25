@@ -37,10 +37,17 @@ dependencies:
   web_socket_channel: ^3.0.3
   firebase_core: ^4.5.0
   firebase_messaging: ^16.1.2
+  flutter_launcher_icons: ^0.14.3
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   
+  flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icons/app_icon.png"
+  adaptive_icon_background: "#0B0B0D"
+  adaptive_icon_foreground: "assets/icons/icon.png"
 
 dev_dependencies:
   flutter_test:
