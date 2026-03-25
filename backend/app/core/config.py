@@ -23,6 +23,7 @@ class Settings(BaseSettings):
    # firebase_credentials_path: str = Field(..., alias="FIREBASE_CREDENTIALS_PATH")
     firebase_credentials_path: str | None = Field(None, alias="FIREBASE_CREDENTIALS_PATH")
     firebase_service_account_json: str | None = Field(None, alias="FIREBASE_SERVICE_ACCOUNT_JSON")
+    
 
     cors_origins: str = Field("", alias="CORS_ORIGINS")
 

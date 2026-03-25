@@ -15,7 +15,7 @@ def get_firebase_app():
     if _firebase_app is not None:
         return _firebase_app
 
-    firebase_json = getattr(settings, "firebase_service_account_json", None)
+    firebase_json = settings.firebase_service_account_json
 
     if not firebase_json:
         raise RuntimeError("FIREBASE_SERVICE_ACCOUNT_JSON is not set")
