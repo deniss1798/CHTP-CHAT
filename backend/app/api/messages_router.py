@@ -16,7 +16,7 @@ from app.core.push_service import send_chat_message_push
 router = APIRouter(prefix="/messages", tags=["Messages"])
 
 @router.post("/", response_model=MessageResponse)
-def send_message(
+async def send_message(
     message: MessageCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -47,7 +47,7 @@ def send_message(
     db.commit()
     db.refresh(new_message)
 
-    manager.broadcast(
+    await manager.broadcast(
         message.chat_id,
         {
             "type": "new_message",
@@ -69,9 +69,8 @@ def send_message(
 
     try:
         send_chat_message_push(
-            db,
+            db=db,
             chat_id=new_message.chat_id,
-            sender_id=current_user.id,
             message_text=new_message.text,
         )
     except Exception as e:
