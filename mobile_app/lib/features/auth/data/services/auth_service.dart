@@ -7,12 +7,12 @@ import '../../../../core/storage/secure_storage_service.dart';
 class AuthService {
   final Dio _dio = ApiClient.dio;
 
-  Future<void> requestEmailCode({
+  Future<String> requestEmailCode({
     required String username,
     required String email,
     required String password,
   }) async {
-    await _dio.post(
+    final response = await _dio.post(
       '/auth/request-email-code',
       data: {
         'username': username,
@@ -20,6 +20,22 @@ class AuthService {
         'password': password,
       },
     );
+
+    final data = response.data;
+
+    String? code;
+
+    if (data is Map<String, dynamic>) {
+      code = data['code']?.toString();
+    } else if (data is Map) {
+      code = data['code']?.toString();
+    }
+
+    if (code == null || code.isEmpty) {
+      throw Exception('Сервер не вернул код подтверждения');
+    }
+
+    return code;
   }
 
   Future<void> verifyEmailCode({

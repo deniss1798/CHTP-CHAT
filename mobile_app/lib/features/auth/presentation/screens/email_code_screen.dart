@@ -7,10 +7,12 @@ import '../../data/services/auth_service.dart';
 
 class EmailCodeScreen extends StatefulWidget {
   final String email;
+  final String? debugCode;
 
   const EmailCodeScreen({
     super.key,
     required this.email,
+    this.debugCode,
   });
 
   @override
@@ -23,6 +25,14 @@ class _EmailCodeScreenState extends State<EmailCodeScreen> {
   final _authService = AuthService();
 
   bool isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.debugCode != null && widget.debugCode!.isNotEmpty) {
+      _codeController.text = widget.debugCode!;
+    }
+  }
 
   @override
   void dispose() {
@@ -162,7 +172,9 @@ class _EmailCodeScreenState extends State<EmailCodeScreen> {
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        'Введите код, отправленный на ${widget.email}',
+                        widget.debugCode == null
+                            ? 'Введите код, отправленный на ${widget.email}'
+                            : 'Тестовый режим: используйте код ниже',
                         style: textTheme.bodyMedium,
                       ),
                       const SizedBox(height: 32),
@@ -221,6 +233,44 @@ class _EmailCodeScreenState extends State<EmailCodeScreen> {
                                 ),
                               ),
                               const SizedBox(height: 24),
+                              if (widget.debugCode != null) ...[
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(14),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.backgroundSecondary,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: AppColors.inputBorder,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Код подтверждения',
+                                        style: TextStyle(
+                                          color: AppColors.textSecondary,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        widget.debugCode!,
+                                        style: const TextStyle(
+                                          color: AppColors.accentBright,
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: 2,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                              ],
                               TextFormField(
                                 controller: _codeController,
                                 validator: validateCode,
@@ -229,7 +279,7 @@ class _EmailCodeScreenState extends State<EmailCodeScreen> {
                                   color: AppColors.textPrimary,
                                 ),
                                 decoration: const InputDecoration(
-                                  hintText: 'Код из письма',
+                                  hintText: 'Код подтверждения',
                                   prefixIcon: Icon(
                                     Icons.verified_outlined,
                                     color: AppColors.textMuted,

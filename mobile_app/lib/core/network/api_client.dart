@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 
 class ApiClient {
-  static const String baseUrl = 'http://10.0.2.2:8000';
+  static const String baseUrl = 'https://chtp-chat-production.up.railway.app';
 
   static final Dio dio = Dio(
     BaseOptions(

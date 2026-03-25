@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+
 import '../../../../app/theme/app_colors.dart';
 import '../../../chats/presentation/screens/chats_screen.dart';
 import '../../data/services/auth_service.dart';
@@ -65,7 +66,7 @@ class _AuthScreenState extends State<AuthScreen> {
       } else {
         final email = emailController.text.trim();
 
-        await _authService.requestEmailCode(
+        final code = await _authService.requestEmailCode(
           username: usernameController.text.trim(),
           email: email,
           password: passwordController.text.trim(),
@@ -75,7 +76,10 @@ class _AuthScreenState extends State<AuthScreen> {
 
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => EmailCodeScreen(email: email),
+            builder: (_) => EmailCodeScreen(
+              email: email,
+              debugCode: code,
+            ),
           ),
         );
       }
@@ -318,7 +322,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                     decoration: const InputDecoration(
                                       hintText: 'Email',
                                       prefixIcon: Icon(
-                                        Icons.mail_outline,
+                                        Icons.alternate_email,
                                         color: AppColors.textMuted,
                                       ),
                                     ),
@@ -364,7 +368,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                       decoration: InputDecoration(
                                         hintText: 'Подтвердите пароль',
                                         prefixIcon: const Icon(
-                                          Icons.lock_outline,
+                                          Icons.lock_reset_outlined,
                                           color: AppColors.textMuted,
                                         ),
                                         suffixIcon: IconButton(
@@ -384,22 +388,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                       ),
                                     ),
                                   ],
-                                  const SizedBox(height: 18),
-                                  if (isLoginMode)
-                                    Align(
-                                      alignment: Alignment.centerRight,
-                                      child: TextButton(
-                                        onPressed: () {},
-                                        child: const Text(
-                                          'Забыли пароль?',
-                                          style: TextStyle(
-                                            color: AppColors.accentBright,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  const SizedBox(height: 6),
+                                  const SizedBox(height: 20),
                                   SizedBox(
                                     width: double.infinity,
                                     child: ElevatedButton(
@@ -433,42 +422,12 @@ class _AuthScreenState extends State<AuthScreen> {
                                           : Text(
                                               isLoginMode
                                                   ? 'Войти'
-                                                  : 'Регистрация',
+                                                  : 'Продолжить',
                                               style: const TextStyle(
                                                 fontSize: 16,
                                                 fontWeight: FontWeight.w700,
                                               ),
                                             ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 14),
-                                  TextButton(
-                                    onPressed: isLoading
-                                        ? null
-                                        : () => toggleMode(!isLoginMode),
-                                    child: RichText(
-                                      text: TextSpan(
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          color: AppColors.textSecondary,
-                                        ),
-                                        children: [
-                                          TextSpan(
-                                            text: isLoginMode
-                                                ? 'Нет аккаунта? '
-                                                : 'Уже есть аккаунт? ',
-                                          ),
-                                          TextSpan(
-                                            text: isLoginMode
-                                                ? 'Зарегистрироваться'
-                                                : 'Войти',
-                                            style: const TextStyle(
-                                              color: AppColors.accentBright,
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
                                     ),
                                   ),
                                 ],
@@ -477,15 +436,6 @@ class _AuthScreenState extends State<AuthScreen> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 26),
-                      Center(
-                        child: Text(
-                          'Безопасное общение в едином пространстве',
-                          style: textTheme.bodySmall,
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
                     ],
                   ),
                 ),
