@@ -4,7 +4,7 @@ import random
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-#from app.core.security import hash_password, verify_password, create_access_token
+from app.core.security import hash_password, verify_password, create_access_token
 from app.db.database import get_db
 from app.models.pending_registration import PendingRegistration
 from app.models.user import User
