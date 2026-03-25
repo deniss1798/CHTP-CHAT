@@ -4,8 +4,7 @@ import random
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.core.email_service import send_verification_code_email
-from app.core.security import hash_password, verify_password, create_access_token
+#from app.core.security import hash_password, verify_password, create_access_token
 from app.db.database import get_db
 from app.models.pending_registration import PendingRegistration
 from app.models.user import User
@@ -69,10 +68,10 @@ def request_email_code(
 
     db.commit()
 
-    send_verification_code_email(payload.email, code)
-
-    return {"message": "Verification code sent"}
-
+    return {
+        "message": "Verification code generated",
+        "code": code,
+    }
 
 @router.post("/verify-email-code", response_model=TokenResponse)
 def verify_email_code(
