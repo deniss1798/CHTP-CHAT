@@ -252,7 +252,46 @@ def get_chat_members(
         for user, role in members
     ]
 
-    @router.post("/{chat_id}/members", response_model=ChatMemberResponse)
+@router.get("/{chat_id}/members", response_model=list[ChatMemberResponse])
+def get_chat_members(
+    chat_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    chat_member = (
+        db.query(ChatMember)
+        .filter(
+            ChatMember.chat_id == chat_id,
+            ChatMember.user_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not chat_member:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not a member of this chat",
+        )
+
+    members = (
+        db.query(User, ChatMember.role)
+        .join(ChatMember, ChatMember.user_id == User.id)
+        .filter(ChatMember.chat_id == chat_id)
+        .all()
+    )
+
+    return [
+        ChatMemberResponse(
+            id=user.id,
+            username=user.username,
+            email=user.email,
+            role=role,
+        )
+        for user, role in members
+    ]
+
+
+@router.post("/{chat_id}/members", response_model=ChatMemberResponse)
 def add_chat_member(
     chat_id: int,
     payload: ChatMemberAddRequest,
