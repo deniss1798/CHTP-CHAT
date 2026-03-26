@@ -103,45 +103,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       throw Exception('Токен не найден');
     }
 
-    Future<void> _openAddMemberScreen() async {
-  final result = await Navigator.of(context).push<bool>(
-    MaterialPageRoute(
-      builder: (_) => ChatMemberAddScreen(
-        chatId: widget.chatId,
-        existingMemberIds: _memberNames.keys.toSet(),
-      ),
-    ),
-  );
-
-  if (!mounted || result != true) return;
-
-  try {
-    await _loadChatMembers();
-
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Участник успешно добавлен'),
-      ),
-    );
-  } catch (e) {
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: AppColors.surfaceSoft,
-        content: Text(
-          _extractErrorMessage(
-            e,
-            fallback: 'Не удалось обновить список участников',
-          ),
-        ),
-      ),
-    );
-  }
-}
-
     final response = await _dio.get(
       '/chats/${widget.chatId}/members',
       options: Options(
@@ -174,6 +135,45 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           }
         }
       }
+    }
+  }
+
+  Future<void> _openAddMemberScreen() async {
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => ChatMemberAddScreen(
+          chatId: widget.chatId,
+          existingMemberIds: _memberNames.keys.toSet(),
+        ),
+      ),
+    );
+
+    if (!mounted || result != true) return;
+
+    try {
+      await _loadChatMembers();
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Участник успешно добавлен'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.surfaceSoft,
+          content: Text(
+            _extractErrorMessage(
+              e,
+              fallback: 'Не удалось обновить список участников',
+            ),
+          ),
+        ),
+      );
     }
   }
 
@@ -614,8 +614,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           final children = <Widget>[];
 
           if (_shouldShowDateDivider(index)) {
-            final label =
-                _formatDateLabel(message['created_at']?.toString());
+            final label = _formatDateLabel(message['created_at']?.toString());
 
             if (label.isNotEmpty) {
               children.add(_buildDateDivider(label));
@@ -809,39 +808,39 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     ),
                   ),
                 ),
-     child: Row(
-  children: [
-    IconButton(
-      onPressed: () => Navigator.of(context).pop(true),
-      icon: const Icon(
-        Icons.arrow_back_ios_new_rounded,
-        color: AppColors.textPrimary,
-      ),
-    ),
-    Expanded(
-      child: Text(
-        widget.title,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(
-          color: AppColors.textPrimary,
-          fontSize: 18,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-    ),
-    if (_isGroupChat)
-      IconButton(
-        tooltip: 'Добавить участника',
-        onPressed: _openAddMemberScreen,
-        icon: const Icon(
-          Icons.person_add_alt_1_rounded,
-          color: AppColors.accent,
-        ),
-      ),
-    _buildConnectionBadge(),
-  ],
-),
+                child: Row(
+                  children: [
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(true),
+                      icon: const Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(
+                        widget.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    if (_isGroupChat)
+                      IconButton(
+                        tooltip: 'Добавить участника',
+                        onPressed: _openAddMemberScreen,
+                        icon: const Icon(
+                          Icons.person_add_alt_1_rounded,
+                          color: AppColors.accent,
+                        ),
+                      ),
+                    _buildConnectionBadge(),
+                  ],
+                ),
               ),
               Expanded(child: _buildBody()),
             ],
