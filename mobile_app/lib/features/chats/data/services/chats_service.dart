@@ -196,4 +196,39 @@ class ChatsService {
 
     return enrichedChats;
   }
+
+  Future<Map<String, dynamic>> addMemberToChat({
+    required int chatId,
+    required int userId,
+  }) async {
+    final token = await SecureStorageService.getAccessToken();
+
+    if (token == null || token.isEmpty) {
+      throw Exception('Токен не найден');
+    }
+
+    final response = await _dio.post(
+      '/chats/$chatId/members',
+      data: {
+        'user_id': userId,
+      },
+      options: Options(
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      ),
+    );
+
+    final data = response.data;
+
+    if (data is Map<String, dynamic>) {
+      return data;
+    }
+
+    if (data is Map) {
+      return Map<String, dynamic>.from(data);
+    }
+
+    throw Exception('Неожиданный формат ответа при добавлении участника');
+  }
 }

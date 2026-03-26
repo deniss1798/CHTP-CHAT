@@ -18,6 +18,10 @@ class ChatCreate(BaseModel):
     member_ids: list[int] = Field(..., min_length=1, max_length=100)
 
 
+class ChatMemberAddRequest(BaseModel):
+    user_id: int
+
+
 class ChatResponse(BaseModel):
     id: int
     type: Literal["private", "group"]

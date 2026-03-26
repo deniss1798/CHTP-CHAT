@@ -10,6 +10,7 @@ from app.models.user import User
 from app.schemas.chat_schema import (
     ChatCreate,
     ChatDetailResponse,
+    ChatMemberAddRequest,
     ChatMemberResponse,
     ChatResponse,
     UserShort,
@@ -250,3 +251,84 @@ def get_chat_members(
         )
         for user, role in members
     ]
+
+    @router.post("/{chat_id}/members", response_model=ChatMemberResponse)
+def add_chat_member(
+    chat_id: int,
+    payload: ChatMemberAddRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    chat = db.query(Chat).filter(Chat.id == chat_id).first()
+
+    if not chat:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Chat not found",
+        )
+
+    requester_membership = (
+        db.query(ChatMember)
+        .filter(
+            ChatMember.chat_id == chat_id,
+            ChatMember.user_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not requester_membership:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not a member of this chat",
+        )
+
+    if chat.type != "group":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You can add members only to group chats",
+        )
+
+    if payload.user_id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You are already in this chat",
+        )
+
+    user_to_add = db.query(User).filter(User.id == payload.user_id).first()
+
+    if not user_to_add:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    existing_member = (
+        db.query(ChatMember)
+        .filter(
+            ChatMember.chat_id == chat_id,
+            ChatMember.user_id == payload.user_id,
+        )
+        .first()
+    )
+
+    if existing_member:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User is already a member of this chat",
+        )
+
+    new_member = ChatMember(
+        chat_id=chat_id,
+        user_id=payload.user_id,
+        role="member",
+    )
+
+    db.add(new_member)
+    db.commit()
+
+    return ChatMemberResponse(
+        id=user_to_add.id,
+        username=user_to_add.username,
+        email=user_to_add.email,
+        role="member",
+    )
