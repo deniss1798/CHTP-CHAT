@@ -897,7 +897,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                         color: AppColors.textPrimary,
                       ),
                     ),
-                    Expanded(
+                   
                       Expanded(
   child: Row(
     children: [
