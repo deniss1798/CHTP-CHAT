@@ -78,10 +78,11 @@ def create_chat(
 
         if existing_chat:
             chat = db.query(Chat).filter(Chat.id == existing_chat.id).first()
-            return ChatResponse(
+         return ChatResponse(
                 id=chat.id,
                 type=chat.type,
                 title=chat.title,
+                avatar_url=chat.avatar_url,
                 created_by=chat.created_by,
             )
 
@@ -107,10 +108,11 @@ def create_chat(
     db.commit()
     db.refresh(new_chat)
 
-    return ChatResponse(
+      return ChatResponse(
         id=new_chat.id,
         type=new_chat.type,
         title=new_chat.title,
+        avatar_url=new_chat.avatar_url,
         created_by=new_chat.created_by,
     )
 
@@ -132,6 +134,7 @@ def get_my_chats(
 
     for chat in chats:
         chat_title = chat.title
+        chat_avatar_url = chat.avatar_url
 
         if chat.type == "private":
             other_user = (
@@ -146,12 +149,14 @@ def get_my_chats(
 
             if other_user:
                 chat_title = other_user.username
+                chat_avatar_url = other_user.avatar_url
 
         result.append(
             ChatResponse(
                 id=chat.id,
                 type=chat.type,
                 title=chat_title,
+                avatar_url=chat_avatar_url,
                 created_by=chat.created_by,
             )
         )
@@ -201,56 +206,29 @@ def get_chat_detail(
             id=user.id,
             username=user.username,
             email=user.email,
+            avatar_url=user.avatar_url,
         )
         for user in users
     ]
 
+    chat_title = chat.title
+    chat_avatar_url = chat.avatar_url
+
+    if chat.type == "private":
+        other_user = next((user for user in users if user.id != current_user.id), None)
+        if other_user:
+            chat_title = other_user.username
+            chat_avatar_url = other_user.avatar_url
+
     return ChatDetailResponse(
         id=chat.id,
         type=chat.type,
-        title=chat.title,
+        title=chat_title,
+        avatar_url=chat_avatar_url,
         created_by=chat.created_by,
         members=members,
     )
 
-
-@router.get("/{chat_id}/members", response_model=list[ChatMemberResponse])
-def get_chat_members(
-    chat_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    chat_member = (
-        db.query(ChatMember)
-        .filter(
-            ChatMember.chat_id == chat_id,
-            ChatMember.user_id == current_user.id,
-        )
-        .first()
-    )
-
-    if not chat_member:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You are not a member of this chat",
-        )
-
-    members = (
-        db.query(User, ChatMember.role)
-        .join(ChatMember, ChatMember.user_id == User.id)
-        .filter(ChatMember.chat_id == chat_id)
-        .all()
-    )
-
-    return [
-        ChatMemberResponse(
-            id=user.id,
-            username=user.username,
-            email=user.email,
-            role=role,
-        )
-        for user, role in members
-    ]
 
 @router.get("/{chat_id}/members", response_model=list[ChatMemberResponse])
 def get_chat_members(

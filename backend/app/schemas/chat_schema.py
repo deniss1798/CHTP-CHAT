@@ -7,6 +7,7 @@ class UserShort(BaseModel):
     id: int
     username: str
     email: EmailStr
+    avatar_url: str | None = None
 
     class Config:
         from_attributes = True
@@ -26,6 +27,7 @@ class ChatResponse(BaseModel):
     id: int
     type: Literal["private", "group"]
     title: str | None
+    avatar_url: str | None = None
     created_by: int | None
 
     class Config:
@@ -43,5 +45,6 @@ class ChatDetailResponse(BaseModel):
     id: int
     type: Literal["private", "group"]
     title: str | None
+    avatar_url: str | None = None
     created_by: int | None
     members: list[UserShort]
