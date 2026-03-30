@@ -76,15 +76,16 @@ def create_chat(
             .first()
         )
 
-        if existing_chat:
-            chat = db.query(Chat).filter(Chat.id == existing_chat.id).first()
-         return ChatResponse(
-                id=chat.id,
-                type=chat.type,
-                title=chat.title,
-                avatar_url=chat.avatar_url,
-                created_by=chat.created_by,
-            )
+if existing_private_chat:
+    chat = existing_private_chat
+
+    return ChatResponse(
+        id=chat.id,
+        type=chat.type,
+        title=chat.title,
+        avatar_url=chat.avatar_url,
+        created_by=chat.created_by,
+    )
 
     new_chat = Chat(
         type=chat_data.type,
