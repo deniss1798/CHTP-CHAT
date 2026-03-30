@@ -14,12 +14,14 @@ class ChatDetailScreen extends StatefulWidget {
   final int chatId;
   final String title;
   final String chatType;
+  final String? avatarUrl;
 
   const ChatDetailScreen({
     super.key,
     required this.chatId,
     required this.title,
     required this.chatType,
+      this.avatarUrl,
   });
 
   @override
@@ -48,6 +50,84 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   final Map<int, String> _memberNames = {};
 
   bool get _isGroupChat => widget.chatType == 'group';
+
+  String _buildInitials(String title) {
+    final parts =
+        title.split(' ').where((e) => e.trim().isNotEmpty).take(2).toList();
+
+    if (parts.isEmpty) return 'Ч';
+
+    if (parts.length == 1) {
+      final word = parts.first.trim();
+      return word.isNotEmpty ? word[0].toUpperCase() : 'Ч';
+    }
+
+    final first = parts[0].trim();
+    final second = parts[1].trim();
+
+    final firstChar = first.isNotEmpty ? first[0].toUpperCase() : '';
+    final secondChar = second.isNotEmpty ? second[0].toUpperCase() : '';
+
+    final result = '$firstChar$secondChar'.trim();
+    return result.isEmpty ? 'Ч' : result;
+  }
+
+  Widget _buildChatAvatar({
+    required String title,
+    required String? avatarUrl,
+    double size = 42,
+  }) {
+    final safeUrl = (avatarUrl ?? '').trim();
+
+    if (safeUrl.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Image.network(
+          safeUrl,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) {
+            return Container(
+              width: size,
+              height: size,
+              decoration: BoxDecoration(
+                color: AppColors.accent,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                _buildInitials(title),
+                style: const TextStyle(
+                  color: Colors.black,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    }
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: AppColors.accent,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        _buildInitials(title),
+        style: const TextStyle(
+          color: Colors.black,
+          fontSize: 14,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -818,17 +898,30 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       ),
                     ),
                     Expanded(
-                      child: Text(
-                        widget.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
+                      Expanded(
+  child: Row(
+    children: [
+      _buildChatAvatar(
+        title: widget.title,
+        avatarUrl: widget.avatarUrl,
+        size: 42,
+      ),
+      const SizedBox(width: 12),
+      Expanded(
+        child: Text(
+          widget.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    ],
+  ),
+),
                     if (_isGroupChat)
                       IconButton(
                         tooltip: 'Добавить участника',

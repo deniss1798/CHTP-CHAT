@@ -166,25 +166,27 @@ class _ChatsScreenState extends State<ChatsScreen> {
     );
   }
 
-Future<void> _openChat({
-  required int chatId,
-  required String title,
-  required String chatType,
-}) async {
-  final result = await Navigator.of(context).push<bool>(
-    MaterialPageRoute(
-      builder: (_) => ChatDetailScreen(
-        chatId: chatId,
-        title: title,
-        chatType: chatType,
+  Future<void> _openChat({
+    required int chatId,
+    required String title,
+    required String chatType,
+    String? avatarUrl,
+  }) async {
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => ChatDetailScreen(
+          chatId: chatId,
+          title: title,
+          chatType: chatType,
+          avatarUrl: avatarUrl,
+        ),
       ),
-    ),
-  );
+    );
 
-  if (result == true) {
-    await _loadChats();
+    if (result == true) {
+      await _loadChats();
+    }
   }
-}
 
   Future<void> _openCreateChatSheet() async {
     final result = await showModalBottomSheet<String>(
@@ -260,11 +262,12 @@ Future<void> _openChat({
       }
 
       if (chatId != null) {
-       await _openChat(
-  chatId: chatId,
-  title: chatTitle,
-  chatType: 'private',
-);
+        await _openChat(
+          chatId: chatId,
+          title: chatTitle,
+          chatType: 'private',
+          avatarUrl: null,
+        );
       }
     }
 
@@ -288,11 +291,12 @@ Future<void> _openChat({
       }
 
       if (chatId != null) {
-       await _openChat(
-  chatId: chatId,
-  title: chatTitle,
-  chatType: 'group',
-);
+        await _openChat(
+          chatId: chatId,
+          title: chatTitle,
+          chatType: 'group',
+          avatarUrl: null,
+        );
       }
     }
   }
@@ -324,6 +328,21 @@ Future<void> _openChat({
 
     final id = chat['id'] ?? chat['chat_id'];
     return 'Чат ${id ?? ''}'.trim();
+  }
+
+  String? _chatAvatarUrl(Map<String, dynamic> chat) {
+    final possible = [
+      chat['avatar_url'],
+      chat['avatarUrl'],
+    ];
+
+    for (final value in possible) {
+      if (value != null && value.toString().trim().isNotEmpty) {
+        return value.toString().trim();
+      }
+    }
+
+    return null;
   }
 
   String _lastMessage(Map<String, dynamic> chat) {
@@ -410,6 +429,63 @@ Future<void> _openChat({
     return result.isEmpty ? 'Ч' : result;
   }
 
+  Widget _buildChatAvatar({
+    required String title,
+    required String? avatarUrl,
+    double size = 62,
+  }) {
+    final safeUrl = (avatarUrl ?? '').trim();
+
+    if (safeUrl.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Image.network(
+          safeUrl,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) {
+            return Container(
+              width: size,
+              height: size,
+              decoration: BoxDecoration(
+                color: AppColors.accent,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                _initials(title),
+                style: const TextStyle(
+                  color: Colors.black,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    }
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: AppColors.accent,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        _initials(title),
+        style: const TextStyle(
+          color: Colors.black,
+          fontSize: 18,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+
   Widget _buildBody() {
     if (_isLoading) {
       return const Center(
@@ -468,7 +544,7 @@ Future<void> _openChat({
         itemBuilder: (context, index) {
           final chat = _filteredChats[index];
           final title = _chatTitle(chat);
-          final initials = _initials(title);
+          final avatarUrl = _chatAvatarUrl(chat);
           final unreadCount = _unreadCount(chat);
           final lastMessage = _lastMessage(chat);
           final timeText = _timeText(chat);
@@ -491,7 +567,7 @@ Future<void> _openChat({
                       chatId: chatId!,
                       title: title,
                       chatType: (chat['type'] ?? '').toString(),
-
+                      avatarUrl: avatarUrl,
                     ),
             child: Container(
               padding: const EdgeInsets.all(14),
@@ -519,22 +595,10 @@ Future<void> _openChat({
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 62,
-                    height: 62,
-                    decoration: BoxDecoration(
-                      color: AppColors.accent,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      initials,
-                      style: const TextStyle(
-                        color: Colors.black,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
+                  _buildChatAvatar(
+                    title: title,
+                    avatarUrl: avatarUrl,
+                    size: 62,
                   ),
                   const SizedBox(width: 14),
                   Expanded(

@@ -61,32 +61,40 @@ class ChatsService {
       }
 
       if (type == 'private') {
-        try {
-          final detailResponse = await _dio.get(
-            '/chats/$chatId',
-            options: options,
-          );
+try {
+    final detailResponse = await _dio.get(
+      '/chats/$chatId',
+      options: options,
+    );
 
-          final detailData = detailResponse.data;
+    final detailData = detailResponse.data;
 
-          if (detailData is Map<String, dynamic>) {
-            final otherUser = detailData['other_user'];
+    if (detailData is Map<String, dynamic>) {
+      final title = (detailData['title'] ?? '').toString().trim();
+      final avatarUrl = (detailData['avatar_url'] ?? '').toString().trim();
 
-            if (otherUser is Map<String, dynamic>) {
-              final username = (otherUser['username'] ?? '').toString().trim();
-              if (username.isNotEmpty) {
-                enriched['display_name'] = username;
-              }
-            } else if (otherUser is Map) {
-              final map = Map<String, dynamic>.from(otherUser);
-              final username = (map['username'] ?? '').toString().trim();
-              if (username.isNotEmpty) {
-                enriched['display_name'] = username;
-              }
-            }
-          }
-        } catch (_) {}
+      if (title.isNotEmpty) {
+        enriched['display_name'] = title;
       }
+
+      if (avatarUrl.isNotEmpty) {
+        enriched['avatar_url'] = avatarUrl;
+      }
+    } else if (detailData is Map) {
+      final map = Map<String, dynamic>.from(detailData);
+      final title = (map['title'] ?? '').toString().trim();
+      final avatarUrl = (map['avatar_url'] ?? '').toString().trim();
+
+      if (title.isNotEmpty) {
+        enriched['display_name'] = title;
+      }
+
+      if (avatarUrl.isNotEmpty) {
+        enriched['avatar_url'] = avatarUrl;
+      }
+    }
+  } catch (_) {}
+}
 
       try {
         final messagesResponse = await _dio.get(
