@@ -59,7 +59,7 @@ def create_chat(
         member_ids = list(all_member_ids)
 
         existing_chat = (
-            db.query(Chat.id)
+            db.query(Chat)
             .join(ChatMember, ChatMember.chat_id == Chat.id)
             .filter(Chat.type == "private")
             .group_by(Chat.id)
@@ -76,20 +76,19 @@ def create_chat(
             .first()
         )
 
-if existing_private_chat:
-    chat = existing_private_chat
-
-    return ChatResponse(
-        id=chat.id,
-        type=chat.type,
-        title=chat.title,
-        avatar_url=chat.avatar_url,
-        created_by=chat.created_by,
-    )
+        if existing_chat:
+            return ChatResponse(
+                id=existing_chat.id,
+                type=existing_chat.type,
+                title=existing_chat.title,
+                avatar_url=existing_chat.avatar_url,
+                created_by=existing_chat.created_by,
+            )
 
     new_chat = Chat(
         type=chat_data.type,
         title=chat_data.title.strip() if chat_data.title else None,
+        avatar_url=None,
         created_by=current_user.id,
     )
 
