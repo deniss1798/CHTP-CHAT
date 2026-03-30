@@ -10,10 +10,22 @@ from app.api.users_router import router as users_router
 from app.api.ws_router import router as ws_router
 from app.core.config import get_settings
 from app.db.database import engine
+from pathlib import Path
+from fastapi.staticfiles import StaticFiles
 
 settings = get_settings()
 
 app = FastAPI(title=settings.app_name)
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+MEDIA_DIR = BASE_DIR / "media"
+
+MEDIA_DIR.mkdir(parents=True, exist_ok=True)
+(MEDIA_DIR / "avatars").mkdir(parents=True, exist_ok=True)
+(MEDIA_DIR / "avatars" / "users").mkdir(parents=True, exist_ok=True)
+(MEDIA_DIR / "avatars" / "chats").mkdir(parents=True, exist_ok=True)
+
+app.mount("/media", StaticFiles(directory=str(MEDIA_DIR)), name="media")
 
 origins = [item.strip() for item in settings.cors_origins.split(",") if item.strip()]
 

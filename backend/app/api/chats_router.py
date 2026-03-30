@@ -7,6 +7,10 @@ from app.db.database import get_db
 from app.models.chat import Chat
 from app.models.chat_member import ChatMember
 from app.models.user import User
+import os
+import uuid
+from pathlib import Path
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from app.schemas.chat_schema import (
     ChatCreate,
     ChatDetailResponse,
@@ -17,6 +21,18 @@ from app.schemas.chat_schema import (
 )
 
 router = APIRouter(prefix="/chats", tags=["Chats"])
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+MEDIA_DIR = BASE_DIR / "media"
+CHAT_AVATARS_DIR = MEDIA_DIR / "avatars" / "chats"
+
+ALLOWED_IMAGE_TYPES = {
+    "image/jpeg": ".jpg",
+    "image/jpg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+}
+
+MAX_AVATAR_SIZE = 5 * 1024 * 1024  # 5 MB
 
 
 @router.post("/", response_model=ChatResponse)
@@ -268,6 +284,120 @@ def get_chat_members(
         for user, role in members
     ]
 
+
+@router.patch("/{chat_id}/avatar", response_model=ChatDetailResponse)
+async def upload_chat_avatar(
+    chat_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    chat = db.query(Chat).filter(Chat.id == chat_id).first()
+
+    if not chat:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Chat not found",
+        )
+
+    if chat.type != "group":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Avatar can be changed only for group chats",
+        )
+
+    membership = (
+        db.query(ChatMember)
+        .filter(
+            ChatMember.chat_id == chat_id,
+            ChatMember.user_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not membership:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not a member of this chat",
+        )
+
+    if membership.role != "owner":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only group owner can change avatar",
+        )
+
+    if not file.content_type or file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only JPG, PNG and WEBP images are allowed",
+        )
+
+    content = await file.read()
+
+    if not content:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Empty file",
+        )
+
+    if len(content) > MAX_AVATAR_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File is too large. Max size is 5 MB",
+        )
+
+    CHAT_AVATARS_DIR.mkdir(parents=True, exist_ok=True)
+
+    extension = ALLOWED_IMAGE_TYPES[file.content_type]
+    filename = f"chat_{chat.id}_{uuid.uuid4().hex}{extension}"
+    file_path = CHAT_AVATARS_DIR / filename
+
+    with open(file_path, "wb") as buffer:
+        buffer.write(content)
+
+    old_avatar_url = chat.avatar_url
+    chat.avatar_url = f"/media/avatars/chats/{filename}"
+
+    db.add(chat)
+    db.commit()
+    db.refresh(chat)
+
+    if old_avatar_url and old_avatar_url.startswith("/media/avatars/chats/"):
+        old_name = old_avatar_url.replace("/media/avatars/chats/", "").strip()
+        old_path = CHAT_AVATARS_DIR / old_name
+        if old_path.exists():
+            try:
+                os.remove(old_path)
+            except OSError:
+                pass
+
+    users = (
+        db.query(User)
+        .join(ChatMember, ChatMember.user_id == User.id)
+        .filter(ChatMember.chat_id == chat_id)
+        .order_by(User.username.asc())
+        .all()
+    )
+
+    members = [
+        UserShort(
+            id=user.id,
+            username=user.username,
+            email=user.email,
+            avatar_url=user.avatar_url,
+        )
+        for user in users
+    ]
+
+    return ChatDetailResponse(
+        id=chat.id,
+        type=chat.type,
+        title=chat.title,
+        avatar_url=chat.avatar_url,
+        created_by=chat.created_by,
+        members=members,
+    )
 
 @router.post("/{chat_id}/members", response_model=ChatMemberResponse)
 def add_chat_member(
