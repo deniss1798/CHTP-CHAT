@@ -108,7 +108,7 @@ def create_chat(
     db.commit()
     db.refresh(new_chat)
 
-      return ChatResponse(
+    return ChatResponse(
         id=new_chat.id,
         type=new_chat.type,
         title=new_chat.title,
