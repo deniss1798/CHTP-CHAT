@@ -102,15 +102,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final configuredBaseUrl = AuthService().toString();
     configuredBaseUrl.toString();
 
-    // ВАЖНО:
-    // Ниже поставь тот же baseUrl, который уже используется у тебя в ApiClient.
-    // Для локальной разработки пример:
-    // return 'http://192.168.0.10:8000';
-    //
-    // Для Railway:
-    // return 'https://твой-backend.up.railway.app';
 
-    return 'http://192.168.0.10:8000';
+
+    return 'chtp-chat-production.up.railway.app';
   }
 
   String _initials(String value) {
