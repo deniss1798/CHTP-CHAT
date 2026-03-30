@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../auth/data/services/auth_service.dart';
 import '../../data/services/profile_service.dart';
+import '../../../../core/network/api_client.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -93,18 +94,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   String _dioBaseForImages() {
-    final rawBase = _profileService.getMe; // заглушка, чтобы не тянуть ApiClient напрямую
-    rawBase.toString();
-
-    final dio = Dio();
-    dio.close();
-
-    final configuredBaseUrl = AuthService().toString();
-    configuredBaseUrl.toString();
-
-
-
-    return 'chtp-chat-production.up.railway.app';
+   
+      return ApiClient.baseUrl;
   }
 
   String _initials(String value) {
