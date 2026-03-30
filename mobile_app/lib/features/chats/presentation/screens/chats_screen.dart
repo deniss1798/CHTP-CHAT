@@ -9,6 +9,7 @@ import '../../data/services/chats_service.dart';
 import 'chat_detail_screen.dart';
 import 'group_chat_create_screen.dart';
 import 'user_picker_screen.dart';
+import '../../../profile/presentation/screens/profile_screen.dart';
 
 class ChatsScreen extends StatefulWidget {
   const ChatsScreen({super.key});
@@ -717,36 +718,62 @@ class _ChatsScreenState extends State<ChatsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
-                          children: [
-                            const Expanded(
-                              child: Text(
-                                'ЧТП',
-                                style: TextStyle(
-                                  color: AppColors.accent,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 4,
-                                ),
-                              ),
-                            ),
-                            Container(
-                              decoration: BoxDecoration(
-                                color: AppColors.surface.withAlpha(180),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: AppColors.accentBorder.withAlpha(120),
-                                ),
-                              ),
-                              child: IconButton(
-                                onPressed: () => _logout(context),
-                                icon: const Icon(
-                                  Icons.logout,
-                                  color: AppColors.accent,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+  children: [
+    const Expanded(
+      child: Text(
+        'ЧТП',
+        style: TextStyle(
+          color: AppColors.accent,
+          fontSize: 16,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 4,
+        ),
+      ),
+    ),
+    Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface.withAlpha(180),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.accentBorder.withAlpha(120),
+        ),
+      ),
+      child: IconButton(
+        onPressed: () async {
+          await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const ProfileScreen(),
+            ),
+          );
+
+          if (!mounted) return;
+          await _loadChats(silent: true);
+        },
+        icon: const Icon(
+          Icons.person_outline,
+          color: AppColors.accent,
+        ),
+      ),
+    ),
+    const SizedBox(width: 10),
+    Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface.withAlpha(180),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.accentBorder.withAlpha(120),
+        ),
+      ),
+      child: IconButton(
+        onPressed: () => _logout(context),
+        icon: const Icon(
+          Icons.logout,
+          color: AppColors.accent,
+        ),
+      ),
+    ),
+  ],
+),
                         const SizedBox(height: 10),
                         const Text(
                           'Сообщения',
