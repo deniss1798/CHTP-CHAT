@@ -478,5 +478,6 @@ def add_chat_member(
         id=user_to_add.id,
         username=user_to_add.username,
         email=user_to_add.email,
+        avatar_url=user_to_add.avatar_url,
         role="member",
     )
