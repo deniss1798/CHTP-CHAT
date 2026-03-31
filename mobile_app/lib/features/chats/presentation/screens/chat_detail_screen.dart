@@ -49,10 +49,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   int? _currentUserId;
   List<Map<String, dynamic>> _messages = [];
-  final Map<int, String> _memberNames = {};
 
   String _chatTitle = '';
   String? _chatAvatarUrl;
+
+  final Map<int, String> _memberNames = {};
+  final Map<int, String?> _memberAvatarUrls = {};
 
   bool get _isGroupChat => widget.chatType == 'group';
 
@@ -105,7 +107,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     return '${ApiClient.baseUrl}$raw';
   }
 
-  Widget _buildChatAvatar({
+  Widget _buildSquareAvatar({
     required String title,
     required String? avatarUrl,
     double size = 42,
@@ -156,6 +158,62 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         style: const TextStyle(
           color: Colors.black,
           fontSize: 14,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCircleAvatar({
+    required String title,
+    required String? avatarUrl,
+    double size = 34,
+  }) {
+    final safeUrl = _normalizedAvatarUrl(avatarUrl);
+
+    if (safeUrl != null && safeUrl.isNotEmpty) {
+      return ClipOval(
+        child: Image.network(
+          safeUrl,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) {
+            return Container(
+              width: size,
+              height: size,
+              decoration: const BoxDecoration(
+                color: AppColors.accent,
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                _buildInitials(title),
+                style: const TextStyle(
+                  color: Colors.black,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    }
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: const BoxDecoration(
+        color: AppColors.accent,
+        shape: BoxShape.circle,
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        _buildInitials(title),
+        style: const TextStyle(
+          color: Colors.black,
+          fontSize: 12,
           fontWeight: FontWeight.w800,
         ),
       ),
@@ -257,12 +315,14 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
     if (data is List) {
       _memberNames.clear();
+      _memberAvatarUrls.clear();
 
       for (final item in data) {
         if (item is Map) {
           final map = Map<String, dynamic>.from(item);
           final rawId = map['id'];
           final username = (map['username'] ?? '').toString().trim();
+          final rawAvatar = (map['avatar_url'] ?? '').toString().trim();
 
           int? userId;
           if (rawId is int) {
@@ -271,8 +331,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             userId = int.tryParse(rawId.toString());
           }
 
-          if (userId != null && username.isNotEmpty) {
-            _memberNames[userId] = username;
+          if (userId != null) {
+            if (username.isNotEmpty) {
+              _memberNames[userId] = username;
+            }
+            _memberAvatarUrls[userId] = rawAvatar.isNotEmpty ? rawAvatar : null;
           }
         }
       }
@@ -571,6 +634,20 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     return _memberNames[senderId] ?? 'Пользователь';
   }
 
+  String? _senderAvatarUrl(Map<String, dynamic> message) {
+    final rawSenderId = message['sender_id'];
+
+    int? senderId;
+    if (rawSenderId is int) {
+      senderId = rawSenderId;
+    } else {
+      senderId = int.tryParse(rawSenderId.toString());
+    }
+
+    if (senderId == null) return null;
+    return _memberAvatarUrls[senderId];
+  }
+
   String _formatTime(String? raw) {
     if (raw == null || raw.trim().isEmpty) return '';
 
@@ -642,91 +719,115 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     final time = _formatTime(message['created_at']?.toString());
     final isUpdated = message['is_updated'] == true;
     final senderName = _senderName(message);
+    final senderAvatarUrl = _senderAvatarUrl(message);
+
+    final bubble = Container(
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.of(context).size.width * 0.70,
+      ),
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: isMine ? AppColors.accent : AppColors.surface,
+        borderRadius: BorderRadius.only(
+          topLeft: const Radius.circular(20),
+          topRight: const Radius.circular(20),
+          bottomLeft: Radius.circular(isMine ? 20 : 8),
+          bottomRight: Radius.circular(isMine ? 8 : 20),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isMine
+                ? AppColors.accent.withAlpha(28)
+                : Colors.black.withAlpha(18),
+            blurRadius: 16,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment:
+            isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          if (_isGroupChat && !isMine)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Text(
+                senderName,
+                style: const TextStyle(
+                  color: AppColors.accent,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          Text(
+            text,
+            style: TextStyle(
+              color: isMine ? Colors.black : AppColors.textPrimary,
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (isUpdated)
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: Text(
+                    'изменено',
+                    style: TextStyle(
+                      color: isMine
+                          ? Colors.black.withAlpha(160)
+                          : AppColors.textMuted,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              Text(
+                time,
+                style: TextStyle(
+                  color: isMine
+                      ? Colors.black.withAlpha(170)
+                      : AppColors.textMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+
+    if (_isGroupChat && !isMine) {
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(right: 8, bottom: 6),
+              child: _buildCircleAvatar(
+                title: senderName,
+                avatarUrl: senderAvatarUrl,
+                size: 34,
+              ),
+            ),
+            Flexible(child: bubble),
+          ],
+        ),
+      );
+    }
 
     return Align(
       alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.74,
-        ),
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: isMine ? AppColors.accent : AppColors.surface,
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(20),
-            topRight: const Radius.circular(20),
-            bottomLeft: Radius.circular(isMine ? 20 : 8),
-            bottomRight: Radius.circular(isMine ? 8 : 20),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: isMine
-                  ? AppColors.accent.withAlpha(28)
-                  : Colors.black.withAlpha(18),
-              blurRadius: 16,
-              spreadRadius: 1,
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment:
-              isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-          children: [
-            if (_isGroupChat && !isMine)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Text(
-                  senderName,
-                  style: const TextStyle(
-                    color: AppColors.accent,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            Text(
-              text,
-              style: TextStyle(
-                color: isMine ? Colors.black : AppColors.textPrimary,
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                height: 1.35,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (isUpdated)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: Text(
-                      'изменено',
-                      style: TextStyle(
-                        color: isMine
-                            ? Colors.black.withAlpha(160)
-                            : AppColors.textMuted,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                Text(
-                  time,
-                  style: TextStyle(
-                    color: isMine
-                        ? Colors.black.withAlpha(170)
-                        : AppColors.textMuted,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
+      child: bubble,
     );
   }
 
@@ -964,7 +1065,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     Expanded(
                       child: Row(
                         children: [
-                          _buildChatAvatar(
+                          _buildSquareAvatar(
                             title: visibleTitle,
                             avatarUrl: _chatAvatarUrl,
                             size: 42,
