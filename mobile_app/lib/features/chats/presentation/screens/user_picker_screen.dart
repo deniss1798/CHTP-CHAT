@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+
 import '../../../../app/theme/app_colors.dart';
+import '../../../../core/network/api_client.dart';
 import '../../data/services/create_chat_service.dart';
 import '../../data/services/users_service.dart';
 
@@ -93,6 +95,105 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
         }).toList();
       }
     });
+  }
+
+  String _initials(String title) {
+    final parts =
+        title.split(' ').where((e) => e.trim().isNotEmpty).take(2).toList();
+
+    if (parts.isEmpty) return '?';
+
+    if (parts.length == 1) {
+      final word = parts.first.trim();
+      return word.isNotEmpty ? word[0].toUpperCase() : '?';
+    }
+
+    final first = parts[0].trim();
+    final second = parts[1].trim();
+
+    final firstChar = first.isNotEmpty ? first[0].toUpperCase() : '';
+    final secondChar = second.isNotEmpty ? second[0].toUpperCase() : '';
+
+    final result = '$firstChar$secondChar'.trim();
+    return result.isEmpty ? '?' : result;
+  }
+
+  String? _userAvatarUrl(Map<String, dynamic> user) {
+    final possible = [
+      user['avatar_url'],
+      user['avatarUrl'],
+    ];
+
+    for (final value in possible) {
+      if (value != null && value.toString().trim().isNotEmpty) {
+        final raw = value.toString().trim();
+
+        if (raw.startsWith('http://') || raw.startsWith('https://')) {
+          return raw;
+        }
+
+        return '${ApiClient.baseUrl}$raw';
+      }
+    }
+
+    return null;
+  }
+
+  Widget _buildUserAvatar({
+    required String title,
+    required String? avatarUrl,
+    double size = 54,
+  }) {
+    final safeUrl = (avatarUrl ?? '').trim();
+
+    if (safeUrl.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: Image.network(
+          safeUrl,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) {
+            return Container(
+              width: size,
+              height: size,
+              decoration: BoxDecoration(
+                color: AppColors.accent,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                _initials(title),
+                style: const TextStyle(
+                  color: Colors.black,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    }
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: AppColors.accent,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        _initials(title),
+        style: const TextStyle(
+          color: Colors.black,
+          fontSize: 18,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
   }
 
   Future<void> _createPrivateChat(Map<String, dynamic> user) async {
@@ -216,6 +317,7 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
         final user = _filteredUsers[index];
         final username = (user['username'] ?? '').toString();
         final email = (user['email'] ?? '').toString();
+        final avatarUrl = _userAvatarUrl(user);
 
         return GestureDetector(
           onTap: _isCreating ? null : () => _createPrivateChat(user),
@@ -230,22 +332,10 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
             ),
             child: Row(
               children: [
-                Container(
-                  width: 54,
-                  height: 54,
-                  decoration: BoxDecoration(
-                    color: AppColors.accent,
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    username.isNotEmpty ? username[0].toUpperCase() : '?',
-                    style: const TextStyle(
-                      color: Colors.black,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
+                _buildUserAvatar(
+                  title: username,
+                  avatarUrl: avatarUrl,
+                  size: 54,
                 ),
                 const SizedBox(width: 14),
                 Expanded(

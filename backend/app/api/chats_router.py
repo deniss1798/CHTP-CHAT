@@ -32,7 +32,7 @@ ALLOWED_IMAGE_TYPES = {
     "image/webp": ".webp",
 }
 
-MAX_AVATAR_SIZE = 5 * 1024 * 1024  # 5 MB
+MAX_AVATAR_SIZE = 5 * 1024 * 1024
 
 
 @router.post("/", response_model=ChatResponse)
