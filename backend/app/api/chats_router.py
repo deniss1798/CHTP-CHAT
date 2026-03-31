@@ -275,14 +275,15 @@ def get_chat_members(
     )
 
     return [
-        ChatMemberResponse(
-            id=user.id,
-            username=user.username,
-            email=user.email,
-            role=role,
-        )
-        for user, role in members
-    ]
+    ChatMemberResponse(
+        id=user.id,
+        username=user.username,
+        email=user.email,
+        avatar_url=user.avatar_url,
+        role=role,
+    )
+    for user, role in members
+]
 
 
 @router.patch("/{chat_id}/avatar", response_model=ChatDetailResponse)

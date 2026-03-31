@@ -1,15 +1,18 @@
 import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+
 import '../../../../app/theme/app_colors.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/secure_storage_service.dart';
 import '../../../auth/data/services/auth_service.dart';
 import '../../../auth/presentation/screens/auth_screen.dart';
+import '../../../profile/presentation/screens/profile_screen.dart';
 import '../../data/services/chats_service.dart';
 import 'chat_detail_screen.dart';
 import 'group_chat_create_screen.dart';
 import 'user_picker_screen.dart';
-import '../../../profile/presentation/screens/profile_screen.dart';
 
 class ChatsScreen extends StatefulWidget {
   const ChatsScreen({super.key});
@@ -339,7 +342,13 @@ class _ChatsScreenState extends State<ChatsScreen> {
 
     for (final value in possible) {
       if (value != null && value.toString().trim().isNotEmpty) {
-        return value.toString().trim();
+        final raw = value.toString().trim();
+
+        if (raw.startsWith('http://') || raw.startsWith('https://')) {
+          return raw;
+        }
+
+        return '${ApiClient.baseUrl}$raw';
       }
     }
 
@@ -718,62 +727,62 @@ class _ChatsScreenState extends State<ChatsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
-  children: [
-    const Expanded(
-      child: Text(
-        'ЧТП',
-        style: TextStyle(
-          color: AppColors.accent,
-          fontSize: 16,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 4,
-        ),
-      ),
-    ),
-    Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface.withAlpha(180),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppColors.accentBorder.withAlpha(120),
-        ),
-      ),
-      child: IconButton(
-        onPressed: () async {
-          await Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => const ProfileScreen(),
-            ),
-          );
+                          children: [
+                            const Expanded(
+                              child: Text(
+                                'ЧТП',
+                                style: TextStyle(
+                                  color: AppColors.accent,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 4,
+                                ),
+                              ),
+                            ),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: AppColors.surface.withAlpha(180),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: AppColors.accentBorder.withAlpha(120),
+                                ),
+                              ),
+                              child: IconButton(
+                                onPressed: () async {
+                                  await Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => const ProfileScreen(),
+                                    ),
+                                  );
 
-          if (!mounted) return;
-          await _loadChats(silent: true);
-        },
-        icon: const Icon(
-          Icons.person_outline,
-          color: AppColors.accent,
-        ),
-      ),
-    ),
-    const SizedBox(width: 10),
-    Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface.withAlpha(180),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppColors.accentBorder.withAlpha(120),
-        ),
-      ),
-      child: IconButton(
-        onPressed: () => _logout(context),
-        icon: const Icon(
-          Icons.logout,
-          color: AppColors.accent,
-        ),
-      ),
-    ),
-  ],
-),
+                                  if (!mounted) return;
+                                  await _loadChats(silent: true);
+                                },
+                                icon: const Icon(
+                                  Icons.person_outline,
+                                  color: AppColors.accent,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: AppColors.surface.withAlpha(180),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: AppColors.accentBorder.withAlpha(120),
+                                ),
+                              ),
+                              child: IconButton(
+                                onPressed: () => _logout(context),
+                                icon: const Icon(
+                                  Icons.logout,
+                                  color: AppColors.accent,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                         const SizedBox(height: 10),
                         const Text(
                           'Сообщения',

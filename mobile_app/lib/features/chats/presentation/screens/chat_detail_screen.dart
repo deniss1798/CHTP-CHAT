@@ -1,6 +1,8 @@
 import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/secure_storage_service.dart';
@@ -21,7 +23,7 @@ class ChatDetailScreen extends StatefulWidget {
     required this.chatId,
     required this.title,
     required this.chatType,
-      this.avatarUrl,
+    this.avatarUrl,
   });
 
   @override
@@ -49,7 +51,27 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   List<Map<String, dynamic>> _messages = [];
   final Map<int, String> _memberNames = {};
 
+  String _chatTitle = '';
+  String? _chatAvatarUrl;
+
   bool get _isGroupChat => widget.chatType == 'group';
+
+  @override
+  void initState() {
+    super.initState();
+    _chatTitle = widget.title;
+    _chatAvatarUrl = widget.avatarUrl;
+    _initChat();
+  }
+
+  @override
+  void dispose() {
+    _socketSubscription?.cancel();
+    _chatSocketService.dispose();
+    _messageController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   String _buildInitials(String title) {
     final parts =
@@ -72,14 +94,25 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     return result.isEmpty ? 'Ч' : result;
   }
 
+  String? _normalizedAvatarUrl(String? avatarUrl) {
+    final raw = (avatarUrl ?? '').trim();
+    if (raw.isEmpty) return null;
+
+    if (raw.startsWith('http://') || raw.startsWith('https://')) {
+      return raw;
+    }
+
+    return '${ApiClient.baseUrl}$raw';
+  }
+
   Widget _buildChatAvatar({
     required String title,
     required String? avatarUrl,
     double size = 42,
   }) {
-    final safeUrl = (avatarUrl ?? '').trim();
+    final safeUrl = _normalizedAvatarUrl(avatarUrl);
 
-    if (safeUrl.isNotEmpty) {
+    if (safeUrl != null && safeUrl.isNotEmpty) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(14),
         child: Image.network(
@@ -129,21 +162,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     );
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _initChat();
-  }
-
-  @override
-  void dispose() {
-    _socketSubscription?.cancel();
-    _chatSocketService.dispose();
-    _messageController.dispose();
-    _scrollController.dispose();
-    super.dispose();
-  }
-
   Future<void> _initChat() async {
     setState(() {
       _isLoading = true;
@@ -160,6 +178,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         _currentUserId = int.tryParse(userId.toString());
       }
 
+      await _loadChatDetails();
+
       if (_isGroupChat) {
         await _loadChatMembers();
       }
@@ -174,6 +194,47 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  Future<void> _loadChatDetails() async {
+    final token = await SecureStorageService.getAccessToken();
+
+    if (token == null || token.isEmpty) {
+      throw Exception('Токен не найден');
+    }
+
+    final response = await _dio.get(
+      '/chats/${widget.chatId}',
+      options: Options(
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      ),
+    );
+
+    final data = response.data;
+
+    Map<String, dynamic>? map;
+
+    if (data is Map<String, dynamic>) {
+      map = data;
+    } else if (data is Map) {
+      map = Map<String, dynamic>.from(data);
+    }
+
+    if (map == null) return;
+
+    final title = (map['title'] ?? '').toString().trim();
+    final avatarUrl = (map['avatar_url'] ?? '').toString().trim();
+
+    if (!mounted) return;
+
+    setState(() {
+      if (title.isNotEmpty) {
+        _chatTitle = title;
+      }
+      _chatAvatarUrl = avatarUrl.isNotEmpty ? avatarUrl : null;
+    });
   }
 
   Future<void> _loadChatMembers() async {
@@ -232,6 +293,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
     try {
       await _loadChatMembers();
+      await _loadChatDetails();
 
       if (!mounted) return;
 
@@ -861,6 +923,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final visibleTitle = _chatTitle.trim().isNotEmpty ? _chatTitle : widget.title;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Container(
@@ -897,31 +961,30 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                         color: AppColors.textPrimary,
                       ),
                     ),
-                   
-                      Expanded(
-  child: Row(
-    children: [
-      _buildChatAvatar(
-        title: widget.title,
-        avatarUrl: widget.avatarUrl,
-        size: 42,
-      ),
-      const SizedBox(width: 12),
-      Expanded(
-        child: Text(
-          widget.title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      ),
-    ],
-  ),
-),
+                    Expanded(
+                      child: Row(
+                        children: [
+                          _buildChatAvatar(
+                            title: visibleTitle,
+                            avatarUrl: _chatAvatarUrl,
+                            size: 42,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              visibleTitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: AppColors.textPrimary,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                     if (_isGroupChat)
                       IconButton(
                         tooltip: 'Добавить участника',
