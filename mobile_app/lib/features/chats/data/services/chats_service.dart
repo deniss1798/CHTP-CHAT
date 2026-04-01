@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/secure_storage_service.dart';
+import '../../../../core/network/url_helper.dart';
 
 class ChatsService {
   final Dio _dio = ApiClient.dio;
@@ -50,16 +51,34 @@ class ChatsService {
     return chats;
   }
 
-  Map<String, dynamic> _normalizeChat(Map<String, dynamic> raw) {
-    final chat = Map<String, dynamic>.from(raw);
+  String? _normalizeAvatarUrl(dynamic value) {
+  if (value == null) return null;
 
-    chat['last_message'] = raw['last_message'];
-    chat['last_message_at'] = raw['last_message_at'];
-    chat['last_message_sender_id'] = raw['last_message_sender_id'];
-    chat['unread_count'] = raw['unread_count'] ?? 0;
+  final raw = value.toString().trim();
+  if (raw.isEmpty) return null;
 
-    return chat;
+  if (raw.startsWith('http://') || raw.startsWith('https://')) {
+    return raw;
   }
+
+  if (raw.startsWith('/')) {
+    return '${ApiClient.baseUrl}$raw';
+  }
+
+  return '${ApiClient.baseUrl}/$raw';
+}
+
+  Map<String, dynamic> _normalizeChat(Map<String, dynamic> raw) {
+  final chat = Map<String, dynamic>.from(raw);
+
+  chat['avatar_url'] = UrlHelper.absoluteMediaUrl(raw['avatar_url']);
+  chat['last_message'] = raw['last_message'];
+  chat['last_message_at'] = raw['last_message_at'];
+  chat['last_message_sender_id'] = raw['last_message_sender_id'];
+  chat['unread_count'] = raw['unread_count'] ?? 0;
+
+  return chat;
+}
 
   Future<Map<String, dynamic>> addMemberToChat({
     required int chatId,
