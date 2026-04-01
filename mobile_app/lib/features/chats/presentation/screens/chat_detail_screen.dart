@@ -11,6 +11,9 @@ import '../../data/services/chat_socket_service.dart';
 import '../../data/services/local_chat_state_service.dart';
 import '../../data/services/messages_service.dart';
 import 'chat_member_add_screen.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import '../../data/services/chat_avatar_service.dart';
 
 class ChatDetailScreen extends StatefulWidget {
   final int chatId;
@@ -36,6 +39,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   final ChatSocketService _chatSocketService = ChatSocketService();
   final LocalChatStateService _localChatStateService = LocalChatStateService();
   final Dio _dio = ApiClient.dio;
+  final ChatAvatarService _chatAvatarService = ChatAvatarService();
+  final ImagePicker _imagePicker = ImagePicker();
+
+  bool _isUploadingChatAvatar = false;
 
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -74,6 +81,63 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     _scrollController.dispose();
     super.dispose();
   }
+
+Future<void> _pickAndUploadChatAvatar() async {
+  if (!_isGroupChat || _isUploadingChatAvatar) return;
+
+  final picked = await _imagePicker.pickImage(
+    source: ImageSource.gallery,
+    imageQuality: 85,
+    maxWidth: 1600,
+  );
+
+  if (picked == null) return;
+
+  setState(() {
+    _isUploadingChatAvatar = true;
+  });
+
+  try {
+    final updated = await _chatAvatarService.uploadChatAvatar(
+      chatId: widget.chatId,
+      file: File(picked.path),
+    );
+
+    final rawAvatar = (updated['avatar_url'] ?? '').toString().trim();
+
+    if (!mounted) return;
+
+   setState(() {
+  _chatAvatarUrl = rawAvatar.isNotEmpty ? rawAvatar : null;
+  _isUploadingChatAvatar = false;
+});
+
+await _loadChatDetails();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Аватар группы обновлен'),
+      ),
+    );
+  } catch (e) {
+    if (!mounted) return;
+
+    setState(() {
+      _isUploadingChatAvatar = false;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          _extractErrorMessage(
+            e,
+            fallback: 'Не удалось обновить аватар группы',
+          ),
+        ),
+      ),
+    );
+  }
+}
 
   String _buildInitials(String title) {
     final parts =
@@ -1087,14 +1151,32 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       ),
                     ),
                     if (_isGroupChat)
-                      IconButton(
-                        tooltip: 'Добавить участника',
-                        onPressed: _openAddMemberScreen,
-                        icon: const Icon(
-                          Icons.person_add_alt_1_rounded,
-                          color: AppColors.accent,
-                        ),
-                      ),
+  IconButton(
+    tooltip: 'Изменить аватар группы',
+    onPressed: _isUploadingChatAvatar ? null : _pickAndUploadChatAvatar,
+    icon: _isUploadingChatAvatar
+        ? const SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: AppColors.accent,
+            ),
+          )
+        : const Icon(
+            Icons.photo_camera_outlined,
+            color: AppColors.accent,
+          ),
+  ),
+if (_isGroupChat)
+  IconButton(
+    tooltip: 'Добавить участника',
+    onPressed: _openAddMemberScreen,
+    icon: const Icon(
+      Icons.person_add_alt_1_rounded,
+      color: AppColors.accent,
+    ),
+  ),
                     _buildConnectionBadge(),
                   ],
                 ),

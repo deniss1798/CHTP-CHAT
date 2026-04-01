@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
@@ -25,9 +23,6 @@ class _ChatsScreenState extends State<ChatsScreen> {
   final ChatsService _chatsService = ChatsService();
   final AuthService _authService = AuthService();
   final TextEditingController _searchController = TextEditingController();
-
-  Timer? _pollingTimer;
-
   bool _isLoading = true;
   String? _error;
   int? _currentUserId;
@@ -44,42 +39,32 @@ class _ChatsScreenState extends State<ChatsScreen> {
 
   @override
   void dispose() {
-    _pollingTimer?.cancel();
+
     _searchController.dispose();
     super.dispose();
   }
 
-  Future<void> _init() async {
-    try {
-      final me = await _authService.getMe();
-      final rawId = me['id'];
+Future<void> _init() async {
+  try {
+    final me = await _authService.getMe();
+    final rawId = me['id'];
 
-      if (rawId is int) {
-        _currentUserId = rawId;
-      } else {
-        _currentUserId = int.tryParse(rawId.toString());
-      }
-
-      await _loadChats();
-      _startPolling();
-    } catch (_) {
-      if (!mounted) return;
-
-      setState(() {
-        _error = 'Не удалось инициализировать список чатов';
-        _isLoading = false;
-      });
+    if (rawId is int) {
+      _currentUserId = rawId;
+    } else {
+      _currentUserId = int.tryParse(rawId.toString());
     }
-  }
 
-  void _startPolling() {
-    _pollingTimer?.cancel();
+    await _loadChats();
+  } catch (_) {
+    if (!mounted) return;
 
-    _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
-      if (!mounted || _currentUserId == null) return;
-      await _loadChats(silent: true);
+    setState(() {
+      _error = 'Не удалось инициализировать список чатов';
+      _isLoading = false;
     });
   }
+}
 
   Future<void> _loadChats({bool silent = false}) async {
     if (_currentUserId == null) return;
@@ -159,7 +144,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
   }
 
   Future<void> _logout(BuildContext context) async {
-    _pollingTimer?.cancel();
+    
     await SecureStorageService.deleteAccessToken();
 
     if (!context.mounted) return;
@@ -356,22 +341,22 @@ class _ChatsScreenState extends State<ChatsScreen> {
   }
 
   String _lastMessage(Map<String, dynamic> chat) {
-    final possible = [
-      chat['last_message'],
-      chat['lastMessage'],
-      chat['message'],
-      chat['last_message_text'],
-      chat['content'],
-    ];
+  final possible = [
+    chat['last_message'],
+    chat['lastMessage'],
+    chat['message'],
+    chat['last_message_text'],
+    chat['content'],
+  ];
 
-    for (final value in possible) {
-      if (value != null && value.toString().trim().isNotEmpty) {
-        return value.toString().trim();
-      }
+  for (final value in possible) {
+    if (value != null && value.toString().trim().isNotEmpty) {
+      return value.toString().trim();
     }
-
-    return 'Сообщений пока нет';
   }
+
+  return chat['type'] == 'private' ? 'Личный чат' : 'Групповой чат';
+}
 
   String _timeText(Map<String, dynamic> chat) {
     final possible = [

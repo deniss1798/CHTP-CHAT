@@ -1,4 +1,5 @@
 from typing import Literal
+from datetime import datetime
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -30,6 +31,11 @@ class ChatResponse(BaseModel):
     avatar_url: str | None = None
     created_by: int | None
 
+    last_message: str | None = None
+    last_message_at: datetime | None = None
+    last_message_sender_id: int | None = None
+    unread_count: int = 0
+
     class Config:
         from_attributes = True
 
@@ -40,6 +46,7 @@ class ChatMemberResponse(BaseModel):
     email: EmailStr
     avatar_url: str | None = None
     role: str
+
 
 class ChatDetailResponse(BaseModel):
     id: int

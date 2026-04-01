@@ -3,6 +3,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 
 import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/secure_storage_service.dart';
+import '../../../../core/session/current_user_store.dart';
 
 class AuthService {
   final Dio _dio = ApiClient.dio;
@@ -66,6 +67,7 @@ class AuthService {
 
     await SecureStorageService.saveAccessToken(token);
     await _registerDeviceToken(token);
+    await getMe(forceRefresh: true);
   }
 
   Future<void> login({
@@ -96,6 +98,7 @@ class AuthService {
 
     await SecureStorageService.saveAccessToken(token);
     await _registerDeviceToken(token);
+    await getMe(forceRefresh: true);
   }
 
   Future<void> _registerDeviceToken(String accessToken) async {
@@ -141,32 +144,39 @@ class AuthService {
     });
   }
 
-  Future<Map<String, dynamic>> getMe() async {
-    final token = await SecureStorageService.getAccessToken();
-
-    if (token == null || token.isEmpty) {
-      throw Exception('Токен не найден');
-    }
-
-    final response = await _dio.get(
-      '/users/me',
-      options: Options(
-        headers: {
-          'Authorization': 'Bearer $token',
-        },
-      ),
-    );
-
-    final data = response.data;
-
-    if (data is Map<String, dynamic>) {
-      return data;
-    }
-
-    if (data is Map) {
-      return Map<String, dynamic>.from(data);
-    }
-
-    throw Exception('Неожиданный формат ответа /users/me');
+Future<Map<String, dynamic>> getMe({bool forceRefresh = false}) async {
+  if (!forceRefresh && CurrentUserStore.user != null) {
+    return CurrentUserStore.user!;
   }
+
+  final token = await SecureStorageService.getAccessToken();
+
+  if (token == null || token.isEmpty) {
+    throw Exception('Токен не найден');
+  }
+
+  final response = await _dio.get(
+    '/users/me',
+    options: Options(
+      headers: {
+        'Authorization': 'Bearer $token',
+      },
+    ),
+  );
+
+  final data = response.data;
+
+  if (data is Map<String, dynamic>) {
+    CurrentUserStore.setUser(data);
+    return data;
+  }
+
+  if (data is Map) {
+    final mapped = Map<String, dynamic>.from(data);
+    CurrentUserStore.setUser(mapped);
+    return mapped;
+  }
+
+  throw Exception('Неожиданный формат ответа /users/me');
+}
 }

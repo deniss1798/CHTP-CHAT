@@ -1,7 +1,13 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+
 import '../../../../app/theme/app_colors.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../auth/data/services/auth_service.dart';
+import '../../data/services/chat_avatar_service.dart';
 import '../../data/services/create_chat_service.dart';
 import '../../data/services/users_service.dart';
 
@@ -15,7 +21,9 @@ class GroupChatCreateScreen extends StatefulWidget {
 class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
   final UsersService _usersService = UsersService();
   final CreateChatService _createChatService = CreateChatService();
+  final ChatAvatarService _chatAvatarService = ChatAvatarService();
   final AuthService _authService = AuthService();
+  final ImagePicker _imagePicker = ImagePicker();
 
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
@@ -28,6 +36,8 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
   List<Map<String, dynamic>> _allUsers = [];
   List<Map<String, dynamic>> _filteredUsers = [];
   final Set<int> _selectedUserIds = <int>{};
+
+  File? _selectedAvatarFile;
 
   @override
   void initState() {
@@ -144,13 +154,170 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
 
     if (parsedUserId == null) return;
 
-    setState(() {
-      if (_selectedUserIds.contains(parsedUserId!)) {
-        _selectedUserIds.remove(parsedUserId);
-      } else {
-        _selectedUserIds.add(parsedUserId);
+final userId = parsedUserId;
+
+setState(() {
+  if (_selectedUserIds.contains(userId)) {
+    _selectedUserIds.remove(userId);
+  } else {
+    _selectedUserIds.add(userId);
+  }
+});
+  }
+
+  String _initials(String title) {
+    final parts =
+        title.split(' ').where((e) => e.trim().isNotEmpty).take(2).toList();
+
+    if (parts.isEmpty) return '?';
+
+    if (parts.length == 1) {
+      final word = parts.first.trim();
+      return word.isNotEmpty ? word[0].toUpperCase() : '?';
+    }
+
+    final first = parts[0].trim();
+    final second = parts[1].trim();
+
+    final firstChar = first.isNotEmpty ? first[0].toUpperCase() : '';
+    final secondChar = second.isNotEmpty ? second[0].toUpperCase() : '';
+
+    final result = '$firstChar$secondChar'.trim();
+    return result.isEmpty ? '?' : result;
+  }
+
+  String? _userAvatarUrl(Map<String, dynamic> user) {
+    final possible = [
+      user['avatar_url'],
+      user['avatarUrl'],
+    ];
+
+    for (final value in possible) {
+      if (value != null && value.toString().trim().isNotEmpty) {
+        final raw = value.toString().trim();
+
+        if (raw.startsWith('http://') || raw.startsWith('https://')) {
+          return raw;
+        }
+
+        return '${ApiClient.baseUrl}$raw';
       }
+    }
+
+    return null;
+  }
+
+  Widget _buildUserAvatar({
+    required String title,
+    required String? avatarUrl,
+    double size = 54,
+  }) {
+    final safeUrl = (avatarUrl ?? '').trim();
+
+    if (safeUrl.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: Image.network(
+          safeUrl,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) {
+            return Container(
+              width: size,
+              height: size,
+              decoration: BoxDecoration(
+                color: AppColors.accent,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                _initials(title),
+                style: const TextStyle(
+                  color: Colors.black,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    }
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: AppColors.accent,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        _initials(title),
+        style: const TextStyle(
+          color: Colors.black,
+          fontSize: 18,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickGroupAvatar() async {
+    final picked = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+      maxWidth: 1600,
+    );
+
+    if (picked == null) return;
+
+    setState(() {
+      _selectedAvatarFile = File(picked.path);
     });
+  }
+
+  void _removeGroupAvatar() {
+    setState(() {
+      _selectedAvatarFile = null;
+    });
+  }
+
+  Widget _buildGroupAvatarPreview() {
+    final title = _titleController.text.trim().isNotEmpty
+        ? _titleController.text.trim()
+        : 'Группа';
+
+    if (_selectedAvatarFile != null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: Image.file(
+          _selectedAvatarFile!,
+          width: 84,
+          height: 84,
+          fit: BoxFit.cover,
+        ),
+      );
+    }
+
+    return Container(
+      width: 84,
+      height: 84,
+      decoration: BoxDecoration(
+        color: AppColors.accent,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        _initials(title),
+        style: const TextStyle(
+          color: Colors.black,
+          fontSize: 26,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
   }
 
   Future<void> _createGroupChat() async {
@@ -187,6 +354,17 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
         chatId = rawChatId;
       } else {
         chatId = int.tryParse(rawChatId.toString());
+      }
+
+      if (chatId == null) {
+        throw Exception('Не удалось получить id созданной группы');
+      }
+
+      if (_selectedAvatarFile != null) {
+        await _chatAvatarService.uploadChatAvatar(
+          chatId: chatId,
+          file: _selectedAvatarFile!,
+        );
       }
 
       if (!mounted) return;
@@ -254,9 +432,41 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+          child: Column(
+            children: [
+              _buildGroupAvatarPreview(),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: _isCreating ? null : _pickGroupAvatar,
+                    icon: const Icon(Icons.photo_library_outlined),
+                    label: Text(
+                      _selectedAvatarFile == null
+                          ? 'Выбрать аватар'
+                          : 'Изменить аватар',
+                    ),
+                  ),
+                  if (_selectedAvatarFile != null) ...[
+                    const SizedBox(width: 10),
+                    OutlinedButton.icon(
+                      onPressed: _isCreating ? null : _removeGroupAvatar,
+                      icon: const Icon(Icons.close),
+                      label: const Text('Убрать'),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
           child: TextField(
             controller: _titleController,
+            onChanged: (_) => setState(() {}),
             style: const TextStyle(color: AppColors.textPrimary),
             decoration: InputDecoration(
               hintText: 'Название группы',
@@ -330,6 +540,7 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
                     final user = _filteredUsers[index];
                     final username = (user['username'] ?? '').toString();
                     final email = (user['email'] ?? '').toString();
+                    final avatarUrl = _userAvatarUrl(user);
 
                     final rawId = user['id'];
                     int? userId;
@@ -360,24 +571,10 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
                         ),
                         child: Row(
                           children: [
-                            Container(
-                              width: 54,
-                              height: 54,
-                              decoration: BoxDecoration(
-                                color: AppColors.accent,
-                                borderRadius: BorderRadius.circular(18),
-                              ),
-                              alignment: Alignment.center,
-                              child: Text(
-                                username.isNotEmpty
-                                    ? username[0].toUpperCase()
-                                    : '?',
-                                style: const TextStyle(
-                                  color: Colors.black,
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
+                            _buildUserAvatar(
+                              title: username,
+                              avatarUrl: avatarUrl,
+                              size: 54,
                             ),
                             const SizedBox(width: 14),
                             Expanded(

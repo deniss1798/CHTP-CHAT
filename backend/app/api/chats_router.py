@@ -8,8 +8,10 @@ from app.models.chat import Chat
 from app.models.chat_member import ChatMember
 from app.models.user import User
 import os
+from datetime import datetime
 import uuid
 from pathlib import Path
+from app.models.message import Message
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from app.schemas.chat_schema import (
     ChatCreate,
@@ -35,102 +37,67 @@ ALLOWED_IMAGE_TYPES = {
 MAX_AVATAR_SIZE = 5 * 1024 * 1024
 
 
-@router.post("/", response_model=ChatResponse)
-def create_chat(
-    chat_data: ChatCreate,
+@router.get("/", response_model=list[ChatResponse])
+def get_my_chats(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if chat_data.type == "private":
-        if len(chat_data.member_ids) != 1:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Private chat must contain exactly one target user",
-            )
+    chats = (
+        db.query(Chat)
+        .join(ChatMember, ChatMember.chat_id == Chat.id)
+        .filter(ChatMember.user_id == current_user.id)
+        .order_by(Chat.id.desc())
+        .all()
+    )
 
-        if chat_data.member_ids[0] == current_user.id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="You cannot create a private chat with yourself",
-            )
+    result = []
 
-    if chat_data.type == "group":
-        if not chat_data.title or not chat_data.title.strip():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Group chat must have a title",
-            )
+    for chat in chats:
+        chat_title = chat.title
+        chat_avatar_url = chat.avatar_url
 
-    all_member_ids = set(chat_data.member_ids)
-    all_member_ids.add(current_user.id)
-
-    users_count = db.query(User).filter(User.id.in_(all_member_ids)).count()
-    if users_count != len(all_member_ids):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="One or more users do not exist",
-        )
-
-    if chat_data.type == "private":
-        member_ids = list(all_member_ids)
-
-        existing_chat = (
-            db.query(Chat)
-            .join(ChatMember, ChatMember.chat_id == Chat.id)
-            .filter(Chat.type == "private")
-            .group_by(Chat.id)
-            .having(func.count(ChatMember.user_id) == len(member_ids))
-            .having(
-                func.sum(
-                    case(
-                        (ChatMember.user_id.in_(member_ids), 1),
-                        else_=0,
-                    )
+        if chat.type == "private":
+            other_user = (
+                db.query(User)
+                .join(ChatMember, ChatMember.user_id == User.id)
+                .filter(
+                    ChatMember.chat_id == chat.id,
+                    User.id != current_user.id,
                 )
-                == len(member_ids)
+                .first()
             )
+
+            if other_user:
+                chat_title = other_user.username
+                chat_avatar_url = other_user.avatar_url
+
+        last_message = (
+            db.query(Message)
+            .filter(Message.chat_id == chat.id)
+            .order_by(Message.created_at.desc(), Message.id.desc())
             .first()
         )
 
-        if existing_chat:
-            return ChatResponse(
-                id=existing_chat.id,
-                type=existing_chat.type,
-                title=existing_chat.title,
-                avatar_url=existing_chat.avatar_url,
-                created_by=existing_chat.created_by,
-            )
-
-    new_chat = Chat(
-        type=chat_data.type,
-        title=chat_data.title.strip() if chat_data.title else None,
-        avatar_url=None,
-        created_by=current_user.id,
-    )
-
-    db.add(new_chat)
-    db.flush()
-
-    for user_id in all_member_ids:
-        role = "owner" if user_id == current_user.id else "member"
-        db.add(
-            ChatMember(
-                chat_id=new_chat.id,
-                user_id=user_id,
-                role=role,
+        result.append(
+            ChatResponse(
+                id=chat.id,
+                type=chat.type,
+                title=chat_title,
+                avatar_url=chat_avatar_url,
+                created_by=chat.created_by,
+                last_message=last_message.text if last_message else None,
+                last_message_at=last_message.created_at if last_message else None,
+                last_message_sender_id=last_message.sender_id if last_message else None,
+                unread_count=0,
             )
         )
 
-    db.commit()
-    db.refresh(new_chat)
-
-    return ChatResponse(
-        id=new_chat.id,
-        type=new_chat.type,
-        title=new_chat.title,
-        avatar_url=new_chat.avatar_url,
-        created_by=new_chat.created_by,
+    result.sort(
+        key=lambda item: item.last_message_at or datetime.min,
+        reverse=True,
     )
+
+    return result
 
 
 @router.get("/", response_model=list[ChatResponse])
