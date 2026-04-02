@@ -17,5 +17,7 @@ COPY . .
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
 
+EXPOSE 8080
+
 # Команда для запуска приложения
 CMD ["python", "app/main.py"]
