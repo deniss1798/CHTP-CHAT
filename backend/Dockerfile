@@ -4,6 +4,9 @@ FROM python:3.14-slim
 # Устанавливаем рабочую директорию внутри контейнера
 WORKDIR /app
 
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
 # Копируем файл с зависимостями (этот слой кешируется, если requirements не менялся)
 COPY requirements.txt .
 
