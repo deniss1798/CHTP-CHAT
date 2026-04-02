@@ -52,7 +52,7 @@ class ApiLoggerInterceptor extends Interceptor {
 }
 
 class ApiClient {
-  static const String baseUrl = 'https://chtp-chat-production.up.railway.app';
+  static const String baseUrl = 'http://83.217.201.40';
 
   static final Dio dio = Dio(
     BaseOptions(
