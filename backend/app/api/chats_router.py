@@ -115,53 +115,54 @@ def create_chat(
     member_ids.add(current_user.id)
 
     if payload.type == "private":
-    other_ids = [user_id for user_id in member_ids if user_id != current_user.id]
-    if len(other_ids) != 1:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Private chat must contain exactly one other participant",
-        )
-
-    other_user_id = other_ids[0]
-
-    # Ищем все private-чаты текущего пользователя
-    private_chats = (
-        db.query(Chat)
-        .join(ChatMember, ChatMember.chat_id == Chat.id)
-        .filter(
-            Chat.type == "private",
-            ChatMember.user_id == current_user.id,
-        )
-        .all()
-    )
-
-    for chat in private_chats:
-        existing_member_ids = {
-            row.user_id
-            for row in db.query(ChatMember.user_id).filter(ChatMember.chat_id == chat.id).all()
-        }
-
-        if existing_member_ids == {current_user.id, other_user_id}:
-            other_user = db.query(User).filter(User.id == other_user_id).first()
-
-            last_message = (
-                db.query(Message)
-                .filter(Message.chat_id == chat.id)
-                .order_by(Message.created_at.desc(), Message.id.desc())
-                .first()
+        other_ids = [user_id for user_id in member_ids if user_id != current_user.id]
+        if len(other_ids) != 1:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Private chat must contain exactly one other participant",
             )
 
-            return ChatResponse(
-                id=chat.id,
-                type=chat.type,
-                title=other_user.username if other_user else chat.title,
-                avatar_url=other_user.avatar_url if other_user else chat.avatar_url,
-                created_by=chat.created_by,
-                last_message=last_message.text if last_message else None,
-                last_message_at=last_message.created_at if last_message else None,
-                last_message_sender_id=last_message.sender_id if last_message else None,
-                unread_count=0,
+        other_user_id = other_ids[0]
+
+        private_chats = (
+            db.query(Chat)
+            .join(ChatMember, ChatMember.chat_id == Chat.id)
+            .filter(
+                Chat.type == "private",
+                ChatMember.user_id == current_user.id,
             )
+            .all()
+        )
+
+        for chat in private_chats:
+            existing_member_ids = {
+                row.user_id
+                for row in db.query(ChatMember.user_id)
+                .filter(ChatMember.chat_id == chat.id)
+                .all()
+            }
+
+            if existing_member_ids == {current_user.id, other_user_id}:
+                other_user = db.query(User).filter(User.id == other_user_id).first()
+
+                last_message = (
+                    db.query(Message)
+                    .filter(Message.chat_id == chat.id)
+                    .order_by(Message.created_at.desc(), Message.id.desc())
+                    .first()
+                )
+
+                return ChatResponse(
+                    id=chat.id,
+                    type=chat.type,
+                    title=other_user.username if other_user else chat.title,
+                    avatar_url=other_user.avatar_url if other_user else chat.avatar_url,
+                    created_by=chat.created_by,
+                    last_message=last_message.text if last_message else None,
+                    last_message_at=last_message.created_at if last_message else None,
+                    last_message_sender_id=last_message.sender_id if last_message else None,
+                    unread_count=0,
+                )
 
     users = db.query(User).filter(User.id.in_(member_ids)).all()
     found_ids = {user.id for user in users}
