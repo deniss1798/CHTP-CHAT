@@ -1,7 +1,4 @@
 from datetime import datetime
-import os
-import uuid
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
@@ -20,12 +17,9 @@ from app.schemas.chat_schema import (
     ChatResponse,
     UserShort,
 )
+from app.services.s3_storage import S3StorageService
 
 router = APIRouter(prefix="/chats", tags=["Chats"])
-
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-MEDIA_DIR = BASE_DIR / "media"
-CHAT_AVATARS_DIR = MEDIA_DIR / "avatars" / "chats"
 
 ALLOWED_IMAGE_TYPES = {
     "image/jpeg": ".jpg",
@@ -392,30 +386,26 @@ async def upload_chat_avatar(
             detail="File is too large. Max size is 5 MB",
         )
 
-    CHAT_AVATARS_DIR.mkdir(parents=True, exist_ok=True)
+    storage = S3StorageService()
 
     extension = ALLOWED_IMAGE_TYPES[file.content_type]
-    filename = f"chat_{chat.id}_{uuid.uuid4().hex}{extension}"
-    file_path = CHAT_AVATARS_DIR / filename
-
-    with open(file_path, "wb") as buffer:
-        buffer.write(content)
-
     old_avatar_url = chat.avatar_url
-    chat.avatar_url = f"/media/avatars/chats/{filename}"
+
+    new_avatar_url = storage.upload_public_avatar(
+        content=content,
+        folder="avatars/chats",
+        owner_id=chat.id,
+        extension=extension,
+        content_type=file.content_type,
+    )
+
+    chat.avatar_url = new_avatar_url
 
     db.add(chat)
     db.commit()
     db.refresh(chat)
 
-    if old_avatar_url and old_avatar_url.startswith("/media/avatars/chats/"):
-        old_name = old_avatar_url.replace("/media/avatars/chats/", "").strip()
-        old_path = CHAT_AVATARS_DIR / old_name
-        if old_path.exists():
-            try:
-                os.remove(old_path)
-            except OSError:
-                pass
+    storage.delete_public_object_by_url(old_avatar_url)
 
     users = (
         db.query(User)

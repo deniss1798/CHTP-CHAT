@@ -2,6 +2,13 @@ from functools import lru_cache
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+s3_endpoint_url: str | None = Field(None, alias="S3_ENDPOINT_URL")
+s3_region: str | None = Field(None, alias="S3_REGION")
+s3_access_key_id: str | None = Field(None, alias="S3_ACCESS_KEY_ID")
+s3_secret_access_key: str | None = Field(None, alias="S3_SECRET_ACCESS_KEY")
+s3_public_bucket: str | None = Field(None, alias="S3_PUBLIC_BUCKET")
+s3_private_bucket: str | None = Field(None, alias="S3_PRIVATE_BUCKET")
+s3_public_base_url: str | None = Field(None, alias="S3_PUBLIC_BASE_URL")
 
 
 class Settings(BaseSettings):

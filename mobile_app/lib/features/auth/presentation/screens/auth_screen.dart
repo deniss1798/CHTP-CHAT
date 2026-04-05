@@ -66,7 +66,7 @@ class _AuthScreenState extends State<AuthScreen> {
       } else {
         final email = emailController.text.trim();
 
-        final code = await _authService.requestEmailCode(
+        await _authService.requestEmailCode(
           username: usernameController.text.trim(),
           email: email,
           password: passwordController.text.trim(),
@@ -78,7 +78,6 @@ class _AuthScreenState extends State<AuthScreen> {
           MaterialPageRoute(
             builder: (_) => EmailCodeScreen(
               email: email,
-              debugCode: code,
             ),
           ),
         );
