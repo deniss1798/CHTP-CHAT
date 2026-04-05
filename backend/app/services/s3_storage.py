@@ -21,6 +21,8 @@ class S3StorageService:
             raise RuntimeError("S3_SECRET_ACCESS_KEY is not set")
         if not settings.s3_public_bucket:
             raise RuntimeError("S3_PUBLIC_BUCKET is not set")
+        if not settings.s3_private_bucket:
+            raise RuntimeError("S3_PRIVATE_BUCKET is not set")
         if not settings.s3_public_base_url:
             raise RuntimeError("S3_PUBLIC_BASE_URL is not set")
 
@@ -49,7 +51,11 @@ class S3StorageService:
     ) -> str:
         object_key = f"{folder}/{owner_id}/{uuid4().hex}{extension}"
 
-        resolved_content_type = content_type or mimetypes.guess_type(object_key)[0] or "application/octet-stream"
+        resolved_content_type = (
+            content_type
+            or mimetypes.guess_type(object_key)[0]
+            or "application/octet-stream"
+        )
 
         self.client.put_object(
             Bucket=self.settings.s3_public_bucket,
@@ -69,11 +75,59 @@ class S3StorageService:
             return
 
         object_key = file_url.removeprefix(base)
-
         if not object_key:
             return
 
         self.client.delete_object(
             Bucket=self.settings.s3_public_bucket,
+            Key=object_key,
+        )
+
+    def upload_private_message_image(
+        self,
+        *,
+        content: bytes,
+        chat_id: int,
+        extension: str,
+        content_type: str | None = None,
+    ) -> tuple[str, str]:
+        object_key = f"messages/images/{chat_id}/{uuid4().hex}{extension}"
+
+        resolved_content_type = (
+            content_type
+            or mimetypes.guess_type(object_key)[0]
+            or "application/octet-stream"
+        )
+
+        self.client.put_object(
+            Bucket=self.settings.s3_private_bucket,
+            Key=object_key,
+            Body=content,
+            ContentType=resolved_content_type,
+        )
+
+        return object_key, f"s3://{self.settings.s3_private_bucket}/{object_key}"
+
+    def generate_private_file_url(
+        self,
+        *,
+        object_key: str,
+        expires_in: int = 3600,
+    ) -> str:
+        return self.client.generate_presigned_url(
+            "get_object",
+            Params={
+                "Bucket": self.settings.s3_private_bucket,
+                "Key": object_key,
+            },
+            ExpiresIn=expires_in,
+        )
+
+    def delete_private_object(self, object_key: str | None) -> None:
+        if not object_key:
+            return
+
+        self.client.delete_object(
+            Bucket=self.settings.s3_private_bucket,
             Key=object_key,
         )
