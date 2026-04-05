@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import firebase_admin
 from firebase_admin import credentials
@@ -15,13 +16,25 @@ def get_firebase_app():
     if _firebase_app is not None:
         return _firebase_app
 
+    firebase_file = settings.firebase_service_account_file
     firebase_json = settings.firebase_service_account_json
 
-    if not firebase_json:
-        raise RuntimeError("FIREBASE_SERVICE_ACCOUNT_JSON is not set")
+    cred = None
 
-    cred_dict = json.loads(firebase_json)
-    cred = credentials.Certificate(cred_dict)
+    if firebase_file:
+        firebase_path = Path(firebase_file)
+        if firebase_path.exists():
+            cred = credentials.Certificate(str(firebase_path))
+
+    if cred is None and firebase_json:
+        cred_dict = json.loads(firebase_json)
+        cred = credentials.Certificate(cred_dict)
+
+    if cred is None:
+        raise RuntimeError(
+            "Firebase credentials are not set. "
+            "Use FIREBASE_SERVICE_ACCOUNT_FILE or FIREBASE_SERVICE_ACCOUNT_JSON"
+        )
+
     _firebase_app = firebase_admin.initialize_app(cred)
-
     return _firebase_app
