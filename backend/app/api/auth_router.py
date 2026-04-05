@@ -8,6 +8,7 @@ from app.core.security import hash_password, verify_password, create_access_toke
 from app.db.database import get_db
 from app.models.pending_registration import PendingRegistration
 from app.models.user import User
+from app.core.email_service import send_verification_code_email
 from app.schemas.email_verification import (
     RequestEmailCodeRequest,
     VerifyEmailCodeRequest,
@@ -68,9 +69,16 @@ def request_email_code(
 
     db.commit()
 
+    try:
+        send_verification_code_email(payload.email, code)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to send verification email",
+        )
+
     return {
-        "message": "Verification code generated",
-        "code": code,
+        "message": "Verification code sent to email",
     }
 
 @router.post("/verify-email-code", response_model=TokenResponse)
