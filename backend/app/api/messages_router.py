@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
@@ -38,16 +39,35 @@ MAX_VIDEO_SIZE = 50 * 1024 * 1024  # 50 MB
 PRIVATE_MEDIA_MESSAGE_TYPES = frozenset({"image", "video", "video_note"})
 
 
+def _make_s3_getter(
+    storage: S3StorageService | None = None,
+) -> Callable[[], S3StorageService]:
+    """Создаёт S3 только при первом обращении (presigned URL для приватного медиа)."""
+    if storage is not None:
+        return lambda: storage
+    holder: list[S3StorageService | None] = [None]
+
+    def get() -> S3StorageService:
+        if holder[0] is None:
+            holder[0] = S3StorageService()
+        return holder[0]
+
+    return get
+
+
 def _load_reply_parent(db: Session, reply_to_message_id: int | None) -> Message | None:
     if not reply_to_message_id:
         return None
     return db.query(Message).filter(Message.id == reply_to_message_id).first()
 
 
-def _reply_preview_for_parent(parent: Message, storage: S3StorageService) -> MessageReplyPreview:
+def _reply_preview_for_parent(
+    parent: Message,
+    get_storage: Callable[[], S3StorageService],
+) -> MessageReplyPreview:
     media_url = parent.media_url
     if parent.message_type in PRIVATE_MEDIA_MESSAGE_TYPES and parent.media_key:
-        media_url = storage.generate_private_file_url(object_key=parent.media_key)
+        media_url = get_storage().generate_private_file_url(object_key=parent.media_key)
     return MessageReplyPreview(
         id=parent.id,
         sender_id=parent.sender_id,
@@ -58,18 +78,17 @@ def _reply_preview_for_parent(parent: Message, storage: S3StorageService) -> Mes
 
 
 def _message_to_response(message: Message, db: Session, storage: S3StorageService | None = None) -> MessageResponse:
-    if storage is None:
-        storage = S3StorageService()
+    get_storage = _make_s3_getter(storage)
 
     reply_preview: MessageReplyPreview | None = None
     if message.reply_to_message_id:
         parent = _load_reply_parent(db, message.reply_to_message_id)
         if parent:
-            reply_preview = _reply_preview_for_parent(parent, storage)
+            reply_preview = _reply_preview_for_parent(parent, get_storage)
 
     media_url = message.media_url
     if message.message_type in PRIVATE_MEDIA_MESSAGE_TYPES and message.media_key:
-        media_url = storage.generate_private_file_url(object_key=message.media_key)
+        media_url = get_storage().generate_private_file_url(object_key=message.media_key)
 
     return MessageResponse(
         id=message.id,
@@ -92,17 +111,17 @@ def _message_to_response(message: Message, db: Session, storage: S3StorageServic
 def _message_to_response_batched(
     message: Message,
     parents_by_id: dict[int, Message],
-    storage: S3StorageService,
+    get_storage: Callable[[], S3StorageService],
 ) -> MessageResponse:
     reply_preview: MessageReplyPreview | None = None
     if message.reply_to_message_id:
         parent = parents_by_id.get(message.reply_to_message_id)
         if parent:
-            reply_preview = _reply_preview_for_parent(parent, storage)
+            reply_preview = _reply_preview_for_parent(parent, get_storage)
 
     media_url = message.media_url
     if message.message_type in PRIVATE_MEDIA_MESSAGE_TYPES and message.media_key:
-        media_url = storage.generate_private_file_url(object_key=message.media_key)
+        media_url = get_storage().generate_private_file_url(object_key=message.media_key)
 
     return MessageResponse(
         id=message.id,
@@ -123,18 +142,17 @@ def _message_to_response_batched(
 
 
 def _build_message_payload(message: Message, db: Session, storage: S3StorageService | None = None) -> dict:
-    if storage is None:
-        storage = S3StorageService()
+    get_storage = _make_s3_getter(storage)
 
     reply_to_dict = None
     if message.reply_to_message_id:
         parent = _load_reply_parent(db, message.reply_to_message_id)
         if parent:
-            reply_to_dict = _reply_preview_for_parent(parent, storage).model_dump()
+            reply_to_dict = _reply_preview_for_parent(parent, get_storage).model_dump()
 
     media_url = message.media_url
     if message.message_type in PRIVATE_MEDIA_MESSAGE_TYPES and message.media_key:
-        media_url = storage.generate_private_file_url(object_key=message.media_key)
+        media_url = get_storage().generate_private_file_url(object_key=message.media_key)
 
     return {
         "id": message.id,
@@ -185,11 +203,11 @@ def _validate_reply_target(db: Session, chat_id: int, reply_to_message_id: int |
 
 
 def _apply_private_media_urls(messages: list[Message]) -> list[Message]:
-    storage = S3StorageService()
+    get_storage = _make_s3_getter()
 
     for message in messages:
         if message.message_type in PRIVATE_MEDIA_MESSAGE_TYPES and message.media_key:
-            message.media_url = storage.generate_private_file_url(
+            message.media_url = get_storage().generate_private_file_url(
                 object_key=message.media_key
             )
 
@@ -197,11 +215,11 @@ def _apply_private_media_urls(messages: list[Message]) -> list[Message]:
 
 
 def _apply_private_media_urls_map(messages: list[Message]) -> None:
-    storage = S3StorageService()
+    get_storage = _make_s3_getter()
 
     for message in messages:
         if message.message_type in PRIVATE_MEDIA_MESSAGE_TYPES and message.media_key:
-            message.media_url = storage.generate_private_file_url(
+            message.media_url = get_storage().generate_private_file_url(
                 object_key=message.media_key
             )
 
@@ -697,9 +715,9 @@ def get_chat_messages(
         for parent in parents:
             parents_by_id[parent.id] = parent
 
-    storage = S3StorageService()
+    get_storage = _make_s3_getter()
 
     return [
-        _message_to_response_batched(message, parents_by_id, storage)
+        _message_to_response_batched(message, parents_by_id, get_storage)
         for message in messages
     ]
