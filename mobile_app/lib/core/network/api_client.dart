@@ -57,9 +57,10 @@ class ApiClient {
   static final Dio dio = Dio(
     BaseOptions(
       baseUrl: baseUrl,
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 15),
-      sendTimeout: const Duration(seconds: 15),
+      connectTimeout: const Duration(seconds: 15),
+      receiveTimeout: const Duration(seconds: 60),
+      // Загрузка фото/видео (до десятков МБ) по мобильной сети часто > 15 с
+      sendTimeout: const Duration(minutes: 5),
       headers: {
         'Content-Type': 'application/json',
       },
