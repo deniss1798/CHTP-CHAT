@@ -28,6 +28,9 @@ ALLOWED_VIDEO_TYPES = {
     "video/mp4": ".mp4",
     "video/webm": ".webm",
     "video/quicktime": ".mov",
+    # Часто с камеры Android
+    "video/3gpp": ".3gp",
+    "video/3gp": ".3gp",
 }
 
 MAX_VIDEO_SIZE = 50 * 1024 * 1024  # 50 MB
@@ -379,11 +382,13 @@ async def send_video_message(
             extension = ".webm"
         elif lower_name.endswith(".mov"):
             extension = ".mov"
+        elif lower_name.endswith(".3gp"):
+            extension = ".3gp"
 
         if extension is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Only MP4, WEBM and MOV videos are allowed",
+                detail="Only MP4, WEBM, MOV and 3GP videos are allowed",
             )
 
     content = await file.read()
@@ -488,11 +493,13 @@ async def send_video_note_message(
             extension = ".webm"
         elif lower_name.endswith(".mov"):
             extension = ".mov"
+        elif lower_name.endswith(".3gp"):
+            extension = ".3gp"
 
         if extension is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Only MP4, WEBM and MOV videos are allowed",
+                detail="Only MP4, WEBM, MOV and 3GP videos are allowed",
             )
 
     content = await file.read()
