@@ -11,6 +11,13 @@ class Message(Base):
     chat_id = Column(BigInteger, ForeignKey("chats.id"), nullable=False, index=True)
     sender_id = Column(BigInteger, ForeignKey("users.id"), nullable=False, index=True)
 
+    reply_to_message_id = Column(
+        BigInteger,
+        ForeignKey("messages.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     text = Column(Text, nullable=False)
 
     message_type = Column(String, nullable=False, default="text")

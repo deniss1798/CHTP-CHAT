@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/network/api_client.dart';
@@ -43,6 +44,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   final ImagePicker _imagePicker = ImagePicker();
 
   bool _isUploadingChatAvatar = false;
+  bool _isSendingImage = false;
 
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -56,6 +58,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   int? _currentUserId;
   List<Map<String, dynamic>> _messages = [];
+
+  Map<String, dynamic>? _replyingTo;
+  Map<String, dynamic>? _editingMessage;
 
   String _chatTitle = '';
   String? _chatAvatarUrl;
@@ -302,9 +307,7 @@ await _loadChatDetails();
 
       await _loadChatDetails();
 
-      if (_isGroupChat) {
-        await _loadChatMembers();
-      }
+      await _loadChatMembers();
 
       await _loadMessages();
       await _connectSocket();
@@ -449,8 +452,9 @@ await _loadChatDetails();
   Future<void> _loadMessages() async {
     try {
       final messages = await _messagesService.getMessages(widget.chatId);
+      final normalizedMessages = messages.map(_normalizeMessageMap).toList();
 
-      messages.sort((a, b) {
+      normalizedMessages.sort((a, b) {
         final aDate = DateTime.tryParse(a['created_at']?.toString() ?? '');
         final bDate = DateTime.tryParse(b['created_at']?.toString() ?? '');
 
@@ -464,7 +468,7 @@ await _loadChatDetails();
       if (!mounted) return;
 
       setState(() {
-        _messages = messages;
+        _messages = normalizedMessages;
         _isLoading = false;
       });
 
@@ -496,7 +500,7 @@ await _loadChatDetails();
       );
 
       _socketSubscription = _chatSocketService.messagesStream.listen((message) {
-        _handleIncomingMessage(message);
+        _handleSocketEvent(message);
       });
 
       if (!mounted) return;
@@ -513,10 +517,61 @@ await _loadChatDetails();
     }
   }
 
-  Future<void> _handleIncomingMessage(Map<String, dynamic> incoming) async {
-    final normalized = _extractMessagePayload(incoming);
-    if (normalized == null) return;
+  void _handleSocketEvent(Map<String, dynamic> incoming) {
+    if (incoming['event'] == 'message_deleted') {
+      final rawId = incoming['id'];
+      int? id;
+      if (rawId is int) {
+        id = rawId;
+      } else {
+        id = int.tryParse(rawId.toString());
+      }
 
+      if (id == null) return;
+
+      if (!mounted) return;
+
+      setState(() {
+        _messages.removeWhere((m) => m['id'] == id);
+        if (_editingMessage != null && _editingMessage!['id'] == id) {
+          _editingMessage = null;
+          _messageController.clear();
+        }
+      });
+
+      return;
+    }
+
+    if (incoming['event'] == 'message_updated') {
+      final msg = incoming['message'];
+      if (msg is! Map) return;
+
+      final normalized =
+          _normalizeMessageMap(Map<String, dynamic>.from(msg));
+      final incomingId = normalized['id'];
+
+      if (!mounted) return;
+
+      setState(() {
+        final idx = _messages.indexWhere((m) => m['id'] == incomingId);
+        if (idx >= 0) {
+          _messages[idx] = normalized;
+        }
+      });
+
+      return;
+    }
+
+    if (incoming['type'] == 'new_message' || incoming.containsKey('message')) {
+      _handleNewMessage(incoming);
+    }
+  }
+
+  Future<void> _handleNewMessage(Map<String, dynamic> incoming) async {
+    final payload = _extractMessagePayload(incoming);
+    if (payload == null) return;
+
+    final normalized = _normalizeMessageMap(payload);
     final incomingId = normalized['id'];
     final exists = _messages.any((m) => m['id'] == incomingId);
 
@@ -548,7 +603,7 @@ await _loadChatDetails();
     if (raw.containsKey('chat_id') &&
         raw.containsKey('sender_id') &&
         raw.containsKey('text')) {
-      return raw;
+      return Map<String, dynamic>.from(raw);
     }
 
     final message = raw['message'];
@@ -560,6 +615,41 @@ await _loadChatDetails();
     if (data is Map) return Map<String, dynamic>.from(data);
 
     return null;
+  }
+
+  Map<String, dynamic> _normalizeMessageMap(Map<String, dynamic> raw) {
+    Map<String, dynamic>? replyTo;
+    final rt = raw['reply_to'];
+    if (rt is Map<String, dynamic>) {
+      replyTo = rt;
+    } else if (rt is Map) {
+      replyTo = Map<String, dynamic>.from(rt);
+    }
+
+    int? replyToId;
+    final rawReplyId = raw['reply_to_message_id'];
+    if (rawReplyId is int) {
+      replyToId = rawReplyId;
+    } else if (rawReplyId != null) {
+      replyToId = int.tryParse(rawReplyId.toString());
+    }
+
+    return {
+      'id': raw['id'],
+      'chat_id': raw['chat_id'],
+      'sender_id': raw['sender_id'],
+      'text': (raw['text'] ?? '').toString(),
+      'message_type': (raw['message_type'] ?? 'text').toString(),
+      'media_key': raw['media_key']?.toString(),
+      'media_url': raw['media_url']?.toString(),
+      'media_mime_type': raw['media_mime_type']?.toString(),
+      'media_size': raw['media_size'],
+      'created_at': raw['created_at'],
+      'updated_at': raw['updated_at'],
+      'is_updated': raw['is_updated'] == true,
+      'reply_to_message_id': replyToId,
+      'reply_to': replyTo,
+    };
   }
 
   Future<void> _markCurrentChatAsRead() async {
@@ -582,6 +672,11 @@ await _loadChatDetails();
   }
 
   Future<void> _sendMessage() async {
+    if (_editingMessage != null) {
+      await _submitEdit();
+      return;
+    }
+
     final text = _messageController.text.trim();
     if (text.isEmpty || _isSending) return;
 
@@ -590,9 +685,14 @@ await _loadChatDetails();
     });
 
     try {
-      final createdMessage = await _messagesService.sendMessage(
-        chatId: widget.chatId,
-        text: text,
+      final replyId = _pendingReplyToMessageId();
+
+      final createdMessage = _normalizeMessageMap(
+        await _messagesService.sendMessage(
+          chatId: widget.chatId,
+          text: text,
+          replyToMessageId: replyId,
+        ),
       );
 
       if (!mounted) return;
@@ -605,6 +705,7 @@ await _loadChatDetails();
         if (!exists) {
           _messages.add(createdMessage);
         }
+        _replyingTo = null;
         _isSending = false;
       });
 
@@ -625,6 +726,68 @@ await _loadChatDetails();
           backgroundColor: AppColors.surfaceSoft,
           content: Text(
             _extractErrorMessage(e, fallback: 'Не удалось отправить сообщение'),
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _pickAndSendImage() async {
+    if (_isSendingImage) return;
+
+    try {
+      final picked = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+        maxWidth: 2200,
+      );
+
+      if (picked == null) return;
+
+      setState(() {
+        _isSendingImage = true;
+      });
+
+      final replyId = _pendingReplyToMessageId();
+
+      final createdMessage = _normalizeMessageMap(
+        await _messagesService.sendPhotoMessage(
+          chatId: widget.chatId,
+          imagePath: picked.path,
+          fileName: picked.name,
+          replyToMessageId: replyId,
+        ),
+      );
+
+      if (!mounted) return;
+
+      final exists = _messages.any((m) => m['id'] == createdMessage['id']);
+
+      setState(() {
+        if (!exists) {
+          _messages.add(createdMessage);
+        }
+        _replyingTo = null;
+        _isSendingImage = false;
+      });
+
+      await _markCurrentChatAsRead();
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToBottom();
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _isSendingImage = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.surfaceSoft,
+          content: Text(
+            _extractErrorMessage(e, fallback: 'Не удалось отправить фото'),
           ),
         ),
       );
@@ -712,6 +875,248 @@ await _loadChatDetails();
     return _memberAvatarUrls[senderId];
   }
 
+  int? _intFromDynamic(Object? raw) {
+    if (raw == null) return null;
+    if (raw is int) return raw;
+    return int.tryParse(raw.toString());
+  }
+
+  String _senderNameForUserId(int? userId) {
+    if (userId == null) return 'Пользователь';
+    if (userId == _currentUserId) return 'Вы';
+    return _memberNames[userId] ?? 'Пользователь';
+  }
+
+  String _replyPreviewLabel(Map<String, dynamic> reply) {
+    final type = (reply['message_type'] ?? 'text').toString();
+    if (type == 'image') {
+      return '📷 Фото';
+    }
+
+    final t = (reply['text'] ?? '').toString().trim();
+    if (t.isEmpty) {
+      return 'Сообщение';
+    }
+    if (t.length > 90) {
+      return '${t.substring(0, 90)}…';
+    }
+    return t;
+  }
+
+  Future<void> _showMessageActions(Map<String, dynamic> message) async {
+    final isMine = _isMine(message);
+    final messageId = _intFromDynamic(message['id']);
+    if (messageId == null) return;
+
+    final messageType = (message['message_type'] ?? 'text').toString();
+    final text = (message['text'] ?? '').toString().trim();
+
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.reply_rounded, color: AppColors.accent),
+                  title: const Text('Ответить'),
+                  onTap: () => Navigator.of(ctx).pop('reply'),
+                ),
+                if (text.isNotEmpty)
+                  ListTile(
+                    leading: const Icon(Icons.copy_rounded, color: AppColors.textPrimary),
+                    title: const Text('Копировать'),
+                    onTap: () => Navigator.of(ctx).pop('copy'),
+                  ),
+                if (isMine && messageType == 'text' && text.isNotEmpty)
+                  ListTile(
+                    leading: const Icon(Icons.edit_rounded, color: AppColors.textPrimary),
+                    title: const Text('Изменить'),
+                    onTap: () => Navigator.of(ctx).pop('edit'),
+                  ),
+                if (isMine)
+                  ListTile(
+                    leading: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+                    title: const Text('Удалить'),
+                    onTap: () => Navigator.of(ctx).pop('delete'),
+                  ),
+                const SizedBox(height: 4),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (!mounted) return;
+
+    if (action == 'reply') {
+      setState(() {
+        _replyingTo = Map<String, dynamic>.from(message);
+        _editingMessage = null;
+      });
+      return;
+    }
+
+    if (action == 'copy' && text.isNotEmpty) {
+      await Clipboard.setData(ClipboardData(text: text));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Текст скопирован')),
+      );
+      return;
+    }
+
+    if (action == 'edit') {
+      setState(() {
+        _editingMessage = Map<String, dynamic>.from(message);
+        _replyingTo = null;
+        _messageController.text = text;
+        _messageController.selection = TextSelection.fromPosition(
+          TextPosition(offset: _messageController.text.length),
+        );
+      });
+      return;
+    }
+
+    if (action == 'delete') {
+      await _confirmDeleteMessage(messageId);
+    }
+  }
+
+  Future<void> _confirmDeleteMessage(int messageId) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: AppColors.surface,
+          title: const Text('Удалить сообщение?'),
+          content: const Text('Это действие нельзя отменить.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Отмена'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text(
+                'Удалить',
+                style: TextStyle(color: Colors.redAccent),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (ok != true) return;
+
+    try {
+      await _messagesService.deleteMessage(messageId);
+
+      if (!mounted) return;
+
+      setState(() {
+        _messages.removeWhere((m) => m['id'] == messageId);
+        if (_editingMessage != null && _editingMessage!['id'] == messageId) {
+          _editingMessage = null;
+          _messageController.clear();
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.surfaceSoft,
+          content: Text(
+            _extractErrorMessage(e, fallback: 'Не удалось удалить сообщение'),
+          ),
+        ),
+      );
+    }
+  }
+
+  void _cancelReply() {
+    setState(() {
+      _replyingTo = null;
+    });
+  }
+
+  void _cancelEdit() {
+    setState(() {
+      _editingMessage = null;
+      _messageController.clear();
+    });
+  }
+
+  int? _pendingReplyToMessageId() {
+    if (_replyingTo == null) return null;
+    return _intFromDynamic(_replyingTo!['id']);
+  }
+
+  Future<void> _submitEdit() async {
+    final editing = _editingMessage;
+    if (editing == null) return;
+
+    final messageId = _intFromDynamic(editing['id']);
+    if (messageId == null) return;
+
+    final text = _messageController.text.trim();
+    if (text.isEmpty) return;
+
+    setState(() {
+      _isSending = true;
+    });
+
+    try {
+      final updated = _normalizeMessageMap(
+        await _messagesService.updateMessage(
+          messageId: messageId,
+          text: text,
+        ),
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        final idx = _messages.indexWhere((m) => m['id'] == updated['id']);
+        if (idx >= 0) {
+          _messages[idx] = updated;
+        }
+        _editingMessage = null;
+        _messageController.clear();
+        _isSending = false;
+      });
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToBottom();
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _isSending = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.surfaceSoft,
+          content: Text(
+            _extractErrorMessage(e, fallback: 'Не удалось изменить сообщение'),
+          ),
+        ),
+      );
+    }
+  }
+
   String _formatTime(String? raw) {
     if (raw == null || raw.trim().isEmpty) return '';
 
@@ -777,94 +1182,215 @@ await _loadChatDetails();
     );
   }
 
+  Widget _buildReplyQuote(Map<String, dynamic> message, bool isMine) {
+    final reply = message['reply_to'];
+    if (reply is! Map) {
+      return const SizedBox.shrink();
+    }
+
+    final map = Map<String, dynamic>.from(reply);
+    final senderId = _intFromDynamic(map['sender_id']);
+    final senderLabel = _senderNameForUserId(senderId);
+    final preview = _replyPreviewLabel(map);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+        decoration: BoxDecoration(
+          color: isMine
+              ? Colors.black.withAlpha(20)
+              : AppColors.surfaceSoft,
+          borderRadius: BorderRadius.circular(14),
+          border: Border(
+            left: BorderSide(
+              color: AppColors.accent.withAlpha(200),
+              width: 3,
+            ),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              senderLabel,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: isMine ? Colors.black.withAlpha(200) : AppColors.accent,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              preview,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: isMine ? Colors.black.withAlpha(200) : AppColors.textSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                height: 1.25,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMessageContent(Map<String, dynamic> message, bool isMine) {
+    final messageType = (message['message_type'] ?? 'text').toString();
+    final mediaUrl = (message['media_url'] ?? '').toString().trim();
+
+    if (messageType == 'image' && mediaUrl.isNotEmpty) {
+      return ConstrainedBox(
+        constraints: const BoxConstraints(
+          maxWidth: 220,
+          maxHeight: 280,
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Image.network(
+            mediaUrl,
+            fit: BoxFit.cover,
+            loadingBuilder: (context, child, progress) {
+              if (progress == null) return child;
+              return Container(
+                width: 220,
+                height: 220,
+                color: isMine
+                    ? Colors.black.withAlpha(20)
+                    : AppColors.surfaceSoft,
+                alignment: Alignment.center,
+                child: const CircularProgressIndicator(),
+              );
+            },
+            errorBuilder: (_, __, ___) {
+              return Container(
+                width: 220,
+                height: 160,
+                color: isMine
+                    ? Colors.black.withAlpha(20)
+                    : AppColors.surfaceSoft,
+                alignment: Alignment.center,
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  'Не удалось загрузить фото',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: isMine ? Colors.black : AppColors.textSecondary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+    }
+
+    return Text(
+  (message['text'] ?? '').toString(),
+  style: TextStyle(
+        color: isMine ? Colors.black : AppColors.textPrimary,
+        fontSize: 15,
+        fontWeight: FontWeight.w600,
+        height: 1.35,
+      ),
+    );
+  }
+
   Widget _buildMessageBubble(Map<String, dynamic> message) {
     final isMine = _isMine(message);
-    final text = (message['text'] ?? '').toString();
     final time = _formatTime(message['created_at']?.toString());
     final isUpdated = message['is_updated'] == true;
     final senderName = _senderName(message);
     final senderAvatarUrl = _senderAvatarUrl(message);
 
-    final bubble = Container(
-      constraints: BoxConstraints(
-        maxWidth: MediaQuery.of(context).size.width * 0.70,
-      ),
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: isMine ? AppColors.accent : AppColors.surface,
-        borderRadius: BorderRadius.only(
-          topLeft: const Radius.circular(20),
-          topRight: const Radius.circular(20),
-          bottomLeft: Radius.circular(isMine ? 20 : 8),
-          bottomRight: Radius.circular(isMine ? 8 : 20),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: isMine
-                ? AppColors.accent.withAlpha(28)
-                : Colors.black.withAlpha(18),
-            blurRadius: 16,
-            spreadRadius: 1,
+    final bubble = Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onLongPress: () => _showMessageActions(message),
+        child: Container(
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.of(context).size.width * 0.70,
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment:
-            isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-        children: [
-          if (_isGroupChat && !isMine)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Text(
-                senderName,
-                style: const TextStyle(
-                  color: AppColors.accent,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
+          margin: const EdgeInsets.symmetric(vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: isMine ? AppColors.accent : AppColors.surface,
+            borderRadius: BorderRadius.only(
+              topLeft: const Radius.circular(20),
+              topRight: const Radius.circular(20),
+              bottomLeft: Radius.circular(isMine ? 20 : 8),
+              bottomRight: Radius.circular(isMine ? 8 : 20),
             ),
-          Text(
-            text,
-            style: TextStyle(
-              color: isMine ? Colors.black : AppColors.textPrimary,
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-              height: 1.35,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (isUpdated)
-                Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: Text(
-                    'изменено',
-                    style: TextStyle(
-                      color: isMine
-                          ? Colors.black.withAlpha(160)
-                          : AppColors.textMuted,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              Text(
-                time,
-                style: TextStyle(
-                  color: isMine
-                      ? Colors.black.withAlpha(170)
-                      : AppColors.textMuted,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                ),
+            boxShadow: [
+              BoxShadow(
+                color: isMine
+                    ? AppColors.accent.withAlpha(28)
+                    : Colors.black.withAlpha(18),
+                blurRadius: 16,
+                spreadRadius: 1,
               ),
             ],
           ),
-        ],
+          child: Column(
+            crossAxisAlignment:
+                isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+            children: [
+              if (_isGroupChat && !isMine)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Text(
+                    senderName,
+                    style: const TextStyle(
+                      color: AppColors.accent,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              _buildReplyQuote(message, isMine),
+              _buildMessageContent(message, isMine),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (isUpdated)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: Text(
+                        'изменено',
+                        style: TextStyle(
+                          color: isMine
+                              ? Colors.black.withAlpha(160)
+                              : AppColors.textMuted,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  Text(
+                    time,
+                    style: TextStyle(
+                      color: isMine
+                          ? Colors.black.withAlpha(170)
+                          : AppColors.textMuted,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
 
@@ -943,10 +1469,13 @@ await _loadChatDetails();
   }
 
   Widget _buildInputBar() {
+    final isEditing = _editingMessage != null;
+    final reply = _replyingTo;
+
     return SafeArea(
       top: false,
       child: Container(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
         decoration: BoxDecoration(
           color: AppColors.surface.withAlpha(235),
           border: Border(
@@ -955,65 +1484,201 @@ await _loadChatDetails();
             ),
           ),
         ),
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              child: TextField(
-                controller: _messageController,
-                style: const TextStyle(color: AppColors.textPrimary),
-                minLines: 1,
-                maxLines: 5,
-                textInputAction: TextInputAction.newline,
-                decoration: InputDecoration(
-                  hintText: 'Введите сообщение...',
-                  hintStyle: const TextStyle(color: AppColors.textMuted),
-                  filled: true,
-                  fillColor: AppColors.surfaceSoft,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 14,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(18),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            GestureDetector(
-              onTap: _isSending ? null : _sendMessage,
-              child: Container(
-                width: 54,
-                height: 54,
-                decoration: BoxDecoration(
-                  color: AppColors.accent,
-                  borderRadius: BorderRadius.circular(18),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.accent.withAlpha(55),
-                      blurRadius: 22,
-                      spreadRadius: 1,
+            if (isEditing)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceSoft,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: AppColors.accentBorder.withAlpha(110),
                     ),
-                  ],
-                ),
-                alignment: Alignment.center,
-                child: _isSending
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.4,
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Colors.black),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.edit_rounded, color: AppColors.accent, size: 20),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          'Редактирование сообщения',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
-                      )
-                    : const Icon(
-                        Icons.send_rounded,
-                        color: Colors.black,
-                        size: 24,
                       ),
+                      IconButton(
+                        onPressed: _cancelEdit,
+                        icon: const Icon(Icons.close_rounded, color: AppColors.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
               ),
+            if (!isEditing && reply != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceSoft,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: AppColors.accentBorder.withAlpha(110),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 3,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: AppColors.accent,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _senderName(reply),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: AppColors.accent,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              (reply['message_type'] ?? 'text').toString() == 'image'
+                                  ? '📷 Фото'
+                                  : (reply['text'] ?? '').toString().trim(),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                height: 1.2,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: _cancelReply,
+                        icon: const Icon(Icons.close_rounded, color: AppColors.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            Row(
+              children: [
+                GestureDetector(
+                  onTap: (isEditing || _isSendingImage)
+                      ? null
+                      : _pickAndSendImage,
+                  child: Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceSoft,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: AppColors.accentBorder.withAlpha(110),
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: _isSendingImage
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2.2),
+                          )
+                        : Icon(
+                            Icons.photo_outlined,
+                            color: isEditing ? AppColors.textMuted : AppColors.accent,
+                            size: 24,
+                          ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextField(
+                    controller: _messageController,
+                    style: const TextStyle(color: AppColors.textPrimary),
+                    minLines: 1,
+                    maxLines: 5,
+                    textInputAction: TextInputAction.newline,
+                    decoration: InputDecoration(
+                      hintText: isEditing
+                          ? 'Новый текст сообщения...'
+                          : 'Введите сообщение...',
+                      hintStyle: const TextStyle(color: AppColors.textMuted),
+                      filled: true,
+                      fillColor: AppColors.surfaceSoft,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(18),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                GestureDetector(
+                  onTap: _isSending ? null : _sendMessage,
+                  child: Container(
+                    width: 54,
+                    height: 54,
+                    decoration: BoxDecoration(
+                      color: AppColors.accent,
+                      borderRadius: BorderRadius.circular(18),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.accent.withAlpha(55),
+                          blurRadius: 22,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                    alignment: Alignment.center,
+                    child: _isSending
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.4,
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.black),
+                            ),
+                          )
+                        : Icon(
+                            isEditing ? Icons.check_rounded : Icons.send_rounded,
+                            color: Colors.black,
+                            size: 24,
+                          ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

@@ -1,4 +1,7 @@
 import 'package:dio/dio.dart';
+import 'package:http_parser/http_parser.dart';
+import 'package:mime/mime.dart';
+
 import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/secure_storage_service.dart';
 
@@ -40,12 +43,14 @@ class MessagesService {
   Future<Map<String, dynamic>> sendMessage({
     required int chatId,
     required String text,
+    int? replyToMessageId,
   }) async {
     final response = await _dio.post(
       '/messages/',
       data: {
         'chat_id': chatId,
         'text': text,
+        if (replyToMessageId != null) 'reply_to_message_id': replyToMessageId,
       },
       options: await _authorizedOptions(),
     );
@@ -61,5 +66,78 @@ class MessagesService {
     }
 
     throw Exception('Неожиданный формат ответа при отправке сообщения');
+  }
+
+  Future<Map<String, dynamic>> updateMessage({
+    required int messageId,
+    required String text,
+  }) async {
+    final response = await _dio.patch(
+      '/messages/$messageId',
+      data: {'text': text},
+      options: await _authorizedOptions(),
+    );
+
+    final data = response.data;
+
+    if (data is Map<String, dynamic>) {
+      return data;
+    }
+
+    if (data is Map) {
+      return Map<String, dynamic>.from(data);
+    }
+
+    throw Exception('Неожиданный формат ответа при редактировании сообщения');
+  }
+
+  Future<void> deleteMessage(int messageId) async {
+    await _dio.delete(
+      '/messages/$messageId',
+      options: await _authorizedOptions(),
+    );
+  }
+
+  Future<Map<String, dynamic>> sendPhotoMessage({
+    required int chatId,
+    required String imagePath,
+    required String fileName,
+    int? replyToMessageId,
+  }) async {
+    final mimeType = lookupMimeType(imagePath) ?? lookupMimeType(fileName) ?? 'application/octet-stream';
+    final mimeParts = mimeType.split('/');
+
+    final formData = FormData.fromMap({
+      'chat_id': chatId.toString(),
+      if (replyToMessageId != null)
+        'reply_to_message_id': replyToMessageId.toString(),
+      'file': await MultipartFile.fromFile(
+        imagePath,
+        filename: fileName,
+        contentType: mimeParts.length == 2
+            ? MediaType(mimeParts[0], mimeParts[1])
+            : MediaType('application', 'octet-stream'),
+      ),
+    });
+
+    final response = await _dio.post(
+      '/messages/photo',
+      data: formData,
+      options: (await _authorizedOptions()).copyWith(
+        contentType: 'multipart/form-data',
+      ),
+    );
+
+    final data = response.data;
+
+    if (data is Map<String, dynamic>) {
+      return data;
+    }
+
+    if (data is Map) {
+      return Map<String, dynamic>.from(data);
+    }
+
+    throw Exception('Неожиданный формат ответа при отправке фото');
   }
 }
