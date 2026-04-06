@@ -21,7 +21,7 @@ class MessagesService {
 
   Future<List<Map<String, dynamic>>> getMessages(int chatId) async {
     final response = await _dio.get(
-      '/messages/$chatId',
+      '/messages/chat/$chatId',
       options: await _authorizedOptions(),
     );
 
@@ -34,7 +34,7 @@ class MessagesService {
           .toList();
     }
 
-    throw Exception('Неожиданный формат ответа /messages/{chat_id}');
+    throw Exception('Неожиданный формат ответа /messages/chat/{chat_id}');
   }
 
   Future<Map<String, dynamic>> sendMessage({

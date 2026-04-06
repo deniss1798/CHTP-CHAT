@@ -464,6 +464,7 @@ async def send_video_message(
 
 
 @router.post("/video-note", response_model=MessageResponse)
+@router.post("/video_note", response_model=MessageResponse)
 async def send_video_note_message(
     chat_id: int = Form(...),
     file: UploadFile = File(...),
@@ -663,7 +664,7 @@ async def delete_message(
     return {"detail": "Message deleted"}
 
 
-@router.get("/{chat_id}", response_model=list[MessageResponse])
+@router.get("/chat/{chat_id}", response_model=list[MessageResponse])
 def get_chat_messages(
     chat_id: int,
     db: Session = Depends(get_db),
