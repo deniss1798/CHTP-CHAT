@@ -24,6 +24,14 @@ ALLOWED_IMAGE_TYPES = {
 
 MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10 MB
 
+ALLOWED_VIDEO_TYPES = {
+    "video/mp4": ".mp4",
+    "video/webm": ".webm",
+    "video/quicktime": ".mov",
+}
+
+MAX_VIDEO_SIZE = 50 * 1024 * 1024  # 50 MB
+
 
 def _load_reply_parent(db: Session, reply_to_message_id: int | None) -> Message | None:
     if not reply_to_message_id:
@@ -33,7 +41,7 @@ def _load_reply_parent(db: Session, reply_to_message_id: int | None) -> Message 
 
 def _reply_preview_for_parent(parent: Message, storage: S3StorageService) -> MessageReplyPreview:
     media_url = parent.media_url
-    if parent.message_type == "image" and parent.media_key:
+    if parent.message_type in {"image", "video"} and parent.media_key:
         media_url = storage.generate_private_file_url(object_key=parent.media_key)
     return MessageReplyPreview(
         id=parent.id,
@@ -55,7 +63,7 @@ def _message_to_response(message: Message, db: Session, storage: S3StorageServic
             reply_preview = _reply_preview_for_parent(parent, storage)
 
     media_url = message.media_url
-    if message.message_type == "image" and message.media_key:
+    if message.message_type in {"image", "video"} and message.media_key:
         media_url = storage.generate_private_file_url(object_key=message.media_key)
 
     return MessageResponse(
@@ -88,7 +96,7 @@ def _message_to_response_batched(
             reply_preview = _reply_preview_for_parent(parent, storage)
 
     media_url = message.media_url
-    if message.message_type == "image" and message.media_key:
+    if message.message_type in {"image", "video"} and message.media_key:
         media_url = storage.generate_private_file_url(object_key=message.media_key)
 
     return MessageResponse(
@@ -120,7 +128,7 @@ def _build_message_payload(message: Message, db: Session, storage: S3StorageServ
             reply_to_dict = _reply_preview_for_parent(parent, storage).model_dump()
 
     media_url = message.media_url
-    if message.message_type == "image" and message.media_key:
+    if message.message_type in {"image", "video"} and message.media_key:
         media_url = storage.generate_private_file_url(object_key=message.media_key)
 
     return {
@@ -175,7 +183,7 @@ def _apply_private_media_urls(messages: list[Message]) -> list[Message]:
     storage = S3StorageService()
 
     for message in messages:
-        if message.message_type == "image" and message.media_key:
+        if message.message_type in {"image", "video"} and message.media_key:
             message.media_url = storage.generate_private_file_url(
                 object_key=message.media_key
             )
@@ -187,7 +195,7 @@ def _apply_private_media_urls_map(messages: list[Message]) -> None:
     storage = S3StorageService()
 
     for message in messages:
-        if message.message_type == "image" and message.media_key:
+        if message.message_type in {"image", "video"} and message.media_key:
             message.media_url = storage.generate_private_file_url(
                 object_key=message.media_key
             )
@@ -345,6 +353,114 @@ async def send_photo_message(
     return _message_to_response(new_message, db)
 
 
+@router.post("/video", response_model=MessageResponse)
+async def send_video_message(
+    chat_id: int = Form(...),
+    file: UploadFile = File(...),
+    reply_to_message_id: int | None = Form(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_chat_member(chat_id, current_user.id, db)
+    _validate_reply_target(db, chat_id, reply_to_message_id)
+
+    video_content_type = file.content_type
+    extension: str | None = None
+    if video_content_type in ALLOWED_VIDEO_TYPES:
+        extension = ALLOWED_VIDEO_TYPES[video_content_type]
+    else:
+        # Some mobile clients may omit Content-Type; infer from filename.
+        lower_name = (file.filename or "").lower()
+        if lower_name.endswith(".mp4"):
+            extension = ".mp4"
+        elif lower_name.endswith(".webm"):
+            extension = ".webm"
+        elif lower_name.endswith(".mov"):
+            extension = ".mov"
+
+        if extension is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Only MP4, WEBM and MOV videos are allowed",
+            )
+
+    content = await file.read()
+
+    if not content:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Empty file",
+        )
+
+    if len(content) > MAX_VIDEO_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File is too large. Max size is 50 MB",
+        )
+
+    storage = S3StorageService()
+    media_content_type = video_content_type or "application/octet-stream"
+
+    media_key, media_url = storage.upload_private_message_video(
+        content=content,
+        chat_id=chat_id,
+        extension=extension,
+        content_type=media_content_type,
+    )
+
+    new_message = Message(
+        chat_id=chat_id,
+        sender_id=current_user.id,
+        text="",
+        message_type="video",
+        media_key=media_key,
+        media_url=media_url,
+        media_mime_type=media_content_type,
+        media_size=len(content),
+        is_updated=False,
+        reply_to_message_id=reply_to_message_id,
+    )
+
+    db.add(new_message)
+    db.commit()
+    db.refresh(new_message)
+
+    new_message.media_url = storage.generate_private_file_url(
+        object_key=new_message.media_key
+    )
+
+    await manager.broadcast(
+        chat_id,
+        {
+            "type": "new_message",
+            "message": _build_message_payload(new_message, db),
+        },
+    )
+
+    recipient_user_ids = [
+        row.user_id
+        for row in db.query(ChatMember)
+        .filter(ChatMember.chat_id == new_message.chat_id)
+        .all()
+        if row.user_id != current_user.id
+    ]
+
+    sender_name = current_user.username
+
+    try:
+        send_chat_message_push(
+            db=db,
+            chat_id=new_message.chat_id,
+            sender_name=sender_name,
+            recipient_user_ids=recipient_user_ids,
+            message_text="🎥 Видео",
+        )
+    except Exception as e:
+        print(f"Push sending skipped: {e}")
+
+    return _message_to_response(new_message, db)
+
+
 @router.patch("/{message_id}", response_model=MessageResponse)
 async def update_message(
     message_id: int,
@@ -411,7 +527,9 @@ async def delete_message(
         )
 
     chat_id = message.chat_id
-    media_key = message.media_key if message.message_type == "image" else None
+    media_key = (
+        message.media_key if message.message_type in {"image", "video"} else None
+    )
 
     db.delete(message)
     db.commit()

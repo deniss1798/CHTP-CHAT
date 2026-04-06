@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:video_player/video_player.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/network/api_client.dart';
@@ -34,6 +35,108 @@ class ChatDetailScreen extends StatefulWidget {
   State<ChatDetailScreen> createState() => _ChatDetailScreenState();
 }
 
+class _VideoMessageWidget extends StatefulWidget {
+  final String url;
+  final bool isMine;
+
+  const _VideoMessageWidget({
+    required this.url,
+    required this.isMine,
+  });
+
+  @override
+  State<_VideoMessageWidget> createState() => _VideoMessageWidgetState();
+}
+
+class _VideoMessageWidgetState extends State<_VideoMessageWidget> {
+  late final VideoPlayerController _controller;
+  bool _initialized = false;
+  bool _showOverlay = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url));
+    _controller.initialize().then((_) {
+      if (!mounted) return;
+      setState(() {
+        _initialized = true;
+      });
+    });
+
+    _controller.addListener(() {
+      if (!mounted) return;
+      final playing = _controller.value.isPlaying;
+      if (playing) {
+        if (_showOverlay) setState(() => _showOverlay = false);
+      } else {
+        if (!_showOverlay) setState(() => _showOverlay = true);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _togglePlayback() {
+    if (!_initialized) return;
+    if (_controller.value.isPlaying) {
+      _controller.pause();
+    } else {
+      _controller.play();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = widget.isMine ? Colors.black.withAlpha(20) : AppColors.surfaceSoft;
+
+    if (!_initialized) {
+      return Container(
+        color: bg,
+        alignment: Alignment.center,
+        child: const CircularProgressIndicator(),
+      );
+    }
+
+    return GestureDetector(
+      onTap: _togglePlayback,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Center(
+            child: AspectRatio(
+              aspectRatio: _controller.value.aspectRatio,
+              child: VideoPlayer(_controller),
+            ),
+          ),
+          AnimatedOpacity(
+            opacity: _showOverlay ? 1 : 0,
+            duration: const Duration(milliseconds: 150),
+            child: Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: Colors.black.withAlpha(55),
+                borderRadius: BorderRadius.circular(24),
+              ),
+              alignment: Alignment.center,
+              child: Icon(
+                _controller.value.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                color: Colors.white,
+                size: 24,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ChatDetailScreenState extends State<ChatDetailScreen> {
   final AuthService _authService = AuthService();
   final MessagesService _messagesService = MessagesService();
@@ -45,6 +148,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   bool _isUploadingChatAvatar = false;
   bool _isSendingImage = false;
+  bool _isSendingVideo = false;
 
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -732,6 +836,63 @@ await _loadChatDetails();
     }
   }
 
+  Future<void> _showAttachmentPicker() async {
+    if (_isUploadingChatAvatar) return;
+
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.photo_outlined, color: AppColors.accent),
+                  title: const Text('Фото'),
+                  onTap: () => Navigator.of(ctx).pop('photo'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.video_collection_outlined, color: AppColors.accent),
+                  title: const Text('Видео'),
+                  onTap: () => Navigator.of(ctx).pop('video_gallery'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.videocam_outlined, color: AppColors.accent),
+                  title: const Text('Снять видео'),
+                  onTap: () => Navigator.of(ctx).pop('video_camera'),
+                ),
+                const SizedBox(height: 4),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (!mounted || choice == null) return;
+
+    if (choice == 'photo') {
+      await _pickAndSendImage();
+      return;
+    }
+
+    if (choice == 'video_gallery') {
+      await _pickAndSendVideo(source: ImageSource.gallery);
+      return;
+    }
+
+    if (choice == 'video_camera') {
+      await _pickAndSendVideo(source: ImageSource.camera);
+      return;
+    }
+  }
+
   Future<void> _pickAndSendImage() async {
     if (_isSendingImage) return;
 
@@ -788,6 +949,67 @@ await _loadChatDetails();
           backgroundColor: AppColors.surfaceSoft,
           content: Text(
             _extractErrorMessage(e, fallback: 'Не удалось отправить фото'),
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _pickAndSendVideo({required ImageSource source}) async {
+    if (_isSendingVideo) return;
+
+    try {
+      final picked = await _imagePicker.pickVideo(
+        source: source,
+        maxDuration: const Duration(seconds: 60),
+      );
+
+      if (picked == null) return;
+
+      setState(() {
+        _isSendingVideo = true;
+      });
+
+      final replyId = _pendingReplyToMessageId();
+
+      final createdMessage = _normalizeMessageMap(
+        await _messagesService.sendVideoMessage(
+          chatId: widget.chatId,
+          videoPath: picked.path,
+          fileName: picked.name,
+          replyToMessageId: replyId,
+        ),
+      );
+
+      if (!mounted) return;
+
+      final exists = _messages.any((m) => m['id'] == createdMessage['id']);
+
+      setState(() {
+        if (!exists) {
+          _messages.add(createdMessage);
+        }
+        _replyingTo = null;
+        _isSendingVideo = false;
+      });
+
+      await _markCurrentChatAsRead();
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToBottom();
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _isSendingVideo = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.surfaceSoft,
+          content: Text(
+            _extractErrorMessage(e, fallback: 'Не удалось отправить видео'),
           ),
         ),
       );
@@ -891,6 +1113,9 @@ await _loadChatDetails();
     final type = (reply['message_type'] ?? 'text').toString();
     if (type == 'image') {
       return '📷 Фото';
+    }
+    if (type == 'video') {
+      return '🎥 Видео';
     }
 
     final t = (reply['text'] ?? '').toString().trim();
@@ -1293,6 +1518,22 @@ await _loadChatDetails();
       );
     }
 
+    if (messageType == 'video' && mediaUrl.isNotEmpty) {
+      return ConstrainedBox(
+        constraints: const BoxConstraints(
+          maxWidth: 240,
+          maxHeight: 280,
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: _VideoMessageWidget(
+            url: mediaUrl,
+            isMine: isMine,
+          ),
+        ),
+      );
+    }
+
     return Text(
   (message['text'] ?? '').toString(),
   style: TextStyle(
@@ -1564,9 +1805,7 @@ await _loadChatDetails();
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              (reply['message_type'] ?? 'text').toString() == 'image'
-                                  ? '📷 Фото'
-                                  : (reply['text'] ?? '').toString().trim(),
+                              _replyPreviewLabel(reply),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
@@ -1590,9 +1829,9 @@ await _loadChatDetails();
             Row(
               children: [
                 GestureDetector(
-                  onTap: (isEditing || _isSendingImage)
+                  onTap: (isEditing || _isSendingImage || _isSendingVideo)
                       ? null
-                      : _pickAndSendImage,
+                      : () => _showAttachmentPicker(),
                   child: Container(
                     width: 50,
                     height: 50,
@@ -1604,7 +1843,7 @@ await _loadChatDetails();
                       ),
                     ),
                     alignment: Alignment.center,
-                    child: _isSendingImage
+                    child: (_isSendingImage || _isSendingVideo)
                         ? const SizedBox(
                             width: 20,
                             height: 20,

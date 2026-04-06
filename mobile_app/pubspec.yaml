@@ -20,6 +20,7 @@ dependencies:
   image_picker: ^1.1.2
   mime: ^1.0.6
   http_parser: ^4.0.2
+  video_player: ^2.11.1
 dev_dependencies:
   flutter_test:
     sdk: flutter
