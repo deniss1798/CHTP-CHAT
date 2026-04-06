@@ -184,4 +184,48 @@ class MessagesService {
 
     throw Exception('Неожиданный формат ответа при отправке видео');
   }
+
+  Future<Map<String, dynamic>> sendVideoNoteMessage({
+    required int chatId,
+    required String videoPath,
+    required String fileName,
+    int? replyToMessageId,
+  }) async {
+    final mimeType =
+        lookupMimeType(videoPath) ?? lookupMimeType(fileName) ?? 'application/octet-stream';
+    final mimeParts = mimeType.split('/');
+
+    final formData = FormData.fromMap({
+      'chat_id': chatId.toString(),
+      if (replyToMessageId != null)
+        'reply_to_message_id': replyToMessageId.toString(),
+      'file': await MultipartFile.fromFile(
+        videoPath,
+        filename: fileName,
+        contentType: mimeParts.length == 2
+            ? MediaType(mimeParts[0], mimeParts[1])
+            : MediaType('application', 'octet-stream'),
+      ),
+    });
+
+    final response = await _dio.post(
+      '/messages/video-note',
+      data: formData,
+      options: (await _authorizedOptions()).copyWith(
+        contentType: 'multipart/form-data',
+      ),
+    );
+
+    final data = response.data;
+
+    if (data is Map<String, dynamic>) {
+      return data;
+    }
+
+    if (data is Map) {
+      return Map<String, dynamic>.from(data);
+    }
+
+    throw Exception('Неожиданный формат ответа при отправке видеосообщения');
+  }
 }

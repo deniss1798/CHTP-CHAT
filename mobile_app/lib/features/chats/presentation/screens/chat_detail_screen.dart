@@ -13,6 +13,7 @@ import '../../data/services/chat_socket_service.dart';
 import '../../data/services/local_chat_state_service.dart';
 import '../../data/services/messages_service.dart';
 import 'chat_member_add_screen.dart';
+import 'video_note_record_screen.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import '../../data/services/chat_avatar_service.dart';
@@ -38,10 +39,12 @@ class ChatDetailScreen extends StatefulWidget {
 class _VideoMessageWidget extends StatefulWidget {
   final String url;
   final bool isMine;
+  final bool isVideoNote;
 
   const _VideoMessageWidget({
     required this.url,
     required this.isMine,
+    this.isVideoNote = false,
   });
 
   @override
@@ -102,17 +105,32 @@ class _VideoMessageWidgetState extends State<_VideoMessageWidget> {
       );
     }
 
+    final videoChild = widget.isVideoNote
+        ? SizedBox(
+            width: 220,
+            height: 220,
+            child: ClipOval(
+              child: FittedBox(
+                fit: BoxFit.cover,
+                child: SizedBox(
+                  width: _controller.value.size.width,
+                  height: _controller.value.size.height,
+                  child: VideoPlayer(_controller),
+                ),
+              ),
+            ),
+          )
+        : AspectRatio(
+            aspectRatio: _controller.value.aspectRatio,
+            child: VideoPlayer(_controller),
+          );
+
     return GestureDetector(
       onTap: _togglePlayback,
       child: Stack(
         alignment: Alignment.center,
         children: [
-          Center(
-            child: AspectRatio(
-              aspectRatio: _controller.value.aspectRatio,
-              child: VideoPlayer(_controller),
-            ),
-          ),
+          Center(child: videoChild),
           AnimatedOpacity(
             opacity: _showOverlay ? 1 : 0,
             duration: const Duration(milliseconds: 150),
@@ -859,13 +877,9 @@ await _loadChatDetails();
                 ),
                 ListTile(
                   leading: const Icon(Icons.video_collection_outlined, color: AppColors.accent),
-                  title: const Text('Видео'),
+                  title: const Text('Видео (файл)'),
+                  subtitle: const Text('Из галереи — обычное видео'),
                   onTap: () => Navigator.of(ctx).pop('video_gallery'),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.videocam_outlined, color: AppColors.accent),
-                  title: const Text('Снять видео'),
-                  onTap: () => Navigator.of(ctx).pop('video_camera'),
                 ),
                 const SizedBox(height: 4),
               ],
@@ -884,11 +898,6 @@ await _loadChatDetails();
 
     if (choice == 'video_gallery') {
       await _pickAndSendVideo(source: ImageSource.gallery);
-      return;
-    }
-
-    if (choice == 'video_camera') {
-      await _pickAndSendVideo(source: ImageSource.camera);
       return;
     }
   }
@@ -1016,6 +1025,80 @@ await _loadChatDetails();
     }
   }
 
+  String _basenameFromPath(String path) {
+    final n = path.replaceAll(r'\', '/').split('/').last;
+    return n.isEmpty ? 'video_note.mp4' : n;
+  }
+
+  Future<void> _openVideoNoteRecorder() async {
+    if (_isSendingVideo) return;
+
+    final path = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => const VideoNoteRecordScreen(),
+      ),
+    );
+
+    if (path == null || path.isEmpty) return;
+
+    await _uploadVideoNote(path);
+  }
+
+  Future<void> _uploadVideoNote(String videoPath) async {
+    if (_isSendingVideo) return;
+
+    setState(() {
+      _isSendingVideo = true;
+    });
+
+    try {
+      final replyId = _pendingReplyToMessageId();
+
+      final createdMessage = _normalizeMessageMap(
+        await _messagesService.sendVideoNoteMessage(
+          chatId: widget.chatId,
+          videoPath: videoPath,
+          fileName: _basenameFromPath(videoPath),
+          replyToMessageId: replyId,
+        ),
+      );
+
+      if (!mounted) return;
+
+      final exists = _messages.any((m) => m['id'] == createdMessage['id']);
+
+      setState(() {
+        if (!exists) {
+          _messages.add(createdMessage);
+        }
+        _replyingTo = null;
+        _isSendingVideo = false;
+      });
+
+      await _markCurrentChatAsRead();
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToBottom();
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _isSendingVideo = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.surfaceSoft,
+          content: Text(
+            _extractErrorMessage(e, fallback: 'Не удалось отправить видеосообщение'),
+          ),
+        ),
+      );
+    }
+  }
+
   void _scrollToBottom({bool jump = false}) {
     if (!_scrollController.hasClients) return;
 
@@ -1116,6 +1199,9 @@ await _loadChatDetails();
     }
     if (type == 'video') {
       return '🎥 Видео';
+    }
+    if (type == 'video_note') {
+      return '🎬 Видеосообщение';
     }
 
     final t = (reply['text'] ?? '').toString().trim();
@@ -1470,6 +1556,18 @@ await _loadChatDetails();
     final messageType = (message['message_type'] ?? 'text').toString();
     final mediaUrl = (message['media_url'] ?? '').toString().trim();
 
+    if (messageType == 'video_note' && mediaUrl.isNotEmpty) {
+      return SizedBox(
+        width: 220,
+        height: 220,
+        child: _VideoMessageWidget(
+          url: mediaUrl,
+          isMine: isMine,
+          isVideoNote: true,
+        ),
+      );
+    }
+
     if (messageType == 'image' && mediaUrl.isNotEmpty) {
       return ConstrainedBox(
         constraints: const BoxConstraints(
@@ -1529,6 +1627,7 @@ await _loadChatDetails();
           child: _VideoMessageWidget(
             url: mediaUrl,
             isMine: isMine,
+            isVideoNote: false,
           ),
         ),
       );
@@ -1828,35 +1927,70 @@ await _loadChatDetails();
               ),
             Row(
               children: [
-                GestureDetector(
-                  onTap: (isEditing || _isSendingImage || _isSendingVideo)
-                      ? null
-                      : () => _showAttachmentPicker(),
-                  child: Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceSoft,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: AppColors.accentBorder.withAlpha(110),
+                Tooltip(
+                  message: 'Фото или видео из галереи',
+                  child: GestureDetector(
+                    onTap: (isEditing || _isSendingImage || _isSendingVideo)
+                        ? null
+                        : () => _showAttachmentPicker(),
+                    child: Container(
+                      width: 48,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceSoft,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: AppColors.accentBorder.withAlpha(110),
+                        ),
                       ),
+                      alignment: Alignment.center,
+                      child: (_isSendingImage || _isSendingVideo)
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2.2),
+                            )
+                          : Icon(
+                              Icons.perm_media_outlined,
+                              color: isEditing ? AppColors.textMuted : AppColors.accent,
+                              size: 22,
+                            ),
                     ),
-                    alignment: Alignment.center,
-                    child: (_isSendingImage || _isSendingVideo)
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2.2),
-                          )
-                        : Icon(
-                            Icons.photo_outlined,
-                            color: isEditing ? AppColors.textMuted : AppColors.accent,
-                            size: 24,
-                          ),
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
+                Tooltip(
+                  message: 'Видеосообщение (кружок) — удерживайте кнопку записи',
+                  child: GestureDetector(
+                    onTap: (isEditing || _isSendingImage || _isSendingVideo)
+                        ? null
+                        : _openVideoNoteRecorder,
+                    child: Container(
+                      width: 48,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceSoft,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: AppColors.accentBorder.withAlpha(110),
+                        ),
+                      ),
+                      alignment: Alignment.center,
+                      child: (_isSendingImage || _isSendingVideo)
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2.2),
+                            )
+                          : Icon(
+                              Icons.videocam_outlined,
+                              color: isEditing ? AppColors.textMuted : AppColors.accent,
+                              size: 22,
+                            ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
                 Expanded(
                   child: TextField(
                     controller: _messageController,
