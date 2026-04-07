@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -40,6 +41,9 @@ class MessageResponse(BaseModel):
 
     reply_to_message_id: int | None = None
     reply_to: MessageReplyPreview | None = None
+
+    # Только для исходящих сообщений текущего пользователя: sent / read
+    delivery_status: Literal["sent", "read"] | None = None
 
     class Config:
         from_attributes = True

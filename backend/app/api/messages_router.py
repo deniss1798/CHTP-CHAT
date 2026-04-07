@@ -77,7 +77,12 @@ def _reply_preview_for_parent(
     )
 
 
-def _message_to_response(message: Message, db: Session, storage: S3StorageService | None = None) -> MessageResponse:
+def _message_to_response(
+    message: Message,
+    db: Session,
+    storage: S3StorageService | None = None,
+    viewer_user_id: int | None = None,
+) -> MessageResponse:
     get_storage = _make_s3_getter(storage)
 
     reply_preview: MessageReplyPreview | None = None
@@ -90,6 +95,12 @@ def _message_to_response(message: Message, db: Session, storage: S3StorageServic
     if message.message_type in PRIVATE_MEDIA_MESSAGE_TYPES and message.media_key:
         media_url = get_storage().generate_private_file_url(object_key=message.media_key)
 
+    delivery_status = None
+    if viewer_user_id is not None:
+        delivery_status = _compute_delivery_status(
+            db, message.chat_id, message, viewer_user_id
+        )
+
     return MessageResponse(
         id=message.id,
         chat_id=message.chat_id,
@@ -105,6 +116,7 @@ def _message_to_response(message: Message, db: Session, storage: S3StorageServic
         is_updated=message.is_updated,
         reply_to_message_id=message.reply_to_message_id,
         reply_to=reply_preview,
+        delivery_status=delivery_status,
     )
 
 
@@ -112,6 +124,8 @@ def _message_to_response_batched(
     message: Message,
     parents_by_id: dict[int, Message],
     get_storage: Callable[[], S3StorageService],
+    db: Session,
+    viewer_user_id: int,
 ) -> MessageResponse:
     reply_preview: MessageReplyPreview | None = None
     if message.reply_to_message_id:
@@ -123,6 +137,10 @@ def _message_to_response_batched(
     if message.message_type in PRIVATE_MEDIA_MESSAGE_TYPES and message.media_key:
         media_url = get_storage().generate_private_file_url(object_key=message.media_key)
 
+    delivery_status = _compute_delivery_status(
+        db, message.chat_id, message, viewer_user_id
+    )
+
     return MessageResponse(
         id=message.id,
         chat_id=message.chat_id,
@@ -138,6 +156,7 @@ def _message_to_response_batched(
         is_updated=message.is_updated,
         reply_to_message_id=message.reply_to_message_id,
         reply_to=reply_preview,
+        delivery_status=delivery_status,
     )
 
 
@@ -170,6 +189,29 @@ def _build_message_payload(message: Message, db: Session, storage: S3StorageServ
         "reply_to_message_id": message.reply_to_message_id,
         "reply_to": reply_to_dict,
     }
+
+
+def _compute_delivery_status(
+    db: Session,
+    chat_id: int,
+    message: Message,
+    viewer_user_id: int,
+) -> str | None:
+    if message.sender_id != viewer_user_id:
+        return None
+    members = (
+        db.query(ChatMember)
+        .filter(ChatMember.chat_id == chat_id)
+        .all()
+    )
+    others = [m for m in members if m.user_id != message.sender_id]
+    if not others:
+        return None
+    for m in others:
+        lr = m.last_read_message_id or 0
+        if lr < message.id:
+            return "sent"
+    return "read"
 
 
 def _ensure_chat_member(chat_id: int, user_id: int, db: Session) -> None:
@@ -279,7 +321,7 @@ async def send_message(
     except Exception as e:
         print(f"Push sending skipped: {e}")
 
-    return _message_to_response(new_message, db)
+    return _message_to_response(new_message, db, viewer_user_id=current_user.id)
 
 
 @router.post("/photo", response_model=MessageResponse)
@@ -373,7 +415,7 @@ async def send_photo_message(
     except Exception as e:
         print(f"Push sending skipped: {e}")
 
-    return _message_to_response(new_message, db)
+    return _message_to_response(new_message, db, viewer_user_id=current_user.id)
 
 
 @router.post("/video", response_model=MessageResponse)
@@ -483,7 +525,7 @@ async def send_video_message(
     except Exception as e:
         print(f"Push sending skipped: {e}")
 
-    return _message_to_response(new_message, db)
+    return _message_to_response(new_message, db, viewer_user_id=current_user.id)
 
 
 @router.post("/video-note", response_model=MessageResponse)
@@ -594,7 +636,7 @@ async def send_video_note_message(
     except Exception as e:
         print(f"Push sending skipped: {e}")
 
-    return _message_to_response(new_message, db)
+    return _message_to_response(new_message, db, viewer_user_id=current_user.id)
 
 
 @router.patch("/{message_id}", response_model=MessageResponse)
@@ -639,7 +681,7 @@ async def update_message(
         },
     )
 
-    return _message_to_response(message, db)
+    return _message_to_response(message, db, viewer_user_id=current_user.id)
 
 
 @router.delete("/{message_id}")
@@ -718,6 +760,8 @@ def get_chat_messages(
     get_storage = _make_s3_getter()
 
     return [
-        _message_to_response_batched(message, parents_by_id, get_storage)
+        _message_to_response_batched(
+            message, parents_by_id, get_storage, db, current_user.id
+        )
         for message in messages
     ]

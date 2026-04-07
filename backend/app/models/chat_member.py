@@ -12,6 +12,12 @@ class ChatMember(Base):
     user_id = Column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     role = Column(String(20), nullable=False, default="member")
     joined_at = Column(TIMESTAMP, server_default=func.now())
+    last_read_message_id = Column(
+        BigInteger,
+        ForeignKey("messages.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     __table_args__ = (
         UniqueConstraint("chat_id", "user_id", name="uq_chat_members_chat_user"),

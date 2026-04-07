@@ -24,6 +24,15 @@ class ChatMemberAddRequest(BaseModel):
     user_id: int
 
 
+class MarkChatReadRequest(BaseModel):
+    message_id: int = Field(..., ge=1)
+
+
+class MemberReadState(BaseModel):
+    user_id: int
+    last_read_message_id: int | None = None
+
+
 class ChatResponse(BaseModel):
     id: int
     type: Literal["private", "group"]

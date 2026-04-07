@@ -9,17 +9,43 @@ from app.models.chat import Chat
 from app.models.chat_member import ChatMember
 from app.models.message import Message
 from app.models.user import User
+from app.core.ws_manager import manager
 from app.schemas.chat_schema import (
     ChatCreate,
     ChatDetailResponse,
     ChatMemberAddRequest,
     ChatMemberResponse,
     ChatResponse,
+    MarkChatReadRequest,
+    MemberReadState,
     UserShort,
 )
 from app.services.s3_storage import S3StorageService
 
 router = APIRouter(prefix="/chats", tags=["Chats"])
+
+def _unread_count_for_user(db: Session, chat_id: int, user_id: int) -> int:
+    member = (
+        db.query(ChatMember)
+        .filter(
+            ChatMember.chat_id == chat_id,
+            ChatMember.user_id == user_id,
+        )
+        .first()
+    )
+    if not member:
+        return 0
+    last_read = member.last_read_message_id or 0
+    return (
+        db.query(Message)
+        .filter(
+            Message.chat_id == chat_id,
+            Message.sender_id != user_id,
+            Message.id > last_read,
+        )
+        .count()
+    )
+
 
 ALLOWED_IMAGE_TYPES = {
     "image/jpeg": ".jpg",
@@ -81,7 +107,7 @@ def get_my_chats(
                 last_message=last_message.text if last_message else None,
                 last_message_at=last_message.created_at if last_message else None,
                 last_message_sender_id=last_message.sender_id if last_message else None,
-                unread_count=0,
+                unread_count=_unread_count_for_user(db, chat.id, current_user.id),
             )
         )
 
@@ -322,6 +348,95 @@ def get_chat_members(
         )
         for user, role in members
     ]
+
+
+@router.get("/{chat_id}/read-state", response_model=list[MemberReadState])
+def get_chat_read_state(
+    chat_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    member = (
+        db.query(ChatMember)
+        .filter(
+            ChatMember.chat_id == chat_id,
+            ChatMember.user_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not member:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not a member of this chat",
+        )
+
+    rows = (
+        db.query(ChatMember.user_id, ChatMember.last_read_message_id)
+        .filter(ChatMember.chat_id == chat_id)
+        .all()
+    )
+
+    return [
+        MemberReadState(user_id=uid, last_read_message_id=lrid)
+        for uid, lrid in rows
+    ]
+
+
+@router.post("/{chat_id}/read")
+async def mark_chat_read(
+    chat_id: int,
+    body: MarkChatReadRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    member = (
+        db.query(ChatMember)
+        .filter(
+            ChatMember.chat_id == chat_id,
+            ChatMember.user_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not member:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not a member of this chat",
+        )
+
+    msg = (
+        db.query(Message)
+        .filter(Message.id == body.message_id, Message.chat_id == chat_id)
+        .first()
+    )
+
+    if not msg:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Message not found",
+        )
+
+    prev = member.last_read_message_id or 0
+    if body.message_id > prev:
+        member.last_read_message_id = body.message_id
+        db.commit()
+        db.refresh(member)
+
+        await manager.broadcast(
+            chat_id,
+            {
+                "type": "read_receipt",
+                "chat_id": chat_id,
+                "user_id": current_user.id,
+                "last_read_message_id": member.last_read_message_id,
+            },
+        )
+
+    return {
+        "detail": "ok",
+        "last_read_message_id": member.last_read_message_id,
+    }
 
 
 @router.patch("/{chat_id}/avatar", response_model=ChatDetailResponse)
