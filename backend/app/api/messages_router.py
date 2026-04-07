@@ -13,6 +13,7 @@ from app.models.message import Message
 from app.models.user import User
 from app.schemas.message_schema import MessageCreate, MessageReplyPreview, MessageResponse, MessageUpdate
 from app.services.s3_storage import S3StorageService
+from app.services.video_transcode import try_transcode_to_desktop_mp4
 
 router = APIRouter(prefix="/messages", tags=["Messages"])
 
@@ -465,8 +466,15 @@ async def send_video_message(
             detail="File is too large. Max size is 50 MB",
         )
 
+    transcoded = try_transcode_to_desktop_mp4(content)
+    if transcoded is not None:
+        content = transcoded
+        extension = ".mp4"
+        media_content_type = "video/mp4"
+    else:
+        media_content_type = video_content_type or "application/octet-stream"
+
     storage = S3StorageService()
-    media_content_type = video_content_type or "application/octet-stream"
 
     media_key, media_url = storage.upload_private_message_video(
         content=content,
@@ -576,8 +584,15 @@ async def send_video_note_message(
             detail="File is too large. Max size is 50 MB",
         )
 
+    transcoded = try_transcode_to_desktop_mp4(content)
+    if transcoded is not None:
+        content = transcoded
+        extension = ".mp4"
+        media_content_type = "video/mp4"
+    else:
+        media_content_type = video_content_type or "application/octet-stream"
+
     storage = S3StorageService()
-    media_content_type = video_content_type or "application/octet-stream"
 
     media_key, media_url = storage.upload_private_message_video_note(
         content=content,

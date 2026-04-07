@@ -1,6 +1,10 @@
 # Используем официальный образ Python
 FROM python:3.14-slim
 
+# ffmpeg: перекодирование видео в H.264/AAC для десктоп-клиентов (Windows video_player)
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
 # Устанавливаем рабочую директорию внутри контейнера
 WORKDIR /app
 
