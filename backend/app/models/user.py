@@ -1,4 +1,4 @@
-from sqlalchemy import BigInteger, Column, String, Text, TIMESTAMP, func
+from sqlalchemy import BigInteger, Column, DateTime, String, Text, TIMESTAMP, func
 
 from app.db.database import Base
 
@@ -12,3 +12,4 @@ class User(Base):
     password_hash = Column(Text, nullable=False)
     avatar_url = Column(Text, nullable=True)
     created_at = Column(TIMESTAMP, server_default=func.now())
+    last_seen_at = Column(DateTime(timezone=True), nullable=True)

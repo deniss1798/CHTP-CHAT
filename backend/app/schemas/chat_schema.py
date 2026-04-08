@@ -9,6 +9,7 @@ class UserShort(BaseModel):
     username: str
     email: EmailStr
     avatar_url: str | None = None
+    last_seen_at: datetime | None = None
 
     class Config:
         from_attributes = True
@@ -55,6 +56,7 @@ class ChatMemberResponse(BaseModel):
     email: EmailStr
     avatar_url: str | None = None
     role: str
+    last_seen_at: datetime | None = None
 
 
 class ChatDetailResponse(BaseModel):

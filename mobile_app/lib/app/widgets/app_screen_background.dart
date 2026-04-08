@@ -1,0 +1,81 @@
+import 'package:flutter/material.dart';
+
+import '../theme/app_colors.dart';
+import '../theme/design_tokens.dart';
+
+/// Стандартный фон: градиент + мягкие «ореолы» акцентного цвета (без перегруза).
+class AppScreenBackground extends StatelessWidget {
+  const AppScreenBackground({
+    super.key,
+    required this.child,
+    this.showAmbientGlow = true,
+  });
+
+  final Widget child;
+  final bool showAmbientGlow;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      decoration: const BoxDecoration(
+        gradient: AppGradients.background,
+      ),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (showAmbientGlow) ...[
+            Positioned(
+              top: 100,
+              left: -70,
+              child: _AmbientBlob(
+                size: 200,
+                color: AppColors.accent.withAlpha(22),
+              ),
+            ),
+            Positioned(
+              bottom: 80,
+              right: -50,
+              child: _AmbientBlob(
+                size: 220,
+                color: AppColors.accent.withAlpha(28),
+              ),
+            ),
+          ],
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _AmbientBlob extends StatelessWidget {
+  const _AmbientBlob({
+    required this.size,
+    required this.color,
+  });
+
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: color,
+              blurRadius: size * 0.45,
+              spreadRadius: 12,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

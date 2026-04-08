@@ -1,27 +1,49 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/design_tokens.dart';
+import '../../../../app/widgets/app_screen_background.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/secure_storage_service.dart';
 import '../../../auth/data/services/auth_service.dart';
 import '../../../auth/presentation/screens/auth_screen.dart';
 import '../../../profile/presentation/screens/profile_screen.dart';
 import '../../data/services/chats_service.dart';
+import '../../data/services/presence_service.dart';
 import 'chat_detail_screen.dart';
 import 'group_chat_create_screen.dart';
 import 'user_picker_screen.dart';
 
 class ChatsScreen extends StatefulWidget {
-  const ChatsScreen({super.key});
+  const ChatsScreen({
+    super.key,
+    this.embedded = false,
+    this.selectedChatId,
+    this.onChatSelected,
+  });
+
+  /// Режим левой колонки на десктопе: открытие чата без полноэкранного push.
+  final bool embedded;
+
+  final int? selectedChatId;
+  final void Function({
+    required int chatId,
+    required String title,
+    required String chatType,
+    String? avatarUrl,
+  })? onChatSelected;
 
   @override
   State<ChatsScreen> createState() => _ChatsScreenState();
 }
 
-class _ChatsScreenState extends State<ChatsScreen> {
+class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
   final ChatsService _chatsService = ChatsService();
   final AuthService _authService = AuthService();
+  final PresenceService _presenceService = PresenceService();
   final TextEditingController _searchController = TextEditingController();
   bool _isLoading = true;
   String? _error;
@@ -30,18 +52,51 @@ class _ChatsScreenState extends State<ChatsScreen> {
   List<Map<String, dynamic>> _allChats = [];
   List<Map<String, dynamic>> _filteredChats = [];
 
+  static const Duration _chatsListPollInterval = Duration(seconds: 15);
+
+  Timer? _chatsPollTimer;
+  Timer? _presenceTimer;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _init();
     _searchController.addListener(_applySearch);
+    _startChatsPolling();
+    _startPresenceHeartbeat();
+  }
+
+  void _startPresenceHeartbeat() {
+    _presenceTimer?.cancel();
+    _presenceService.ping();
+    _presenceTimer = Timer.periodic(const Duration(seconds: 50), (_) {
+      _presenceService.ping();
+    });
   }
 
   @override
   void dispose() {
-
+    _presenceTimer?.cancel();
+    _chatsPollTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _startChatsPolling() {
+    _chatsPollTimer?.cancel();
+    _chatsPollTimer = Timer.periodic(_chatsListPollInterval, (_) {
+      if (!mounted || _currentUserId == null) return;
+      _loadChats(silent: true);
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _currentUserId != null) {
+      _loadChats(silent: true);
+    }
   }
 
 Future<void> _init() async {
@@ -161,7 +216,19 @@ Future<void> _init() async {
     required String chatType,
     String? avatarUrl,
   }) async {
-    final result = await Navigator.of(context).push<bool>(
+    if (widget.embedded && widget.onChatSelected != null) {
+      widget.onChatSelected!(
+        chatId: chatId,
+        title: title,
+        chatType: chatType,
+        avatarUrl: avatarUrl,
+      );
+      if (!mounted) return;
+      await _loadChats(silent: true);
+      return;
+    }
+
+    await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => ChatDetailScreen(
           chatId: chatId,
@@ -172,9 +239,8 @@ Future<void> _init() async {
       ),
     );
 
-    if (result == true) {
-      await _loadChats();
-    }
+    if (!mounted) return;
+    await _loadChats(silent: true);
   }
 
   Future<void> _openCreateChatSheet() async {
@@ -533,9 +599,14 @@ Future<void> _init() async {
       color: AppColors.accent,
       onRefresh: _loadChats,
       child: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 110),
+        padding: EdgeInsets.fromLTRB(
+          widget.embedded ? 12 : 20,
+          0,
+          widget.embedded ? 12 : 20,
+          widget.embedded ? 96 : 110,
+        ),
         itemCount: _filteredChats.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 14),
+        separatorBuilder: (_, __) => const SizedBox(height: 10),
         itemBuilder: (context, index) {
           final chat = _filteredChats[index];
           final title = _chatTitle(chat);
@@ -554,6 +625,8 @@ Future<void> _init() async {
           }
 
           final isUnread = unreadCount > 0;
+          final isSelected =
+              widget.selectedChatId != null && chatId == widget.selectedChatId;
 
           return GestureDetector(
             onTap: chatId == null
@@ -564,30 +637,35 @@ Future<void> _init() async {
                       chatType: (chat['type'] ?? '').toString(),
                       avatarUrl: avatarUrl,
                     ),
-            child: Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: isUnread
-                    ? const Color(0xFF17131B)
-                    : AppColors.surface.withAlpha(215),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: isUnread
-                      ? AppColors.accent.withAlpha(200)
-                      : AppColors.accentBorder.withAlpha(120),
-                  width: isUnread ? 1.4 : 1,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? AppColors.accent.withAlpha(42)
+                      : (isUnread
+                          ? AppColors.accent.withAlpha(20)
+                          : AppColors.surface.withAlpha(230)),
+                  border: isSelected
+                      ? Border.all(
+                          color: AppColors.accent.withAlpha(200),
+                          width: 1.5,
+                        )
+                      : null,
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: isUnread
-                        ? AppColors.accent.withAlpha(30)
-                        : AppColors.accent.withAlpha(12),
-                    blurRadius: isUnread ? 22 : 18,
-                    spreadRadius: 1,
-                  ),
-                ],
-              ),
-              child: Row(
+                child: IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (isUnread)
+                        Container(
+                          width: 4,
+                          color: AppColors.accent,
+                        ),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.all(AppSpacing.md),
+                          child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildChatAvatar(
@@ -669,6 +747,12 @@ Future<void> _init() async {
                     ],
                   ),
                 ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           );
@@ -681,33 +765,19 @@ Future<void> _init() async {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF0B0B0D),
-              Color(0xFF09090B),
-              Color(0xFF140A02),
-            ],
-          ),
-        ),
+      body: AppScreenBackground(
         child: SafeArea(
           child: Stack(
             children: [
-              Positioned(
-                bottom: 40,
-                right: -30,
-                child: _GlowCircle(
-                  size: 180,
-                  color: AppColors.accent.withAlpha(24),
-                ),
-              ),
               Column(
                 children: [
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+                    padding: EdgeInsets.fromLTRB(
+                      widget.embedded ? 12 : 20,
+                      widget.embedded ? 14 : 18,
+                      widget.embedded ? 12 : 20,
+                      0,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -724,47 +794,41 @@ Future<void> _init() async {
                                 ),
                               ),
                             ),
-                            Container(
-                              decoration: BoxDecoration(
-                                color: AppColors.surface.withAlpha(180),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: AppColors.accentBorder.withAlpha(120),
+                            IconButton(
+                              style: IconButton.styleFrom(
+                                backgroundColor:
+                                    AppColors.surface.withAlpha(200),
+                                foregroundColor: AppColors.accent,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadius.sm),
                                 ),
                               ),
-                              child: IconButton(
-                                onPressed: () async {
-                                  await Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => const ProfileScreen(),
-                                    ),
-                                  );
+                              onPressed: () async {
+                                await Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => const ProfileScreen(),
+                                  ),
+                                );
 
-                                  if (!mounted) return;
-                                  await _loadChats(silent: true);
-                                },
-                                icon: const Icon(
-                                  Icons.person_outline,
-                                  color: AppColors.accent,
-                                ),
-                              ),
+                                if (!mounted) return;
+                                await _loadChats(silent: true);
+                              },
+                              icon: const Icon(Icons.person_outline),
                             ),
-                            const SizedBox(width: 10),
-                            Container(
-                              decoration: BoxDecoration(
-                                color: AppColors.surface.withAlpha(180),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: AppColors.accentBorder.withAlpha(120),
+                            const SizedBox(width: AppSpacing.sm),
+                            IconButton(
+                              style: IconButton.styleFrom(
+                                backgroundColor:
+                                    AppColors.surface.withAlpha(200),
+                                foregroundColor: AppColors.accent,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadius.sm),
                                 ),
                               ),
-                              child: IconButton(
-                                onPressed: () => _logout(context),
-                                icon: const Icon(
-                                  Icons.logout,
-                                  color: AppColors.accent,
-                                ),
-                              ),
+                              onPressed: () => _logout(context),
+                              icon: const Icon(Icons.logout),
                             ),
                           ],
                         ),
@@ -824,8 +888,8 @@ Future<void> _init() async {
                 ],
               ),
               Positioned(
-                right: 20,
-                bottom: 20,
+                right: widget.embedded ? 12 : 20,
+                bottom: widget.embedded ? 16 : 20,
                 child: GestureDetector(
                   onTap: _openCreateChatSheet,
                   child: Container(
@@ -836,9 +900,13 @@ Future<void> _init() async {
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.accent.withAlpha(70),
-                          blurRadius: 24,
-                          spreadRadius: 2,
+                          color: Colors.black.withAlpha(90),
+                          blurRadius: 16,
+                          offset: const Offset(0, 8),
+                        ),
+                        BoxShadow(
+                          color: AppColors.accent.withAlpha(45),
+                          blurRadius: 20,
                         ),
                       ],
                     ),
@@ -877,13 +945,17 @@ class _CreateChatOption extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpacing.lg),
         decoration: BoxDecoration(
           color: AppColors.surfaceSoft,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: AppColors.accentBorder.withAlpha(100),
-          ),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(50),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Row(
           children: [
@@ -892,7 +964,7 @@ class _CreateChatOption extends StatelessWidget {
               height: 52,
               decoration: BoxDecoration(
                 color: AppColors.accent,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
               ),
               alignment: Alignment.center,
               child: Icon(
@@ -931,36 +1003,6 @@ class _CreateChatOption extends StatelessWidget {
               Icons.arrow_forward_ios_rounded,
               color: AppColors.textMuted,
               size: 18,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _GlowCircle extends StatelessWidget {
-  final double size;
-  final Color color;
-
-  const _GlowCircle({
-    required this.size,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: color,
-              blurRadius: size / 2,
-              spreadRadius: 18,
             ),
           ],
         ),

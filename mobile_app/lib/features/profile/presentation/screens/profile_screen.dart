@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../../app/theme/app_colors.dart';
+import '../../../../app/widgets/app_screen_background.dart';
 import '../../../auth/data/services/auth_service.dart';
 import '../../data/services/profile_service.dart';
 import '../../../../core/network/api_client.dart';
@@ -234,9 +235,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       decoration: BoxDecoration(
         color: AppColors.surfaceSoft,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: AppColors.accentBorder.withAlpha(110),
-        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(40),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         children: [
@@ -417,7 +422,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         iconTheme: const IconThemeData(color: AppColors.textPrimary),
         title: const Text(
@@ -428,18 +433,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
       ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF0B0B0D),
-              Color(0xFF09090B),
-              Color(0xFF140A02),
-            ],
-          ),
-        ),
+      body: AppScreenBackground(
         child: SafeArea(
           top: false,
           child: _buildBody(),

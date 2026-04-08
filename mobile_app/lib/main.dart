@@ -1,10 +1,24 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 
 import 'app/app.dart';
+import 'app/desktop_chat_session.dart';
+import 'core/platform/desktop_layout.dart';
 import 'features/chats/presentation/screens/chat_detail_screen.dart';
 import 'firebase_options.dart';
+
+bool get _firebasePushSupported {
+  if (kIsWeb) return false;
+  switch (defaultTargetPlatform) {
+    case TargetPlatform.android:
+    case TargetPlatform.iOS:
+      return true;
+    default:
+      return false;
+  }
+}
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -21,17 +35,20 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-
-  await _initPush();
+  if (_firebasePushSupported) {
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+    await _initPush();
+  }
 
   runApp(const MessengerApp());
 
-  final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
-  if (initialMessage != null) {
-    final chatId = _extractChatId(initialMessage.data);
-    if (chatId != null) {
-      setPendingPushChatId(chatId);
+  if (_firebasePushSupported) {
+    final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
+    if (initialMessage != null) {
+      final chatId = _extractChatId(initialMessage.data);
+      if (chatId != null) {
+        setPendingPushChatId(chatId);
+      }
     }
   }
 }
@@ -74,6 +91,15 @@ int? _extractChatId(Map<String, dynamic> data) {
 void _openChat(int chatId) {
   final navigator = appNavigatorKey.currentState;
   if (navigator == null) return;
+
+  if (isDesktopMessengerLayout) {
+    desktopChatOpenRequest.value = DesktopChatOpenRequest(
+      chatId: chatId,
+      title: 'Чат',
+      chatType: 'private',
+    );
+    return;
+  }
 
   navigator.push(
     MaterialPageRoute(

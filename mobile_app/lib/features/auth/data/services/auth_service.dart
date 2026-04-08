@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform, kIsWeb;
 
 import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/secure_storage_service.dart';
@@ -7,6 +8,17 @@ import '../../../../core/session/current_user_store.dart';
 
 class AuthService {
   final Dio _dio = ApiClient.dio;
+
+  bool get _fcmDeviceRegistrationSupported {
+    if (kIsWeb) return false;
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+      case TargetPlatform.iOS:
+        return true;
+      default:
+        return false;
+    }
+  }
 
 Future<void> requestEmailCode({
   required String username,
@@ -86,6 +98,8 @@ Future<void> requestEmailCode({
   }
 
   Future<void> _registerDeviceToken(String accessToken) async {
+    if (!_fcmDeviceRegistrationSupported) return;
+
     final fcmToken = await FirebaseMessaging.instance.getToken();
 
     if (fcmToken == null || fcmToken.isEmpty) {

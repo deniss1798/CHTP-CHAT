@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 from jose import JWTError, jwt
@@ -8,6 +9,7 @@ from app.core.config import get_settings
 from app.core.ws_manager import manager
 from app.db.database import SessionLocal
 from app.models.chat_member import ChatMember
+from app.models.user import User
 
 router = APIRouter(tags=["WebSocket"])
 settings = get_settings()
@@ -47,6 +49,12 @@ async def websocket_chat(
             return
 
         await manager.connect(chat_id, websocket, user_id)
+
+        user_row = db.query(User).filter(User.id == user_id).first()
+        if user_row:
+            user_row.last_seen_at = datetime.now(timezone.utc)
+            db.add(user_row)
+            db.commit()
 
         while True:
             raw = await websocket.receive_text()

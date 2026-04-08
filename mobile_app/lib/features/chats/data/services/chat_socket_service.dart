@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:convert';
+import 'dart:convert' show jsonDecode, jsonEncode;
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../../../../core/storage/secure_storage_service.dart';
 
@@ -69,6 +69,14 @@ class ChatSocketService {
     }
 
     return '$wsBase/ws/chat/$chatId?token=$token';
+  }
+
+  void sendTyping(bool typing) {
+    final ch = _channel;
+    if (ch == null) return;
+    try {
+      ch.sink.add(jsonEncode({'type': 'typing', 'typing': typing}));
+    } catch (_) {}
   }
 
   Future<void> disconnect() async {

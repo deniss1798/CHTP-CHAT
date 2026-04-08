@@ -2,7 +2,10 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_colors.dart';
-import '../../../chats/presentation/screens/chats_screen.dart';
+import '../../../../app/theme/design_tokens.dart';
+import '../../../../app/home_chats_route.dart';
+import '../../../../app/widgets/app_screen_background.dart';
+import '../../../../app/widgets/desktop_constrained_content.dart';
 import '../../data/services/auth_service.dart';
 
 class EmailCodeScreen extends StatefulWidget {
@@ -68,7 +71,7 @@ class _EmailCodeScreenState extends State<EmailCodeScreen> {
       if (!mounted) return;
 
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const ChatsScreen()),
+        MaterialPageRoute(builder: (_) => buildHomeChatsScreen()),
         (route) => false,
       );
     } catch (e) {
@@ -110,52 +113,26 @@ class _EmailCodeScreenState extends State<EmailCodeScreen> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final size = MediaQuery.sizeOf(context);
+    final wide = size.width >= AppBreakpoints.wideLayoutMinWidth;
 
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF0B0B0D),
-              Color(0xFF09090B),
-              Color(0xFF140A02),
-            ],
-          ),
-        ),
+      body: AppScreenBackground(
         child: SafeArea(
-          child: Stack(
-            children: [
-              Positioned(
-                top: 120,
-                left: -80,
-                child: _GlowCircle(
-                  size: 220,
-                  color: AppColors.accent.withAlpha(20),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.xxl,
+              vertical: AppSpacing.lg,
+            ),
+            child: DesktopConstrainedContent(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: size.height - 60,
                 ),
-              ),
-              Positioned(
-                bottom: 80,
-                right: -60,
-                child: _GlowCircle(
-                  size: 240,
-                  color: AppColors.accent.withAlpha(26),
-                ),
-              ),
-              SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 18,
-                ),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minHeight: MediaQuery.of(context).size.height - 60,
-                  ),
-                  child: Column(
+                child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(height: 18),
+                      const SizedBox(height: AppSpacing.lg),
                       const Text(
                         'CHTP',
                         style: TextStyle(
@@ -165,10 +142,15 @@ class _EmailCodeScreenState extends State<EmailCodeScreen> {
                           letterSpacing: 4,
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: AppSpacing.xxl),
                       Text(
                         'Подтверждение почты',
-                        style: textTheme.headlineLarge,
+                        style: wide
+                            ? textTheme.headlineMedium?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.textPrimary,
+                              )
+                            : textTheme.headlineLarge,
                       ),
                       const SizedBox(height: 10),
                       Text(
@@ -177,22 +159,18 @@ class _EmailCodeScreenState extends State<EmailCodeScreen> {
                             : 'Тестовый режим: используйте код ниже',
                         style: textTheme.bodyMedium,
                       ),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: AppSpacing.xxxl),
                       Container(
                         width: double.infinity,
-                        padding: const EdgeInsets.all(22),
+                        padding: const EdgeInsets.all(AppSpacing.xl),
                         decoration: BoxDecoration(
-                          color: AppColors.surface.withAlpha(235),
-                          borderRadius: BorderRadius.circular(30),
-                          border: Border.all(
-                            color: AppColors.accentBorder,
-                            width: 1,
-                          ),
+                          color: AppColors.surface.withAlpha(248),
+                          borderRadius: BorderRadius.circular(AppRadius.xl),
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.accent.withAlpha(26),
-                              blurRadius: 50,
-                              spreadRadius: 2,
+                              color: Colors.black.withAlpha(100),
+                              blurRadius: 40,
+                              offset: const Offset(0, 16),
                             ),
                           ],
                         ),
@@ -205,12 +183,13 @@ class _EmailCodeScreenState extends State<EmailCodeScreen> {
                                 height: 84,
                                 decoration: BoxDecoration(
                                   color: AppColors.accent,
-                                  borderRadius: BorderRadius.circular(24),
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadius.lg),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: AppColors.accent.withAlpha(72),
-                                      blurRadius: 32,
-                                      spreadRadius: 2,
+                                      color: AppColors.accent.withAlpha(48),
+                                      blurRadius: 24,
+                                      offset: const Offset(0, 8),
                                     ),
                                   ],
                                 ),
@@ -239,10 +218,8 @@ class _EmailCodeScreenState extends State<EmailCodeScreen> {
                                   padding: const EdgeInsets.all(14),
                                   decoration: BoxDecoration(
                                     color: AppColors.backgroundSecondary,
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: AppColors.inputBorder,
-                                    ),
+                                    borderRadius:
+                                        BorderRadius.circular(AppRadius.md),
                                   ),
                                   child: Column(
                                     crossAxisAlignment:
@@ -346,40 +323,9 @@ class _EmailCodeScreenState extends State<EmailCodeScreen> {
                   ),
                 ),
               ),
-            ],
+            ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _GlowCircle extends StatelessWidget {
-  final double size;
-  final Color color;
-
-  const _GlowCircle({
-    required this.size,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: color,
-              blurRadius: size / 2,
-              spreadRadius: 18,
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

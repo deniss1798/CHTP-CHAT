@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/design_tokens.dart';
 import '../../data/services/chats_service.dart';
 import '../../data/services/users_service.dart';
 
@@ -314,15 +315,7 @@ class _ChatMemberAddScreenState extends State<ChatMemberAddScreen> {
       backgroundColor: AppColors.background,
       body: Container(
         decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF0B0B0D),
-              Color(0xFF09090B),
-              Color(0xFF140A02),
-            ],
-          ),
+          gradient: AppGradients.background,
         ),
         child: SafeArea(
           child: Column(

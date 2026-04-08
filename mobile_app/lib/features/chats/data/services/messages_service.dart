@@ -22,6 +22,32 @@ class MessagesService {
     );
   }
 
+  Future<void> markChatRead({
+    required int chatId,
+    required int messageId,
+  }) async {
+    await _dio.post(
+      '/chats/$chatId/read',
+      data: {'message_id': messageId},
+      options: await _authorizedOptions(),
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getChatReadState(int chatId) async {
+    final response = await _dio.get(
+      '/chats/$chatId/read-state',
+      options: await _authorizedOptions(),
+    );
+    final data = response.data;
+    if (data is List) {
+      return data
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+    }
+    return [];
+  }
+
   Future<List<Map<String, dynamic>>> getMessages(int chatId) async {
     final response = await _dio.get(
       '/messages/chat/$chatId',

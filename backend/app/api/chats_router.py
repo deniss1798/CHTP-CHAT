@@ -287,6 +287,7 @@ def get_chat_detail(
             username=user.username,
             email=user.email,
             avatar_url=user.avatar_url,
+            last_seen_at=user.last_seen_at,
         )
         for user in users
     ]
@@ -345,6 +346,7 @@ def get_chat_members(
             email=user.email,
             avatar_url=user.avatar_url,
             role=role,
+            last_seen_at=user.last_seen_at,
         )
         for user, role in members
     ]
@@ -536,6 +538,7 @@ async def upload_chat_avatar(
             username=user.username,
             email=user.email,
             avatar_url=user.avatar_url,
+            last_seen_at=user.last_seen_at,
         )
         for user in users
     ]
@@ -630,4 +633,5 @@ def add_chat_member(
         email=user_to_add.email,
         avatar_url=user_to_add.avatar_url,
         role="member",
+        last_seen_at=user_to_add.last_seen_at,
     )

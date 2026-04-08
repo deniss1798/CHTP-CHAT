@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_user
@@ -67,6 +69,18 @@ async def upload_my_avatar(
     storage.delete_public_object_by_url(old_avatar_url)
 
     return current_user
+
+
+@router.post("/me/presence", status_code=status.HTTP_204_NO_CONTENT)
+def post_my_presence(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Клиент вызывает периодически (и при открытии приложения), чтобы другие видели «в сети»."""
+    current_user.last_seen_at = datetime.now(timezone.utc)
+    db.add(current_user)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/me", response_model=UserResponse)

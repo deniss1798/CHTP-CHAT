@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import '../../../../app/app.dart';
+import '../../../../app/desktop_chat_session.dart';
+import '../../../../app/home_chats_route.dart';
 import '../../../../app/theme/app_colors.dart';
+import '../../../../app/widgets/app_screen_background.dart';
 import '../../../../core/storage/secure_storage_service.dart';
 import '../../../auth/presentation/screens/auth_screen.dart';
+import '../../../../core/platform/desktop_layout.dart';
 import '../../../chats/presentation/screens/chat_detail_screen.dart';
-import '../../../chats/presentation/screens/chats_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -31,11 +34,20 @@ class _SplashScreenState extends State<SplashScreen> {
       final pendingChatId = consumePendingPushChatId();
 
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const ChatsScreen()),
+        MaterialPageRoute(builder: (_) => buildHomeChatsScreen()),
       );
 
       if (pendingChatId != null) {
         Future.delayed(const Duration(milliseconds: 150), () {
+          if (isDesktopMessengerLayout) {
+            desktopChatOpenRequest.value = DesktopChatOpenRequest(
+              chatId: pendingChatId,
+              title: 'Чат',
+              chatType: 'private',
+            );
+            return;
+          }
+
           final navigator = appNavigatorKey.currentState;
           if (navigator == null) return;
 
@@ -61,92 +73,29 @@ class _SplashScreenState extends State<SplashScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF0B0B0D),
-              Color(0xFF09090B),
-              Color(0xFF140A02),
-            ],
-          ),
-        ),
-        child: Stack(
-          children: [
-            Positioned(
-              top: 140,
-              left: -70,
-              child: _GlowCircle(
-                size: 200,
-                color: AppColors.accent.withAlpha(22),
-              ),
-            ),
-            Positioned(
-              bottom: 100,
-              right: -50,
-              child: _GlowCircle(
-                size: 220,
-                color: AppColors.accent.withAlpha(30),
-              ),
-            ),
-            const SafeArea(
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'ЧТП ЧАТ',
-                      style: TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 34,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                    SizedBox(height: 14),
-                    CircularProgressIndicator(
-                      color: AppColors.accent,
-                      strokeWidth: 2.5,
-                    ),
-                  ],
+      body: AppScreenBackground(
+        child: const SafeArea(
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'ЧТП ЧАТ',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 34,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1,
+                  ),
                 ),
-              ),
+                SizedBox(height: 14),
+                CircularProgressIndicator(
+                  color: AppColors.accent,
+                  strokeWidth: 2.5,
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _GlowCircle extends StatelessWidget {
-  final double size;
-  final Color color;
-
-  const _GlowCircle({
-    required this.size,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: color,
-              blurRadius: size / 2,
-              spreadRadius: 18,
-            ),
-          ],
+          ),
         ),
       ),
     );
