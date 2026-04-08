@@ -47,13 +47,15 @@ class _VideoMessageWidget extends StatefulWidget {
   final String url;
   final bool isMine;
   final bool isVideoNote;
-  final VoidCallback onOpenFullscreen;
+
+  /// Для обычного видео: открыть на весь экран. Для кружков ([isVideoNote]) не используется.
+  final VoidCallback? onOpenFullscreen;
 
   const _VideoMessageWidget({
     required this.url,
     required this.isMine,
     this.isVideoNote = false,
-    required this.onOpenFullscreen,
+    this.onOpenFullscreen,
   });
 
   @override
@@ -63,6 +65,7 @@ class _VideoMessageWidget extends StatefulWidget {
 class _VideoMessageWidgetState extends State<_VideoMessageWidget> {
   VideoPlayerController? _controller;
   bool _initialized = false;
+  bool _showOverlay = true;
   String? _initError;
   int _loadGeneration = 0;
 
@@ -104,6 +107,18 @@ class _VideoMessageWidgetState extends State<_VideoMessageWidget> {
         _initError = e.toString().replaceFirst('Exception: ', '');
       });
     });
+
+    if (widget.isVideoNote) {
+      c.addListener(() {
+        if (!mounted || gen != _loadGeneration) return;
+        final playing = c.value.isPlaying;
+        if (playing) {
+          if (_showOverlay) setState(() => _showOverlay = false);
+        } else {
+          if (!_showOverlay) setState(() => _showOverlay = true);
+        }
+      });
+    }
   }
 
   @override
@@ -111,6 +126,16 @@ class _VideoMessageWidgetState extends State<_VideoMessageWidget> {
     _loadGeneration++;
     _controller?.dispose();
     super.dispose();
+  }
+
+  void _togglePlayback() {
+    final c = _controller;
+    if (c == null || !_initialized) return;
+    if (c.value.isPlaying) {
+      c.pause();
+    } else {
+      c.play();
+    }
   }
 
   @override
@@ -196,6 +221,38 @@ class _VideoMessageWidgetState extends State<_VideoMessageWidget> {
             aspectRatio: c.value.aspectRatio,
             child: VideoPlayer(c),
           );
+
+    if (widget.isVideoNote) {
+      return GestureDetector(
+        onTap: _togglePlayback,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Center(child: videoChild),
+            AnimatedOpacity(
+              opacity: _showOverlay ? 1 : 0,
+              duration: const Duration(milliseconds: 150),
+              child: Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: Colors.black.withAlpha(55),
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                alignment: Alignment.center,
+                child: Icon(
+                  c.value.isPlaying
+                      ? Icons.pause_rounded
+                      : Icons.play_arrow_rounded,
+                  color: Colors.white,
+                  size: 24,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return GestureDetector(
       onTap: widget.onOpenFullscreen,
@@ -608,6 +665,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   void _applyReadReceiptToMessages(int userId, int lastReadId) {
     _lastReadByUserId[userId] = lastReadId;
+    _memberLastSeen[userId] = DateTime.now().toUtc();
     if (!mounted) return;
     setState(() {
       _messages = _messages.map((m) {
@@ -874,6 +932,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       await _loadMessages();
       await _connectSocket();
       _startPresenceHeartbeat();
+      if (mounted && _messageController.text.trim().isNotEmpty) {
+        _onMessageTextChanged();
+      }
     } catch (e) {
       if (!mounted) return;
 
@@ -1085,17 +1146,23 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   Future<void> _connectSocket() async {
     await _socketSubscription?.cancel();
 
-    try {
-      await _chatSocketService.connect(
-        chatId: widget.chatId,
-        baseHttpUrl: ApiClient.baseUrl,
-      );
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        await _chatSocketService.connect(
+          chatId: widget.chatId,
+          baseHttpUrl: ApiClient.baseUrl,
+        );
 
-      _socketSubscription = _chatSocketService.messagesStream.listen((message) {
-        _handleSocketEvent(message);
-      });
-
-    } catch (_) {}
+        _socketSubscription = _chatSocketService.messagesStream.listen((message) {
+          _handleSocketEvent(message);
+        });
+        return;
+      } catch (_) {
+        if (attempt < 2) {
+          await Future<void>.delayed(const Duration(milliseconds: 500));
+        }
+      }
+    }
   }
 
   void _handleSocketEvent(Map<String, dynamic> incoming) {
@@ -1111,6 +1178,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       }
       setState(() {
         _typingUserId = uid;
+        _memberLastSeen[uid] = DateTime.now().toUtc();
       });
       _typingStopTimer?.cancel();
       _typingStopTimer = Timer(const Duration(seconds: 3), () {
@@ -1195,6 +1263,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
     var normalized = _normalizeMessageMap(payload);
     final incomingId = normalized['id'];
+    final senderId = _intFromDynamic(normalized['sender_id']);
     if (_isMine(normalized)) {
       final mid = _intFromDynamic(normalized['id']);
       if (mid != null) {
@@ -1208,6 +1277,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     if (!mounted) return;
 
     setState(() {
+      if (senderId != null &&
+          senderId != _currentUserId &&
+          !_isGroupChat) {
+        _memberLastSeen[senderId] = DateTime.now().toUtc();
+      }
       _messages.add(normalized);
       _messages.sort((a, b) {
         final aDate = DateTime.tryParse(a['created_at']?.toString() ?? '');
@@ -2097,7 +2171,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           url: mediaUrl,
           isMine: isMine,
           isVideoNote: true,
-          onOpenFullscreen: () => _openFullscreenVideo(mediaUrl, isVideoNote: true),
         ),
       );
     }

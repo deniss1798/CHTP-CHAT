@@ -25,13 +25,13 @@ class ChatSocketService {
       throw Exception('Токен не найден');
     }
 
-    final wsUrl = _buildWsUrl(
+    final uri = _buildWsUri(
       baseHttpUrl: baseHttpUrl,
       chatId: chatId,
       token: token,
     );
 
-    _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
+    _channel = WebSocketChannel.connect(uri);
 
     _subscription = _channel!.stream.listen(
       (event) {
@@ -45,30 +45,34 @@ class ChatSocketService {
           }
         } catch (_) {}
       },
-      onError: (_) {},
-      onDone: () {},
+      onError: (_) {
+        _clearChannel();
+      },
+      onDone: _clearChannel,
       cancelOnError: false,
     );
   }
 
-  String _buildWsUrl({
+  void _clearChannel() {
+    _channel = null;
+  }
+
+  /// JWT в query должен кодироваться (`=`, `+`, `&`), иначе WS не подключается — не приходят печать/прочтения.
+  Uri _buildWsUri({
     required String baseHttpUrl,
     required int chatId,
     required String token,
   }) {
-    String wsBase = baseHttpUrl.trim();
-
-    if (wsBase.startsWith('https://')) {
-      wsBase = wsBase.replaceFirst('https://', 'wss://');
-    } else if (wsBase.startsWith('http://')) {
-      wsBase = wsBase.replaceFirst('http://', 'ws://');
-    }
-
-    if (wsBase.endsWith('/')) {
-      wsBase = wsBase.substring(0, wsBase.length - 1);
-    }
-
-    return '$wsBase/ws/chat/$chatId?token=$token';
+    final base = baseHttpUrl.trim();
+    final root = Uri.parse(base.endsWith('/') ? base : '$base/');
+    final resolved = root.resolve('ws/chat/$chatId');
+    return Uri(
+      scheme: root.scheme == 'https' ? 'wss' : 'ws',
+      host: resolved.host,
+      port: resolved.hasPort ? resolved.port : null,
+      path: resolved.path,
+      queryParameters: {'token': token},
+    );
   }
 
   void sendTyping(bool typing) {
@@ -83,7 +87,7 @@ class ChatSocketService {
     await _subscription?.cancel();
     _subscription = null;
     await _channel?.sink.close();
-    _channel = null;
+    _clearChannel();
   }
 
   void dispose() {
