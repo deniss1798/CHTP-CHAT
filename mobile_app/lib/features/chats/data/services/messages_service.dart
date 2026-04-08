@@ -26,18 +26,29 @@ class MessagesService {
     required int chatId,
     required int messageId,
   }) async {
+    final base = await _authorizedOptions();
     await _dio.post(
       '/chats/$chatId/read',
       data: {'message_id': messageId},
-      options: await _authorizedOptions(),
+      options: base.copyWith(
+        validateStatus: (s) =>
+            s != null && (s == 200 || s == 201 || s == 204 || s == 404),
+      ),
     );
   }
 
   Future<List<Map<String, dynamic>>> getChatReadState(int chatId) async {
+    final base = await _authorizedOptions();
     final response = await _dio.get(
       '/chats/$chatId/read-state',
-      options: await _authorizedOptions(),
+      options: base.copyWith(
+        validateStatus: (s) =>
+            s != null && ((s >= 200 && s < 300) || s == 404),
+      ),
     );
+    if (response.statusCode == 404) {
+      return [];
+    }
     final data = response.data;
     if (data is List) {
       return data

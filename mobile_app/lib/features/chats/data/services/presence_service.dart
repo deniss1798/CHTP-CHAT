@@ -16,7 +16,9 @@ class PresenceService {
         '/users/me/presence',
         options: Options(
           headers: {'Authorization': 'Bearer $token'},
-          validateStatus: (s) => s != null && s >= 200 && s < 300,
+          // 404 — на сервере ещё не задеплоен этот маршрут; не считаем ошибкой.
+          validateStatus: (s) =>
+              s != null && (s == 204 || s == 200 || s == 404),
         ),
       );
     } catch (_) {}

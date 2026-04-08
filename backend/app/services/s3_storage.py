@@ -7,6 +7,20 @@ from botocore.client import Config
 from app.core.config import get_settings
 
 
+def is_s3_configured() -> bool:
+    """Все переменные S3 заданы — можно подписывать URL и грузить файлы."""
+    s = get_settings()
+    return bool(
+        s.s3_endpoint_url
+        and s.s3_region
+        and s.s3_access_key_id
+        and s.s3_secret_access_key
+        and s.s3_public_bucket
+        and s.s3_private_bucket
+        and s.s3_public_base_url
+    )
+
+
 class S3StorageService:
     def __init__(self) -> None:
         settings = get_settings()

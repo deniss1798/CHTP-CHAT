@@ -12,7 +12,7 @@ from app.models.chat_member import ChatMember
 from app.models.message import Message
 from app.models.user import User
 from app.schemas.message_schema import MessageCreate, MessageReplyPreview, MessageResponse, MessageUpdate
-from app.services.s3_storage import S3StorageService
+from app.services.s3_storage import S3StorageService, is_s3_configured
 from app.services.video_transcode import try_transcode_to_desktop_mp4
 
 router = APIRouter(prefix="/messages", tags=["Messages"])
@@ -62,18 +62,35 @@ def _load_reply_parent(db: Session, reply_to_message_id: int | None) -> Message 
     return db.query(Message).filter(Message.id == reply_to_message_id).first()
 
 
+def _safe_message_text(message: Message) -> str:
+    t = message.text
+    return "" if t is None else str(t)
+
+
+def _safe_message_type(message: Message) -> str:
+    mt = message.message_type
+    if mt is None or (isinstance(mt, str) and not mt.strip()):
+        return "text"
+    return str(mt)
+
+
 def _reply_preview_for_parent(
     parent: Message,
     get_storage: Callable[[], S3StorageService],
 ) -> MessageReplyPreview:
     media_url = parent.media_url
-    if parent.message_type in PRIVATE_MEDIA_MESSAGE_TYPES and parent.media_key:
+    ptype = _safe_message_type(parent)
+    if (
+        is_s3_configured()
+        and ptype in PRIVATE_MEDIA_MESSAGE_TYPES
+        and parent.media_key
+    ):
         media_url = get_storage().generate_private_file_url(object_key=parent.media_key)
     return MessageReplyPreview(
         id=parent.id,
         sender_id=parent.sender_id,
-        text=parent.text or "",
-        message_type=parent.message_type,
+        text=_safe_message_text(parent),
+        message_type=ptype,
         media_url=media_url,
     )
 
@@ -92,8 +109,13 @@ def _message_to_response(
         if parent:
             reply_preview = _reply_preview_for_parent(parent, get_storage)
 
+    mtype_single = _safe_message_type(message)
     media_url = message.media_url
-    if message.message_type in PRIVATE_MEDIA_MESSAGE_TYPES and message.media_key:
+    if (
+        is_s3_configured()
+        and mtype_single in PRIVATE_MEDIA_MESSAGE_TYPES
+        and message.media_key
+    ):
         media_url = get_storage().generate_private_file_url(object_key=message.media_key)
 
     delivery_status = None
@@ -106,15 +128,15 @@ def _message_to_response(
         id=message.id,
         chat_id=message.chat_id,
         sender_id=message.sender_id,
-        text=message.text,
-        message_type=message.message_type,
+        text=_safe_message_text(message),
+        message_type=mtype_single,
         media_key=message.media_key,
         media_url=media_url,
         media_mime_type=message.media_mime_type,
         media_size=message.media_size,
         created_at=message.created_at,
         updated_at=message.updated_at,
-        is_updated=message.is_updated,
+        is_updated=bool(message.is_updated) if message.is_updated is not None else False,
         reply_to_message_id=message.reply_to_message_id,
         reply_to=reply_preview,
         delivery_status=delivery_status,
@@ -135,7 +157,12 @@ def _message_to_response_batched(
             reply_preview = _reply_preview_for_parent(parent, get_storage)
 
     media_url = message.media_url
-    if message.message_type in PRIVATE_MEDIA_MESSAGE_TYPES and message.media_key:
+    mtype = _safe_message_type(message)
+    if (
+        is_s3_configured()
+        and mtype in PRIVATE_MEDIA_MESSAGE_TYPES
+        and message.media_key
+    ):
         media_url = get_storage().generate_private_file_url(object_key=message.media_key)
 
     delivery_status = _compute_delivery_status(
@@ -146,15 +173,15 @@ def _message_to_response_batched(
         id=message.id,
         chat_id=message.chat_id,
         sender_id=message.sender_id,
-        text=message.text,
-        message_type=message.message_type,
+        text=_safe_message_text(message),
+        message_type=mtype,
         media_key=message.media_key,
         media_url=media_url,
         media_mime_type=message.media_mime_type,
         media_size=message.media_size,
         created_at=message.created_at,
         updated_at=message.updated_at,
-        is_updated=message.is_updated,
+        is_updated=bool(message.is_updated) if message.is_updated is not None else False,
         reply_to_message_id=message.reply_to_message_id,
         reply_to=reply_preview,
         delivery_status=delivery_status,
@@ -171,7 +198,12 @@ def _build_message_payload(message: Message, db: Session, storage: S3StorageServ
             reply_to_dict = _reply_preview_for_parent(parent, get_storage).model_dump()
 
     media_url = message.media_url
-    if message.message_type in PRIVATE_MEDIA_MESSAGE_TYPES and message.media_key:
+    mtype_payload = _safe_message_type(message)
+    if (
+        is_s3_configured()
+        and mtype_payload in PRIVATE_MEDIA_MESSAGE_TYPES
+        and message.media_key
+    ):
         media_url = get_storage().generate_private_file_url(object_key=message.media_key)
 
     return {
@@ -179,7 +211,7 @@ def _build_message_payload(message: Message, db: Session, storage: S3StorageServ
         "chat_id": message.chat_id,
         "sender_id": message.sender_id,
         "text": message.text,
-        "message_type": message.message_type,
+        "message_type": mtype_payload,
         "media_key": message.media_key,
         "media_url": media_url,
         "media_mime_type": message.media_mime_type,
@@ -246,10 +278,14 @@ def _validate_reply_target(db: Session, chat_id: int, reply_to_message_id: int |
 
 
 def _apply_private_media_urls(messages: list[Message]) -> list[Message]:
+    if not is_s3_configured():
+        return messages
+
     get_storage = _make_s3_getter()
 
     for message in messages:
-        if message.message_type in PRIVATE_MEDIA_MESSAGE_TYPES and message.media_key:
+        mtype = _safe_message_type(message)
+        if mtype in PRIVATE_MEDIA_MESSAGE_TYPES and message.media_key:
             message.media_url = get_storage().generate_private_file_url(
                 object_key=message.media_key
             )
@@ -258,10 +294,14 @@ def _apply_private_media_urls(messages: list[Message]) -> list[Message]:
 
 
 def _apply_private_media_urls_map(messages: list[Message]) -> None:
+    if not is_s3_configured():
+        return
+
     get_storage = _make_s3_getter()
 
     for message in messages:
-        if message.message_type in PRIVATE_MEDIA_MESSAGE_TYPES and message.media_key:
+        mtype = _safe_message_type(message)
+        if mtype in PRIVATE_MEDIA_MESSAGE_TYPES and message.media_key:
             message.media_url = get_storage().generate_private_file_url(
                 object_key=message.media_key
             )
@@ -335,6 +375,12 @@ async def send_photo_message(
 ):
     _ensure_chat_member(chat_id, current_user.id, db)
     _validate_reply_target(db, chat_id, reply_to_message_id)
+
+    if not is_s3_configured():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Media storage (S3) is not configured",
+        )
 
     if not file.content_type or file.content_type not in ALLOWED_IMAGE_TYPES:
         raise HTTPException(
@@ -429,6 +475,12 @@ async def send_video_message(
 ):
     _ensure_chat_member(chat_id, current_user.id, db)
     _validate_reply_target(db, chat_id, reply_to_message_id)
+
+    if not is_s3_configured():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Media storage (S3) is not configured",
+        )
 
     video_content_type = file.content_type
     extension: str | None = None
@@ -548,6 +600,12 @@ async def send_video_note_message(
     """Круглое видеосообщение (аналог Telegram video message / video note)."""
     _ensure_chat_member(chat_id, current_user.id, db)
     _validate_reply_target(db, chat_id, reply_to_message_id)
+
+    if not is_s3_configured():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Media storage (S3) is not configured",
+        )
 
     video_content_type = file.content_type
     extension: str | None = None
@@ -727,7 +785,7 @@ async def delete_message(
     db.delete(message)
     db.commit()
 
-    if media_key:
+    if media_key and is_s3_configured():
         try:
             storage = S3StorageService()
             storage.delete_private_object(media_key)

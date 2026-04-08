@@ -52,7 +52,17 @@ class ApiLoggerInterceptor extends Interceptor {
 }
 
 class ApiClient {
-  static const String baseUrl = 'http://83.217.201.40';
+  /// Базовый URL REST API без завершающего `/`.
+  /// Сборка: `flutter run --dart-define=API_BASE_URL=https://example.com/api`
+  static String get baseUrl {
+    const env = String.fromEnvironment('API_BASE_URL');
+    final raw =
+        env.trim().isNotEmpty ? env.trim() : 'http://83.217.201.40';
+    if (raw.endsWith('/')) {
+      return raw.substring(0, raw.length - 1);
+    }
+    return raw;
+  }
 
   static final Dio dio = Dio(
     BaseOptions(

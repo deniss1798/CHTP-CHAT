@@ -31,7 +31,17 @@ class ChatSocketService {
       token: token,
     );
 
-    _channel = WebSocketChannel.connect(uri);
+    final channel = WebSocketChannel.connect(uri);
+    try {
+      await channel.ready.timeout(const Duration(seconds: 20));
+    } catch (_) {
+      try {
+        await channel.sink.close();
+      } catch (_) {}
+      rethrow;
+    }
+
+    _channel = channel;
 
     _subscription = _channel!.stream.listen(
       (event) {
@@ -57,20 +67,30 @@ class ChatSocketService {
     _channel = null;
   }
 
-  /// Абсолютный путь `/ws/chat/{id}` + JWT в query (кодирование обязательно).
+  /// Путь к WS совпадает с префиксом REST: `http://host/api` → `ws://host/api/ws/chat/{id}`.
   Uri _buildWsUri({
     required String baseHttpUrl,
     required int chatId,
     required String token,
   }) {
     final base = baseHttpUrl.trim();
-    final httpUri = Uri.parse(base);
+    final httpUri = Uri.parse(base.isEmpty ? 'http://localhost' : base);
     final scheme = httpUri.scheme == 'https' ? 'wss' : 'ws';
+    var pathPrefix = httpUri.path;
+    if (pathPrefix.length > 1 && pathPrefix.endsWith('/')) {
+      pathPrefix = pathPrefix.substring(0, pathPrefix.length - 1);
+    }
+    if (pathPrefix == '/') {
+      pathPrefix = '';
+    }
+    final wsPath = pathPrefix.isEmpty
+        ? '/ws/chat/$chatId'
+        : '$pathPrefix/ws/chat/$chatId';
     return Uri(
       scheme: scheme,
       host: httpUri.host,
       port: httpUri.hasPort ? httpUri.port : null,
-      path: '/ws/chat/$chatId',
+      path: wsPath,
       queryParameters: {'token': token},
     );
   }
