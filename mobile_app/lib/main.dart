@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import 'app/app.dart';
 import 'app/desktop_chat_session.dart';
+import 'core/notifiers/chats_list_refresh_notifier.dart';
 import 'core/platform/desktop_layout.dart';
 import 'features/chats/presentation/screens/chat_detail_screen.dart';
 import 'firebase_options.dart';
@@ -71,6 +72,7 @@ Future<void> _initPush() async {
     print('Foreground message title: ${message.notification?.title}');
     print('Foreground message body: ${message.notification?.body}');
     print('Foreground message data: ${message.data}');
+    requestChatsListRefresh();
   });
 
   FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {

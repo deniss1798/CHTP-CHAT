@@ -9,6 +9,7 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../app/widgets/app_screen_background.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/url_helper.dart';
+import '../../../../core/notifiers/chats_list_refresh_notifier.dart';
 import '../../../../core/storage/secure_storage_service.dart';
 import '../../../auth/data/services/auth_service.dart';
 import '../../data/services/chat_socket_service.dart';
@@ -1375,6 +1376,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       chatId: widget.chatId,
       lastMessageId: lastMessageId,
     );
+
+    requestChatsListRefresh();
   }
 
   Future<void> _sendMessage() async {

@@ -75,11 +75,18 @@ class ChatsService {
   chat['last_message'] = raw['last_message'];
   chat['last_message_at'] = raw['last_message_at'];
   chat['last_message_sender_id'] = raw['last_message_sender_id'];
-  chat['unread_count'] = raw['unread_count'] ?? 0;
+  chat['unread_count'] = _parseUnreadCount(raw['unread_count']);
   chat['peer_last_seen_at'] = raw['peer_last_seen_at'];
 
   return chat;
 }
+
+  int _parseUnreadCount(dynamic value) {
+    if (value == null) return 0;
+    if (value is int) return value;
+    if (value is double) return value.round();
+    return int.tryParse(value.toString()) ?? 0;
+  }
 
   Future<Map<String, dynamic>> addMemberToChat({
     required int chatId,

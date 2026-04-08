@@ -7,6 +7,7 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/design_tokens.dart';
 import '../../../../app/widgets/app_screen_background.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/notifiers/chats_list_refresh_notifier.dart';
 import '../../../../core/storage/secure_storage_service.dart';
 import '../../../auth/data/services/auth_service.dart';
 import '../../../auth/presentation/screens/auth_screen.dart';
@@ -52,14 +53,21 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
   List<Map<String, dynamic>> _allChats = [];
   List<Map<String, dynamic>> _filteredChats = [];
 
-  static const Duration _chatsListPollInterval = Duration(seconds: 15);
+  static const Duration _chatsListPollInterval = Duration(seconds: 5);
 
   Timer? _chatsPollTimer;
   Timer? _presenceTimer;
 
+  late final VoidCallback _chatsRefreshListener;
+
   @override
   void initState() {
     super.initState();
+    _chatsRefreshListener = () {
+      if (!mounted || _currentUserId == null) return;
+      _loadChats(silent: true);
+    };
+    chatsListRefreshNotifier.addListener(_chatsRefreshListener);
     WidgetsBinding.instance.addObserver(this);
     _init();
     _searchController.addListener(_applySearch);
@@ -77,6 +85,7 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    chatsListRefreshNotifier.removeListener(_chatsRefreshListener);
     _presenceTimer?.cancel();
     _chatsPollTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
@@ -466,6 +475,7 @@ Future<void> _init() async {
     final value = chat['unread_count'] ?? chat['unreadCount'] ?? 0;
 
     if (value is int) return value;
+    if (value is double) return value.round();
     return int.tryParse(value.toString()) ?? 0;
   }
 
