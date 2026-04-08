@@ -76,6 +76,7 @@ class ChatsService {
   chat['last_message_at'] = raw['last_message_at'];
   chat['last_message_sender_id'] = raw['last_message_sender_id'];
   chat['unread_count'] = raw['unread_count'] ?? 0;
+  chat['peer_last_seen_at'] = raw['peer_last_seen_at'];
 
   return chat;
 }

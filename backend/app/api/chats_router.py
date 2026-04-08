@@ -84,11 +84,13 @@ def get_my_chats(
             .all()
         )
 
+        peer_last_seen_at = None
         if chat.type == "private":
             other_user = next((user for user in users if user.id != current_user.id), None)
             if other_user:
                 chat_title = other_user.username
                 chat_avatar_url = other_user.avatar_url
+                peer_last_seen_at = other_user.last_seen_at
 
         last_message = (
             db.query(Message)
@@ -108,6 +110,7 @@ def get_my_chats(
                 last_message_at=last_message.created_at if last_message else None,
                 last_message_sender_id=last_message.sender_id if last_message else None,
                 unread_count=_unread_count_for_user(db, chat.id, current_user.id),
+                peer_last_seen_at=peer_last_seen_at,
             )
         )
 
@@ -182,6 +185,7 @@ def create_chat(
                     last_message_at=last_message.created_at if last_message else None,
                     last_message_sender_id=last_message.sender_id if last_message else None,
                     unread_count=0,
+                    peer_last_seen_at=other_user.last_seen_at if other_user else None,
                 )
 
     users = db.query(User).filter(User.id.in_(member_ids)).all()
@@ -231,6 +235,12 @@ def create_chat(
     db.commit()
     db.refresh(chat)
 
+    peer_last_seen_at = None
+    if payload.type == "private":
+        other_u = next((u for u in users if u.id != current_user.id), None)
+        if other_u:
+            peer_last_seen_at = other_u.last_seen_at
+
     return ChatResponse(
         id=chat.id,
         type=chat.type,
@@ -241,6 +251,7 @@ def create_chat(
         last_message_at=None,
         last_message_sender_id=None,
         unread_count=0,
+        peer_last_seen_at=peer_last_seen_at,
     )
 
 

@@ -45,6 +45,8 @@ class ChatResponse(BaseModel):
     last_message_at: datetime | None = None
     last_message_sender_id: int | None = None
     unread_count: int = 0
+    # Для личных чатов — last_seen собеседника (индикатор «в сети» в списке).
+    peer_last_seen_at: datetime | None = None
 
     class Config:
         from_attributes = True

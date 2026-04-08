@@ -469,6 +469,20 @@ Future<void> _init() async {
     return int.tryParse(value.toString()) ?? 0;
   }
 
+  static const Duration _peerOnlineThreshold = Duration(seconds: 120);
+
+  bool _peerOnlineFromLastSeenRaw(dynamic raw) {
+    if (raw == null) return false;
+    final t = DateTime.tryParse(raw.toString());
+    if (t == null) return false;
+    return DateTime.now().toUtc().difference(t.toUtc()) <= _peerOnlineThreshold;
+  }
+
+  bool _peerOnlineInList(Map<String, dynamic> chat) {
+    if ((chat['type'] ?? '').toString() != 'private') return false;
+    return _peerOnlineFromLastSeenRaw(chat['peer_last_seen_at']);
+  }
+
   String _initials(String title) {
     final parts =
         title.split(' ').where((e) => e.trim().isNotEmpty).take(2).toList();
@@ -494,11 +508,14 @@ Future<void> _init() async {
     required String title,
     required String? avatarUrl,
     double size = 62,
+    bool showOnlineDot = false,
   }) {
     final safeUrl = (avatarUrl ?? '').trim();
 
+    Widget inner;
+
     if (safeUrl.isNotEmpty) {
-      return ClipRRect(
+      inner = ClipRRect(
         borderRadius: BorderRadius.circular(20),
         child: Image.network(
           safeUrl,
@@ -526,24 +543,46 @@ Future<void> _init() async {
           },
         ),
       );
+    } else {
+      inner = Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: AppColors.accent,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          _initials(title),
+          style: const TextStyle(
+            color: Colors.black,
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      );
     }
 
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: AppColors.accent,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        _initials(title),
-        style: const TextStyle(
-          color: Colors.black,
-          fontSize: 18,
-          fontWeight: FontWeight.w800,
+    if (!showOnlineDot) return inner;
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        inner,
+        Positioned(
+          right: 0,
+          bottom: 0,
+          child: Container(
+            width: 14,
+            height: 14,
+            decoration: BoxDecoration(
+              color: AppColors.success,
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.background, width: 2),
+            ),
+          ),
         ),
-      ),
+      ],
     );
   }
 
@@ -672,6 +711,7 @@ Future<void> _init() async {
                     title: title,
                     avatarUrl: avatarUrl,
                     size: 62,
+                    showOnlineDot: _peerOnlineInList(chat),
                   ),
                   const SizedBox(width: 14),
                   Expanded(

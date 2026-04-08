@@ -2518,15 +2518,34 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                           ),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: Text(
-                              visibleTitle,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: AppColors.textPrimary,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                              ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  visibleTitle,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: AppColors.textPrimary,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                if (!_isGroupChat) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    peerOnline ? 'в сети' : 'не в сети',
+                                    style: TextStyle(
+                                      color: peerOnline
+                                          ? AppColors.success
+                                          : AppColors.textMuted,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
                           ),
                         ],
