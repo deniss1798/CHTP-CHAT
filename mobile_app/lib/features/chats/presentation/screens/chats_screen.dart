@@ -471,12 +471,41 @@ Future<void> _init() async {
     return '$day.$month';
   }
 
-  int _unreadCount(Map<String, dynamic> chat) {
-    final value = chat['unread_count'] ?? chat['unreadCount'] ?? 0;
+  int? _intFromChatField(dynamic v) {
+    if (v == null) return null;
+    if (v is int) return v;
+    return int.tryParse(v.toString());
+  }
 
+  int _parseUnreadRaw(dynamic value) {
+    if (value == null) return 0;
     if (value is int) return value;
     if (value is double) return value.round();
     return int.tryParse(value.toString()) ?? 0;
+  }
+
+  /// Счётчик с сервера; если 0 — эвристика по last_message_id vs my_last_read (последнее от собеседника).
+  int _unreadCount(Map<String, dynamic> chat) {
+    final api = _parseUnreadRaw(chat['unread_count'] ?? chat['unreadCount']);
+    if (api > 0) return api;
+
+    if (_currentUserId == null) return 0;
+
+    final lastId = _intFromChatField(
+      chat['last_message_id'] ?? chat['lastMessageId'],
+    );
+    final lastSender = _intFromChatField(
+      chat['last_message_sender_id'] ?? chat['lastMessageSenderId'],
+    );
+    final myRead = _intFromChatField(
+          chat['my_last_read_message_id'] ?? chat['myLastReadMessageId'],
+        ) ??
+        0;
+
+    if (lastId == null || lastSender == null) return 0;
+    if (lastSender == _currentUserId) return 0;
+    if (lastId > myRead) return 1;
+    return 0;
   }
 
   static const Duration _peerOnlineThreshold = Duration(seconds: 120);

@@ -35,12 +35,14 @@ def _unread_count_for_user(db: Session, chat_id: int, user_id: int) -> int:
     )
     if not member:
         return 0
-    last_read = member.last_read_message_id or 0
+    last_read = int(member.last_read_message_id or 0)
+    uid = int(user_id)
+    cid = int(chat_id)
     return (
         db.query(Message)
         .filter(
-            Message.chat_id == chat_id,
-            Message.sender_id != user_id,
+            Message.chat_id == cid,
+            Message.sender_id != uid,
             Message.id > last_read,
         )
         .count()
@@ -99,6 +101,16 @@ def get_my_chats(
             .first()
         )
 
+        membership = (
+            db.query(ChatMember)
+            .filter(
+                ChatMember.chat_id == chat.id,
+                ChatMember.user_id == current_user.id,
+            )
+            .first()
+        )
+        my_last_read = (membership.last_read_message_id or 0) if membership else 0
+
         result.append(
             ChatResponse(
                 id=chat.id,
@@ -109,6 +121,8 @@ def get_my_chats(
                 last_message=last_message.text if last_message else None,
                 last_message_at=last_message.created_at if last_message else None,
                 last_message_sender_id=last_message.sender_id if last_message else None,
+                last_message_id=last_message.id if last_message else None,
+                my_last_read_message_id=my_last_read,
                 unread_count=_unread_count_for_user(db, chat.id, current_user.id),
                 peer_last_seen_at=peer_last_seen_at,
             )
@@ -175,6 +189,16 @@ def create_chat(
                     .first()
                 )
 
+                member_row = (
+                    db.query(ChatMember)
+                    .filter(
+                        ChatMember.chat_id == chat.id,
+                        ChatMember.user_id == current_user.id,
+                    )
+                    .first()
+                )
+                my_lr = (member_row.last_read_message_id or 0) if member_row else 0
+
                 return ChatResponse(
                     id=chat.id,
                     type=chat.type,
@@ -184,7 +208,9 @@ def create_chat(
                     last_message=last_message.text if last_message else None,
                     last_message_at=last_message.created_at if last_message else None,
                     last_message_sender_id=last_message.sender_id if last_message else None,
-                    unread_count=0,
+                    last_message_id=last_message.id if last_message else None,
+                    my_last_read_message_id=my_lr,
+                    unread_count=_unread_count_for_user(db, chat.id, current_user.id),
                     peer_last_seen_at=other_user.last_seen_at if other_user else None,
                 )
 
@@ -250,6 +276,8 @@ def create_chat(
         last_message=None,
         last_message_at=None,
         last_message_sender_id=None,
+        last_message_id=None,
+        my_last_read_message_id=0,
         unread_count=0,
         peer_last_seen_at=peer_last_seen_at,
     )
