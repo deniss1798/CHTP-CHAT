@@ -23,10 +23,16 @@ class ConnectionManager:
         if not self.active_connections[chat_id]:
             del self.active_connections[chat_id]
 
+    async def _send_json_safe(self, chat_id: int, websocket: WebSocket, message: dict) -> None:
+        try:
+            await websocket.send_json(message)
+        except Exception:
+            self.disconnect(chat_id, websocket)
+
     async def broadcast(self, chat_id: int, message: dict):
         conns = list(self.active_connections.get(chat_id, []))
         for connection, _ in conns:
-            await connection.send_json(message)
+            await self._send_json_safe(chat_id, connection, message)
 
     async def broadcast_to_others(
         self,
@@ -38,7 +44,7 @@ class ConnectionManager:
         for connection, uid in conns:
             if uid == exclude_user_id:
                 continue
-            await connection.send_json(message)
+            await self._send_json_safe(chat_id, connection, message)
 
 
 manager = ConnectionManager()

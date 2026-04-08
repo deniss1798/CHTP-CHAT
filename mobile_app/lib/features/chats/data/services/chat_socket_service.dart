@@ -57,20 +57,20 @@ class ChatSocketService {
     _channel = null;
   }
 
-  /// JWT в query должен кодироваться (`=`, `+`, `&`), иначе WS не подключается — не приходят печать/прочтения.
+  /// Абсолютный путь `/ws/chat/{id}` + JWT в query (кодирование обязательно).
   Uri _buildWsUri({
     required String baseHttpUrl,
     required int chatId,
     required String token,
   }) {
     final base = baseHttpUrl.trim();
-    final root = Uri.parse(base.endsWith('/') ? base : '$base/');
-    final resolved = root.resolve('ws/chat/$chatId');
+    final httpUri = Uri.parse(base);
+    final scheme = httpUri.scheme == 'https' ? 'wss' : 'ws';
     return Uri(
-      scheme: root.scheme == 'https' ? 'wss' : 'ws',
-      host: resolved.host,
-      port: resolved.hasPort ? resolved.port : null,
-      path: resolved.path,
+      scheme: scheme,
+      host: httpUri.host,
+      port: httpUri.hasPort ? httpUri.port : null,
+      path: '/ws/chat/$chatId',
       queryParameters: {'token': token},
     );
   }

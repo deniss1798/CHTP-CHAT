@@ -71,14 +71,21 @@ class ChatsService {
   Map<String, dynamic> _normalizeChat(Map<String, dynamic> raw) {
   final chat = Map<String, dynamic>.from(raw);
 
-  chat['avatar_url'] = UrlHelper.absoluteMediaUrl(raw['avatar_url']);
-  chat['last_message'] = raw['last_message'];
-  chat['last_message_at'] = raw['last_message_at'];
-  chat['last_message_sender_id'] = raw['last_message_sender_id'];
-  chat['last_message_id'] = raw['last_message_id'];
-  chat['my_last_read_message_id'] = raw['my_last_read_message_id'];
-  chat['unread_count'] = _parseUnreadCount(raw['unread_count']);
-  chat['peer_last_seen_at'] = raw['peer_last_seen_at'];
+  chat['avatar_url'] = UrlHelper.absoluteMediaUrl(
+    raw['avatar_url'] ?? raw['avatarUrl'],
+  );
+  chat['last_message'] = raw['last_message'] ?? raw['lastMessage'];
+  chat['last_message_at'] = raw['last_message_at'] ?? raw['lastMessageAt'];
+  chat['last_message_sender_id'] =
+      raw['last_message_sender_id'] ?? raw['lastMessageSenderId'];
+  chat['last_message_id'] = raw['last_message_id'] ?? raw['lastMessageId'];
+  chat['my_last_read_message_id'] =
+      raw['my_last_read_message_id'] ?? raw['myLastReadMessageId'];
+  chat['unread_count'] = _parseUnreadCount(
+    raw['unread_count'] ?? raw['unreadCount'],
+  );
+  chat['peer_last_seen_at'] =
+      raw['peer_last_seen_at'] ?? raw['peerLastSeenAt'];
 
   return chat;
 }

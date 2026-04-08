@@ -508,7 +508,7 @@ Future<void> _init() async {
     return 0;
   }
 
-  static const Duration _peerOnlineThreshold = Duration(seconds: 120);
+  static const Duration _peerOnlineThreshold = Duration(seconds: 180);
 
   bool _peerOnlineFromLastSeenRaw(dynamic raw) {
     if (raw == null) return false;

@@ -565,8 +565,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   final Map<int, DateTime?> _memberLastSeen = {};
 
   Timer? _presenceTimer;
+  Timer? _socketReconnectTimer;
 
-  static const Duration _peerOnlineThreshold = Duration(seconds: 120);
+  static const Duration _peerOnlineThreshold = Duration(seconds: 180);
 
   /// user_id -> last_read_message_id (с сервера)
   final Map<int, int> _lastReadByUserId = {};
@@ -597,6 +598,16 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     });
   }
 
+  void _startSocketReconnectLoop() {
+    _socketReconnectTimer?.cancel();
+    _socketReconnectTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+      if (!mounted) return;
+      if (!_chatSocketService.isConnected) {
+        unawaited(_connectSocket());
+      }
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -608,6 +619,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   @override
   void dispose() {
+    _socketReconnectTimer?.cancel();
     _presenceTimer?.cancel();
     _typingDebounce?.cancel();
     _typingStopTimer?.cancel();
@@ -619,22 +631,38 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     super.dispose();
   }
 
+  Future<void> _ensureSocketConnected() async {
+    if (_chatSocketService.isConnected) return;
+    await _connectSocket();
+  }
+
+  Future<void> _sendTypingFalse() async {
+    await _ensureSocketConnected();
+    if (!mounted || !_chatSocketService.isConnected) return;
+    _chatSocketService.sendTyping(false);
+  }
+
+  Future<void> _fireTypingBurst() async {
+    await _ensureSocketConnected();
+    if (!mounted || !_chatSocketService.isConnected) return;
+    _chatSocketService.sendTyping(true);
+    _typingStopTimer?.cancel();
+    _typingStopTimer = Timer(const Duration(seconds: 3), () {
+      unawaited(_sendTypingFalse());
+    });
+  }
+
   void _onMessageTextChanged() {
-    if (!_chatSocketService.isConnected) return;
     final hasText = _messageController.text.isNotEmpty;
     if (!hasText) {
       _typingDebounce?.cancel();
       _typingStopTimer?.cancel();
-      _chatSocketService.sendTyping(false);
+      unawaited(_sendTypingFalse());
       return;
     }
     _typingDebounce?.cancel();
     _typingDebounce = Timer(const Duration(milliseconds: 220), () {
-      _chatSocketService.sendTyping(true);
-      _typingStopTimer?.cancel();
-      _typingStopTimer = Timer(const Duration(seconds: 3), () {
-        _chatSocketService.sendTyping(false);
-      });
+      unawaited(_fireTypingBurst());
     });
   }
 
@@ -932,6 +960,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
       await _loadMessages();
       await _connectSocket();
+      _startSocketReconnectLoop();
       _startPresenceHeartbeat();
       if (mounted && _messageController.text.trim().isNotEmpty) {
         _onMessageTextChanged();
