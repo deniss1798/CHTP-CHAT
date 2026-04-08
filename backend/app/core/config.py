@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -29,13 +29,26 @@ class Settings(BaseSettings):
         alias="FIREBASE_SERVICE_ACCOUNT_JSON",
     )
 
-    s3_endpoint_url: str | None = Field(None, alias="S3_ENDPOINT_URL")
-    s3_region: str | None = Field(None, alias="S3_REGION")
-    s3_access_key_id: str | None = Field(None, alias="S3_ACCESS_KEY_ID")
-    s3_secret_access_key: str | None = Field(None, alias="S3_SECRET_ACCESS_KEY")
-    s3_public_bucket: str | None = Field(None, alias="S3_PUBLIC_BUCKET")
-    s3_private_bucket: str | None = Field(None, alias="S3_PRIVATE_BUCKET")
-    s3_public_base_url: str | None = Field(None, alias="S3_PUBLIC_BASE_URL")
+    # Поддержка и S3_*, и стандартных AWS_* (часто так задают в .env / панели хостинга).
+    s3_endpoint_url: str | None = Field(
+        None,
+        validation_alias=AliasChoices("S3_ENDPOINT_URL", "AWS_ENDPOINT_URL"),
+    )
+    s3_region: str | None = Field(
+        None,
+        validation_alias=AliasChoices("S3_REGION", "AWS_DEFAULT_REGION"),
+    )
+    s3_access_key_id: str | None = Field(
+        None,
+        validation_alias=AliasChoices("S3_ACCESS_KEY_ID", "AWS_ACCESS_KEY_ID"),
+    )
+    s3_secret_access_key: str | None = Field(
+        None,
+        validation_alias=AliasChoices("S3_SECRET_ACCESS_KEY", "AWS_SECRET_ACCESS_KEY"),
+    )
+    s3_public_bucket: str | None = Field(None, validation_alias="S3_PUBLIC_BUCKET")
+    s3_private_bucket: str | None = Field(None, validation_alias="S3_PRIVATE_BUCKET")
+    s3_public_base_url: str | None = Field(None, validation_alias="S3_PUBLIC_BASE_URL")
 
     cors_origins: str = Field("", alias="CORS_ORIGINS")
 

@@ -379,7 +379,12 @@ async def send_photo_message(
     if not is_private_s3_ready():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Media storage (S3) is not configured",
+            detail=(
+                "Private S3 is not configured. Set S3_ENDPOINT_URL, "
+                "S3_ACCESS_KEY_ID (or AWS_ACCESS_KEY_ID), "
+                "S3_SECRET_ACCESS_KEY (or AWS_SECRET_ACCESS_KEY), "
+                "S3_PRIVATE_BUCKET in .env"
+            ),
         )
 
     if not file.content_type or file.content_type not in ALLOWED_IMAGE_TYPES:
@@ -479,7 +484,12 @@ async def send_video_message(
     if not is_private_s3_ready():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Media storage (S3) is not configured",
+            detail=(
+                "Private S3 is not configured. Set S3_ENDPOINT_URL, "
+                "S3_ACCESS_KEY_ID (or AWS_ACCESS_KEY_ID), "
+                "S3_SECRET_ACCESS_KEY (or AWS_SECRET_ACCESS_KEY), "
+                "S3_PRIVATE_BUCKET in .env"
+            ),
         )
 
     video_content_type = file.content_type
@@ -604,7 +614,12 @@ async def send_video_note_message(
     if not is_private_s3_ready():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Media storage (S3) is not configured",
+            detail=(
+                "Private S3 is not configured. Set S3_ENDPOINT_URL, "
+                "S3_ACCESS_KEY_ID (or AWS_ACCESS_KEY_ID), "
+                "S3_SECRET_ACCESS_KEY (or AWS_SECRET_ACCESS_KEY), "
+                "S3_PRIVATE_BUCKET in .env"
+            ),
         )
 
     video_content_type = file.content_type

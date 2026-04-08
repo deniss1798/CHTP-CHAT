@@ -7,14 +7,18 @@ from botocore.client import Config
 from app.core.config import get_settings
 
 
+def _env_nonempty(value: str | None) -> bool:
+    return bool(value and str(value).strip())
+
+
 def is_private_s3_ready() -> bool:
     """Достаточно для presigned URL и загрузки в приватный бакет (чаты, медиа)."""
     s = get_settings()
     return bool(
-        s.s3_endpoint_url
-        and s.s3_access_key_id
-        and s.s3_secret_access_key
-        and s.s3_private_bucket
+        _env_nonempty(s.s3_endpoint_url)
+        and _env_nonempty(s.s3_access_key_id)
+        and _env_nonempty(s.s3_secret_access_key)
+        and _env_nonempty(s.s3_private_bucket)
     )
 
 
@@ -22,7 +26,7 @@ def is_s3_configured() -> bool:
     """Полный набор: приватный + публичный бакет (аватары, публичные URL)."""
     s = get_settings()
     return is_private_s3_ready() and bool(
-        s.s3_public_bucket and s.s3_public_base_url
+        _env_nonempty(s.s3_public_bucket) and _env_nonempty(s.s3_public_base_url)
     )
 
 
