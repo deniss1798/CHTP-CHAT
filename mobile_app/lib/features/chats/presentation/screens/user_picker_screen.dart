@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
@@ -19,46 +21,71 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
   final CreateChatService _createChatService = CreateChatService();
   final TextEditingController _searchController = TextEditingController();
 
-  bool _isLoading = true;
+  Timer? _searchDebounce;
+
+  bool _isSearching = false;
   bool _isCreating = false;
   String? _error;
 
-  List<Map<String, dynamic>> _allUsers = [];
   List<Map<String, dynamic>> _filteredUsers = [];
 
   @override
   void initState() {
     super.initState();
-    _loadUsers();
-    _searchController.addListener(_applySearch);
+    _searchController.addListener(_onSearchChanged);
   }
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadUsers() async {
+  void _onSearchChanged() {
+    _searchDebounce?.cancel();
+    final q = _searchController.text.trim();
+    if (q.isEmpty) {
+      setState(() {
+        _filteredUsers = [];
+        _error = null;
+        _isSearching = false;
+      });
+      return;
+    }
+
     setState(() {
-      _isLoading = true;
+      _isSearching = true;
+      _error = null;
+    });
+
+    _searchDebounce = Timer(const Duration(milliseconds: 400), () {
+      _performSearch();
+    });
+  }
+
+  Future<void> _performSearch() async {
+    final q = _searchController.text.trim();
+    if (q.isEmpty) return;
+
+    setState(() {
+      _isSearching = true;
       _error = null;
     });
 
     try {
-      final users = await _usersService.getUsers();
+      final users = await _usersService.searchUsers(q);
 
       if (!mounted) return;
 
       setState(() {
-        _allUsers = users;
         _filteredUsers = users;
-        _isLoading = false;
+        _isSearching = false;
       });
     } catch (e) {
       if (!mounted) return;
 
-      String message = 'Не удалось загрузить пользователей';
+      String message = 'Не удалось выполнить поиск';
 
       if (e is DioException) {
         final data = e.response?.data;
@@ -77,25 +104,9 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
 
       setState(() {
         _error = message;
-        _isLoading = false;
+        _isSearching = false;
       });
     }
-  }
-
-  void _applySearch() {
-    final query = _searchController.text.trim().toLowerCase();
-
-    setState(() {
-      if (query.isEmpty) {
-        _filteredUsers = List.from(_allUsers);
-      } else {
-        _filteredUsers = _allUsers.where((user) {
-          final username = (user['username'] ?? '').toString().toLowerCase();
-          final email = (user['email'] ?? '').toString().toLowerCase();
-          return username.contains(query) || email.contains(query);
-        }).toList();
-      }
-    });
   }
 
   String _initials(String title) {
@@ -263,13 +274,7 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
   }
 
   Widget _buildBody() {
-    if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(
-          color: AppColors.accent,
-        ),
-      );
-    }
+    final query = _searchController.text.trim();
 
     if (_error != null) {
       return Center(
@@ -289,11 +294,35 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
               ),
               const SizedBox(height: 16),
               ElevatedButton(
-                onPressed: _loadUsers,
+                onPressed: _performSearch,
                 child: const Text('Повторить'),
               ),
             ],
           ),
+        ),
+      );
+    }
+
+    if (query.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 32),
+          child: Text(
+            'Введите username, чтобы найти пользователя',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 16,
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_isSearching) {
+      return const Center(
+        child: CircularProgressIndicator(
+          color: AppColors.accent,
         ),
       );
     }
@@ -427,7 +456,7 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
                   controller: _searchController,
                   style: const TextStyle(color: AppColors.textPrimary),
                   decoration: InputDecoration(
-                    hintText: 'Поиск по username или email',
+                    hintText: 'Поиск по username',
                     hintStyle: const TextStyle(color: AppColors.textMuted),
                     filled: true,
                     fillColor: AppColors.surfaceSoft,

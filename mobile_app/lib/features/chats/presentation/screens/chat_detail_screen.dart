@@ -47,11 +47,13 @@ class _VideoMessageWidget extends StatefulWidget {
   final String url;
   final bool isMine;
   final bool isVideoNote;
+  final VoidCallback onOpenFullscreen;
 
   const _VideoMessageWidget({
     required this.url,
     required this.isMine,
     this.isVideoNote = false,
+    required this.onOpenFullscreen,
   });
 
   @override
@@ -61,7 +63,6 @@ class _VideoMessageWidget extends StatefulWidget {
 class _VideoMessageWidgetState extends State<_VideoMessageWidget> {
   VideoPlayerController? _controller;
   bool _initialized = false;
-  bool _showOverlay = true;
   String? _initError;
   int _loadGeneration = 0;
 
@@ -103,16 +104,6 @@ class _VideoMessageWidgetState extends State<_VideoMessageWidget> {
         _initError = e.toString().replaceFirst('Exception: ', '');
       });
     });
-
-    c.addListener(() {
-      if (!mounted || gen != _loadGeneration) return;
-      final playing = c.value.isPlaying;
-      if (playing) {
-        if (_showOverlay) setState(() => _showOverlay = false);
-      } else {
-        if (!_showOverlay) setState(() => _showOverlay = true);
-      }
-    });
   }
 
   @override
@@ -120,16 +111,6 @@ class _VideoMessageWidgetState extends State<_VideoMessageWidget> {
     _loadGeneration++;
     _controller?.dispose();
     super.dispose();
-  }
-
-  void _togglePlayback() {
-    final c = _controller;
-    if (c == null || !_initialized) return;
-    if (c.value.isPlaying) {
-      c.pause();
-    } else {
-      c.play();
-    }
   }
 
   @override
@@ -217,6 +198,249 @@ class _VideoMessageWidgetState extends State<_VideoMessageWidget> {
           );
 
     return GestureDetector(
+      onTap: widget.onOpenFullscreen,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Center(child: videoChild),
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: Colors.black.withAlpha(55),
+              borderRadius: BorderRadius.circular(24),
+            ),
+            alignment: Alignment.center,
+            child: const Icon(
+              Icons.play_arrow_rounded,
+              color: Colors.white,
+              size: 24,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FullscreenImageViewer extends StatelessWidget {
+  final String url;
+
+  const _FullscreenImageViewer({required this.url});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.close_rounded, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
+      body: SafeArea(
+        child: Center(
+          child: InteractiveViewer(
+            minScale: 0.5,
+            maxScale: 4,
+            child: Image.network(
+              url,
+              fit: BoxFit.contain,
+              loadingBuilder: (context, child, progress) {
+                if (progress == null) return child;
+                return const SizedBox(
+                  height: 200,
+                  width: double.infinity,
+                  child: Center(
+                    child: CircularProgressIndicator(color: AppColors.accent),
+                  ),
+                );
+              },
+              errorBuilder: (_, __, ___) => const Padding(
+                padding: EdgeInsets.all(24),
+                child: Text(
+                  'Не удалось загрузить фото',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white70),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FullscreenVideoPage extends StatefulWidget {
+  final String url;
+  final bool isVideoNote;
+
+  const _FullscreenVideoPage({
+    required this.url,
+    this.isVideoNote = false,
+  });
+
+  @override
+  State<_FullscreenVideoPage> createState() => _FullscreenVideoPageState();
+}
+
+class _FullscreenVideoPageState extends State<_FullscreenVideoPage> {
+  VideoPlayerController? _controller;
+  bool _initialized = false;
+  bool _showOverlay = true;
+  String? _initError;
+  int _loadGeneration = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _attach();
+  }
+
+  void _attach() {
+    final gen = ++_loadGeneration;
+    _controller?.dispose();
+    _controller = null;
+    _initialized = false;
+    _initError = null;
+
+    final uri = Uri.tryParse(widget.url);
+    if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
+      setState(() => _initError = 'Некорректный адрес видео');
+      return;
+    }
+
+    final c = VideoPlayerController.networkUrl(
+      uri,
+      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+    );
+    _controller = c;
+
+    c.initialize().then((_) {
+      if (!mounted || gen != _loadGeneration) return;
+      setState(() {
+        _initialized = true;
+        _initError = null;
+      });
+    }).catchError((Object e, _) {
+      if (!mounted || gen != _loadGeneration) return;
+      setState(() {
+        _initialized = false;
+        _initError = e.toString().replaceFirst('Exception: ', '');
+      });
+    });
+
+    c.addListener(() {
+      if (!mounted || gen != _loadGeneration) return;
+      final playing = c.value.isPlaying;
+      if (playing) {
+        if (_showOverlay) setState(() => _showOverlay = false);
+      } else {
+        if (!_showOverlay) setState(() => _showOverlay = true);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _loadGeneration++;
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  void _togglePlayback() {
+    final c = _controller;
+    if (c == null || !_initialized) return;
+    if (c.value.isPlaying) {
+      c.pause();
+    } else {
+      c.play();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.close_rounded, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
+      body: SafeArea(
+        child: _buildBody(),
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_initError != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                _initError!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white70),
+              ),
+              const SizedBox(height: 16),
+              TextButton.icon(
+                onPressed: () => setState(_attach),
+                icon: const Icon(Icons.refresh_rounded, color: AppColors.accent),
+                label: const Text(
+                  'Повторить',
+                  style: TextStyle(color: AppColors.accent),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (!_initialized || _controller == null) {
+      return const Center(
+        child: CircularProgressIndicator(color: AppColors.accent),
+      );
+    }
+
+    final c = _controller!;
+
+    final videoChild = widget.isVideoNote
+        ? LayoutBuilder(
+            builder: (context, constraints) {
+              final side = constraints.biggest.shortestSide * 0.92;
+              return SizedBox(
+                width: side,
+                height: side,
+                child: ClipOval(
+                  child: FittedBox(
+                    fit: BoxFit.cover,
+                    child: SizedBox(
+                      width: c.value.size.width,
+                      height: c.value.size.height,
+                      child: VideoPlayer(c),
+                    ),
+                  ),
+                ),
+              );
+            },
+          )
+        : AspectRatio(
+            aspectRatio: c.value.aspectRatio,
+            child: VideoPlayer(c),
+          );
+
+    return GestureDetector(
       onTap: _togglePlayback,
       child: Stack(
         alignment: Alignment.center,
@@ -226,17 +450,17 @@ class _VideoMessageWidgetState extends State<_VideoMessageWidget> {
             opacity: _showOverlay ? 1 : 0,
             duration: const Duration(milliseconds: 150),
             child: Container(
-              width: 48,
-              height: 48,
+              width: 56,
+              height: 56,
               decoration: BoxDecoration(
                 color: Colors.black.withAlpha(55),
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(28),
               ),
               alignment: Alignment.center,
               child: Icon(
                 c.value.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
                 color: Colors.white,
-                size: 24,
+                size: 28,
               ),
             ),
           ),
@@ -1843,6 +2067,24 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     );
   }
 
+  void _openFullscreenImage(String url) {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (ctx) => _FullscreenImageViewer(url: url),
+      ),
+    );
+  }
+
+  void _openFullscreenVideo(String url, {required bool isVideoNote}) {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (ctx) => _FullscreenVideoPage(url: url, isVideoNote: isVideoNote),
+      ),
+    );
+  }
+
   Widget _buildMessageContent(Map<String, dynamic> message, bool isMine) {
     final messageType = (message['message_type'] ?? 'text').toString();
     final mediaUrl = (message['media_url'] ?? '').toString().trim();
@@ -1855,58 +2097,63 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           url: mediaUrl,
           isMine: isMine,
           isVideoNote: true,
+          onOpenFullscreen: () => _openFullscreenVideo(mediaUrl, isVideoNote: true),
         ),
       );
     }
 
     if (messageType == 'image' && mediaUrl.isNotEmpty) {
-      return ConstrainedBox(
-        constraints: const BoxConstraints(
-          maxWidth: 220,
-          maxHeight: 280,
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Image.network(
-            mediaUrl,
-            fit: BoxFit.cover,
-            loadingBuilder: (context, child, progress) {
-              if (progress == null) return child;
-              return Container(
-                width: 220,
-                height: 220,
-                color: Colors.black.withAlpha(14),
-                alignment: Alignment.center,
-                child: SizedBox(
-                  width: 26,
-                  height: 26,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: AppColors.accent.withAlpha(220),
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _openFullscreenImage(mediaUrl),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            maxWidth: 220,
+            maxHeight: 280,
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.network(
+              mediaUrl,
+              fit: BoxFit.cover,
+              loadingBuilder: (context, child, progress) {
+                if (progress == null) return child;
+                return Container(
+                  width: 220,
+                  height: 220,
+                  color: Colors.black.withAlpha(14),
+                  alignment: Alignment.center,
+                  child: SizedBox(
+                    width: 26,
+                    height: 26,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.accent.withAlpha(220),
+                    ),
                   ),
-                ),
-              );
-            },
-            errorBuilder: (_, __, ___) {
-              return Container(
-                width: 220,
-                height: 160,
-                color: isMine
-                    ? Colors.black.withAlpha(20)
-                    : AppColors.surfaceSoft,
-                alignment: Alignment.center,
-                padding: const EdgeInsets.all(16),
-                child: Text(
-                  'Не удалось загрузить фото',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: isMine ? Colors.black : AppColors.textSecondary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
+                );
+              },
+              errorBuilder: (_, __, ___) {
+                return Container(
+                  width: 220,
+                  height: 160,
+                  color: isMine
+                      ? Colors.black.withAlpha(20)
+                      : AppColors.surfaceSoft,
+                  alignment: Alignment.center,
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    'Не удалось загрузить фото',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: isMine ? Colors.black : AppColors.textSecondary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
         ),
       );
@@ -1924,6 +2171,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             url: mediaUrl,
             isMine: isMine,
             isVideoNote: false,
+            onOpenFullscreen: () => _openFullscreenVideo(mediaUrl, isVideoNote: false),
           ),
         ),
       );
