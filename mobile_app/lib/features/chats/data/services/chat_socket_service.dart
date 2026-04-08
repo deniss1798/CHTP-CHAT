@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:convert' show jsonDecode, jsonEncode;
+import 'dart:convert' show jsonDecode, jsonEncode, utf8;
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../../../../core/storage/secure_storage_service.dart';
 
@@ -46,7 +46,15 @@ class ChatSocketService {
     _subscription = _channel!.stream.listen(
       (event) {
         try {
-          final decoded = jsonDecode(event);
+          final String text;
+          if (event is String) {
+            text = event;
+          } else if (event is List<int>) {
+            text = utf8.decode(event);
+          } else {
+            text = event.toString();
+          }
+          final decoded = jsonDecode(text);
 
           if (decoded is Map<String, dynamic>) {
             _messageController.add(decoded);

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -29,13 +30,17 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
 
+  Timer? _searchDebounce;
+
   bool _isLoading = true;
+  bool _isSearching = false;
   bool _isCreating = false;
   String? _error;
+  String? _searchError;
 
   int? _currentUserId;
-  List<Map<String, dynamic>> _allUsers = [];
-  List<Map<String, dynamic>> _filteredUsers = [];
+  List<Map<String, dynamic>> _searchResults = [];
+  final Map<int, Map<String, dynamic>> _selectedUsersCache = {};
   final Set<int> _selectedUserIds = <int>{};
 
   File? _selectedAvatarFile;
@@ -44,11 +49,12 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
   void initState() {
     super.initState();
     _init();
-    _searchController.addListener(_applySearch);
+    _searchController.addListener(_onSearchChanged);
   }
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _titleController.dispose();
     _searchController.dispose();
     super.dispose();
@@ -70,26 +76,9 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
         _currentUserId = int.tryParse(rawId.toString());
       }
 
-      final users = await _usersService.getUsers();
-
-      final filtered = users.where((u) {
-        final rawUserId = u['id'];
-        int? userId;
-
-        if (rawUserId is int) {
-          userId = rawUserId;
-        } else {
-          userId = int.tryParse(rawUserId.toString());
-        }
-
-        return userId != null && userId != _currentUserId;
-      }).toList();
-
       if (!mounted) return;
 
       setState(() {
-        _allUsers = filtered;
-        _filteredUsers = filtered;
         _isLoading = false;
       });
     } catch (e) {
@@ -98,27 +87,78 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
       setState(() {
         _error = _extractErrorMessage(
           e,
-          fallback: 'Не удалось загрузить пользователей',
+          fallback: 'Не удалось загрузить профиль',
         );
         _isLoading = false;
       });
     }
   }
 
-  void _applySearch() {
-    final query = _searchController.text.trim().toLowerCase();
+  void _onSearchChanged() {
+    _searchDebounce?.cancel();
+    final q = _searchController.text.trim();
+
+    if (q.isEmpty) {
+      setState(() {
+        _searchResults = [];
+        _searchError = null;
+        _isSearching = false;
+      });
+      return;
+    }
 
     setState(() {
-      if (query.isEmpty) {
-        _filteredUsers = List.from(_allUsers);
-      } else {
-        _filteredUsers = _allUsers.where((user) {
-          final username = (user['username'] ?? '').toString().toLowerCase();
-          final email = (user['email'] ?? '').toString().toLowerCase();
-          return username.contains(query) || email.contains(query);
-        }).toList();
-      }
+      _isSearching = true;
+      _searchError = null;
     });
+
+    _searchDebounce = Timer(const Duration(milliseconds: 400), () {
+      _performSearch();
+    });
+  }
+
+  Future<void> _performSearch() async {
+    final q = _searchController.text.trim();
+    if (q.isEmpty) return;
+
+    setState(() {
+      _isSearching = true;
+      _searchError = null;
+    });
+
+    try {
+      final users = await _usersService.searchUsers(q);
+      final me = _currentUserId;
+
+      if (!mounted) return;
+
+      final filtered = users.where((u) {
+        final rawUserId = u['id'];
+        int? userId;
+        if (rawUserId is int) {
+          userId = rawUserId;
+        } else {
+          userId = int.tryParse(rawUserId.toString());
+        }
+        return userId != null && userId != me;
+      }).toList();
+
+      setState(() {
+        _searchResults = filtered;
+        _isSearching = false;
+        _searchError = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _searchError = _extractErrorMessage(
+          e,
+          fallback: 'Не удалось выполнить поиск',
+        );
+        _isSearching = false;
+      });
+    }
   }
 
   String _extractErrorMessage(Object e, {required String fallback}) {
@@ -155,15 +195,17 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
 
     if (parsedUserId == null) return;
 
-final userId = parsedUserId;
+    final userId = parsedUserId;
 
-setState(() {
-  if (_selectedUserIds.contains(userId)) {
-    _selectedUserIds.remove(userId);
-  } else {
-    _selectedUserIds.add(userId);
-  }
-});
+    setState(() {
+      if (_selectedUserIds.contains(userId)) {
+        _selectedUserIds.remove(userId);
+        _selectedUsersCache.remove(userId);
+      } else {
+        _selectedUserIds.add(userId);
+        _selectedUsersCache[userId] = Map<String, dynamic>.from(user);
+      }
+    });
   }
 
   String _initials(String title) {
@@ -396,6 +438,18 @@ setState(() {
     }
   }
 
+  List<Map<String, dynamic>> _usersForList() {
+    final q = _searchController.text.trim();
+    if (q.isNotEmpty) {
+      return _searchResults;
+    }
+    final ids = _selectedUserIds.toList()..sort();
+    return ids
+        .map((id) => _selectedUsersCache[id])
+        .whereType<Map<String, dynamic>>()
+        .toList();
+  }
+
   Widget _buildBody() {
     if (_isLoading) {
       return const Center(
@@ -421,7 +475,15 @@ setState(() {
               ),
               const SizedBox(height: 16),
               ElevatedButton(
-                onPressed: _init,
+                onPressed: () {
+                  final q = _searchController.text.trim();
+                  if (q.isEmpty) {
+                    setState(() => _error = null);
+                    _init();
+                  } else {
+                    _performSearch();
+                  }
+                },
                 child: const Text('Повторить'),
               ),
             ],
@@ -523,100 +585,7 @@ setState(() {
         ),
         const SizedBox(height: 12),
         Expanded(
-          child: _filteredUsers.isEmpty
-              ? const Center(
-                  child: Text(
-                    'Пользователи не найдены',
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 16,
-                    ),
-                  ),
-                )
-              : ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                  itemCount: _filteredUsers.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
-                    final user = _filteredUsers[index];
-                    final username = (user['username'] ?? '').toString();
-                    final email = (user['email'] ?? '').toString();
-                    final avatarUrl = _userAvatarUrl(user);
-
-                    final rawId = user['id'];
-                    int? userId;
-                    if (rawId is int) {
-                      userId = rawId;
-                    } else {
-                      userId = int.tryParse(rawId.toString());
-                    }
-
-                    final isSelected =
-                        userId != null && _selectedUserIds.contains(userId);
-
-                    return GestureDetector(
-                      onTap: () => _toggleUser(user),
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? const Color(0xFF17131B)
-                              : AppColors.surface.withAlpha(210),
-                          borderRadius: BorderRadius.circular(22),
-                          border: Border.all(
-                            color: isSelected
-                                ? AppColors.accent
-                                : AppColors.accentBorder.withAlpha(110),
-                            width: isSelected ? 1.4 : 1,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            _buildUserAvatar(
-                              title: username,
-                              avatarUrl: avatarUrl,
-                              size: 54,
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    username,
-                                    style: const TextStyle(
-                                      color: AppColors.textPrimary,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    email,
-                                    style: const TextStyle(
-                                      color: AppColors.textSecondary,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Icon(
-                              isSelected
-                                  ? Icons.check_circle
-                                  : Icons.radio_button_unchecked,
-                              color: isSelected
-                                  ? AppColors.accent
-                                  : AppColors.textMuted,
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
+          child: _buildUserListArea(),
         ),
         SafeArea(
           top: false,
@@ -642,6 +611,173 @@ setState(() {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildUserListArea() {
+    final q = _searchController.text.trim();
+
+    if (q.isEmpty) {
+      if (_selectedUserIds.isEmpty) {
+        return const Center(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 32),
+            child: Text(
+              'Введите username или email, чтобы найти участников',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 16,
+              ),
+            ),
+          ),
+        );
+      }
+      final selectedOnly = _usersForList();
+      return ListView.separated(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        itemCount: selectedOnly.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        itemBuilder: (context, index) {
+          return _buildUserTile(selectedOnly[index]);
+        },
+      );
+    }
+
+    if (_isSearching) {
+      return const Center(
+        child: CircularProgressIndicator(
+          color: AppColors.accent,
+        ),
+      );
+    }
+
+    if (_searchError != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                _searchError!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _performSearch,
+                child: const Text('Повторить'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_searchResults.isEmpty) {
+      return const Center(
+        child: Text(
+          'Пользователи не найдены',
+          style: TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 16,
+          ),
+        ),
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+      itemCount: _searchResults.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      itemBuilder: (context, index) {
+        final user = _searchResults[index];
+        return _buildUserTile(user);
+      },
+    );
+  }
+
+  Widget _buildUserTile(Map<String, dynamic> user) {
+    final username = (user['username'] ?? '').toString();
+    final email = (user['email'] ?? '').toString();
+    final avatarUrl = _userAvatarUrl(user);
+
+    final rawId = user['id'];
+    int? userId;
+    if (rawId is int) {
+      userId = rawId;
+    } else {
+      userId = int.tryParse(rawId.toString());
+    }
+
+    final isSelected =
+        userId != null && _selectedUserIds.contains(userId);
+
+    return GestureDetector(
+      onTap: () => _toggleUser(user),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? const Color(0xFF17131B)
+              : AppColors.surface.withAlpha(210),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(
+            color: isSelected
+                ? AppColors.accent
+                : AppColors.accentBorder.withAlpha(110),
+            width: isSelected ? 1.4 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            _buildUserAvatar(
+              title: username,
+              avatarUrl: avatarUrl,
+              size: 54,
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    username,
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    email,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Icon(
+              isSelected
+                  ? Icons.check_circle
+                  : Icons.radio_button_unchecked,
+              color: isSelected
+                  ? AppColors.accent
+                  : AppColors.textMuted,
+            ),
+          ],
+        ),
+      ),
     );
   }
 

@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -49,6 +49,23 @@ class Settings(BaseSettings):
     s3_public_bucket: str | None = Field(None, validation_alias="S3_PUBLIC_BUCKET")
     s3_private_bucket: str | None = Field(None, validation_alias="S3_PRIVATE_BUCKET")
     s3_public_base_url: str | None = Field(None, validation_alias="S3_PUBLIC_BASE_URL")
+
+    @field_validator(
+        "s3_endpoint_url",
+        "s3_region",
+        "s3_access_key_id",
+        "s3_secret_access_key",
+        "s3_public_bucket",
+        "s3_private_bucket",
+        "s3_public_base_url",
+        mode="before",
+    )
+    @classmethod
+    def _strip_s3_env(cls, v: object) -> str | None:
+        if v is None:
+            return None
+        s = str(v).strip()
+        return s if s else None
 
     cors_origins: str = Field("", alias="CORS_ORIGINS")
 

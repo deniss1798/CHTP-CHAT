@@ -573,7 +573,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   final Map<int, int> _lastReadByUserId = {};
 
   Timer? _typingDebounce;
-  Timer? _typingStopTimer;
+  /// Отправка `typing: false` после паузы в собственном вводе.
+  Timer? _localTypingStopTimer;
+  /// Скрыть строку «… печатает» после тишины от собеседника.
+  Timer? _remoteTypingHideTimer;
   int? _typingUserId;
 
   bool get _isGroupChat => widget.chatType == 'group';
@@ -622,7 +625,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     _socketReconnectTimer?.cancel();
     _presenceTimer?.cancel();
     _typingDebounce?.cancel();
-    _typingStopTimer?.cancel();
+    _localTypingStopTimer?.cancel();
+    _remoteTypingHideTimer?.cancel();
     _messageController.removeListener(_onMessageTextChanged);
     _socketSubscription?.cancel();
     _chatSocketService.dispose();
@@ -646,8 +650,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     await _ensureSocketConnected();
     if (!mounted || !_chatSocketService.isConnected) return;
     _chatSocketService.sendTyping(true);
-    _typingStopTimer?.cancel();
-    _typingStopTimer = Timer(const Duration(seconds: 3), () {
+    _localTypingStopTimer?.cancel();
+    _localTypingStopTimer = Timer(const Duration(seconds: 3), () {
       unawaited(_sendTypingFalse());
     });
   }
@@ -656,7 +660,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     final hasText = _messageController.text.isNotEmpty;
     if (!hasText) {
       _typingDebounce?.cancel();
-      _typingStopTimer?.cancel();
+      _localTypingStopTimer?.cancel();
       unawaited(_sendTypingFalse());
       return;
     }
@@ -1210,8 +1214,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         _typingUserId = uid;
         _memberLastSeen[uid] = DateTime.now().toUtc();
       });
-      _typingStopTimer?.cancel();
-      _typingStopTimer = Timer(const Duration(seconds: 3), () {
+      _remoteTypingHideTimer?.cancel();
+      _remoteTypingHideTimer = Timer(const Duration(seconds: 3), () {
         if (!mounted) return;
         setState(() {
           if (_typingUserId == uid) {
@@ -1307,6 +1311,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     if (!mounted) return;
 
     setState(() {
+      if (senderId != null && senderId == _typingUserId) {
+        _typingUserId = null;
+        _remoteTypingHideTimer?.cancel();
+      }
       if (senderId != null &&
           senderId != _currentUserId &&
           !_isGroupChat) {
@@ -1798,7 +1806,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   int? _intFromDynamic(Object? raw) {
     if (raw == null) return null;
-    if (raw is int) return raw;
+    // JSON numbers on web are often decoded as double, not int.
+    if (raw is num) return raw.toInt();
     return int.tryParse(raw.toString());
   }
 
