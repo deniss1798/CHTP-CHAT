@@ -7,17 +7,22 @@ from botocore.client import Config
 from app.core.config import get_settings
 
 
-def is_s3_configured() -> bool:
-    """Все переменные S3 заданы — можно подписывать URL и грузить файлы."""
+def is_private_s3_ready() -> bool:
+    """Достаточно для presigned URL и загрузки в приватный бакет (чаты, медиа)."""
     s = get_settings()
     return bool(
         s.s3_endpoint_url
-        and s.s3_region
         and s.s3_access_key_id
         and s.s3_secret_access_key
-        and s.s3_public_bucket
         and s.s3_private_bucket
-        and s.s3_public_base_url
+    )
+
+
+def is_s3_configured() -> bool:
+    """Полный набор: приватный + публичный бакет (аватары, публичные URL)."""
+    s = get_settings()
+    return is_private_s3_ready() and bool(
+        s.s3_public_bucket and s.s3_public_base_url
     )
 
 
@@ -27,31 +32,30 @@ class S3StorageService:
 
         if not settings.s3_endpoint_url:
             raise RuntimeError("S3_ENDPOINT_URL is not set")
-        if not settings.s3_region:
-            raise RuntimeError("S3_REGION is not set")
         if not settings.s3_access_key_id:
             raise RuntimeError("S3_ACCESS_KEY_ID is not set")
         if not settings.s3_secret_access_key:
             raise RuntimeError("S3_SECRET_ACCESS_KEY is not set")
-        if not settings.s3_public_bucket:
-            raise RuntimeError("S3_PUBLIC_BUCKET is not set")
         if not settings.s3_private_bucket:
             raise RuntimeError("S3_PRIVATE_BUCKET is not set")
-        if not settings.s3_public_base_url:
-            raise RuntimeError("S3_PUBLIC_BASE_URL is not set")
+
+        region = (settings.s3_region or "").strip() or "us-east-1"
 
         self.settings = settings
         self.client = boto3.client(
             "s3",
             endpoint_url=settings.s3_endpoint_url,
-            region_name=settings.s3_region,
+            region_name=region,
             aws_access_key_id=settings.s3_access_key_id,
             aws_secret_access_key=settings.s3_secret_access_key,
             config=Config(signature_version="s3v4"),
         )
 
     def _build_public_url(self, object_key: str) -> str:
-        base = self.settings.s3_public_base_url.rstrip("/")
+        base = self.settings.s3_public_base_url
+        if not base:
+            raise RuntimeError("S3_PUBLIC_BASE_URL is not set")
+        base = base.rstrip("/")
         return f"{base}/{object_key}"
 
     def upload_public_avatar(
@@ -63,6 +67,8 @@ class S3StorageService:
         extension: str,
         content_type: str | None = None,
     ) -> str:
+        if not self.settings.s3_public_bucket:
+            raise RuntimeError("S3_PUBLIC_BUCKET is not set")
         object_key = f"{folder}/{owner_id}/{uuid4().hex}{extension}"
 
         resolved_content_type = (
@@ -84,7 +90,11 @@ class S3StorageService:
         if not file_url:
             return
 
-        base = self.settings.s3_public_base_url.rstrip("/") + "/"
+        pub_base = self.settings.s3_public_base_url
+        if not self.settings.s3_public_bucket or not pub_base:
+            return
+
+        base = pub_base.rstrip("/") + "/"
         if not file_url.startswith(base):
             return
 

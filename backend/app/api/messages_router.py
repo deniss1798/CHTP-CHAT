@@ -12,7 +12,7 @@ from app.models.chat_member import ChatMember
 from app.models.message import Message
 from app.models.user import User
 from app.schemas.message_schema import MessageCreate, MessageReplyPreview, MessageResponse, MessageUpdate
-from app.services.s3_storage import S3StorageService, is_s3_configured
+from app.services.s3_storage import S3StorageService, is_private_s3_ready
 from app.services.video_transcode import try_transcode_to_desktop_mp4
 
 router = APIRouter(prefix="/messages", tags=["Messages"])
@@ -81,7 +81,7 @@ def _reply_preview_for_parent(
     media_url = parent.media_url
     ptype = _safe_message_type(parent)
     if (
-        is_s3_configured()
+        is_private_s3_ready()
         and ptype in PRIVATE_MEDIA_MESSAGE_TYPES
         and parent.media_key
     ):
@@ -112,7 +112,7 @@ def _message_to_response(
     mtype_single = _safe_message_type(message)
     media_url = message.media_url
     if (
-        is_s3_configured()
+        is_private_s3_ready()
         and mtype_single in PRIVATE_MEDIA_MESSAGE_TYPES
         and message.media_key
     ):
@@ -159,7 +159,7 @@ def _message_to_response_batched(
     media_url = message.media_url
     mtype = _safe_message_type(message)
     if (
-        is_s3_configured()
+        is_private_s3_ready()
         and mtype in PRIVATE_MEDIA_MESSAGE_TYPES
         and message.media_key
     ):
@@ -200,7 +200,7 @@ def _build_message_payload(message: Message, db: Session, storage: S3StorageServ
     media_url = message.media_url
     mtype_payload = _safe_message_type(message)
     if (
-        is_s3_configured()
+        is_private_s3_ready()
         and mtype_payload in PRIVATE_MEDIA_MESSAGE_TYPES
         and message.media_key
     ):
@@ -278,7 +278,7 @@ def _validate_reply_target(db: Session, chat_id: int, reply_to_message_id: int |
 
 
 def _apply_private_media_urls(messages: list[Message]) -> list[Message]:
-    if not is_s3_configured():
+    if not is_private_s3_ready():
         return messages
 
     get_storage = _make_s3_getter()
@@ -294,7 +294,7 @@ def _apply_private_media_urls(messages: list[Message]) -> list[Message]:
 
 
 def _apply_private_media_urls_map(messages: list[Message]) -> None:
-    if not is_s3_configured():
+    if not is_private_s3_ready():
         return
 
     get_storage = _make_s3_getter()
@@ -376,7 +376,7 @@ async def send_photo_message(
     _ensure_chat_member(chat_id, current_user.id, db)
     _validate_reply_target(db, chat_id, reply_to_message_id)
 
-    if not is_s3_configured():
+    if not is_private_s3_ready():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Media storage (S3) is not configured",
@@ -476,7 +476,7 @@ async def send_video_message(
     _ensure_chat_member(chat_id, current_user.id, db)
     _validate_reply_target(db, chat_id, reply_to_message_id)
 
-    if not is_s3_configured():
+    if not is_private_s3_ready():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Media storage (S3) is not configured",
@@ -601,7 +601,7 @@ async def send_video_note_message(
     _ensure_chat_member(chat_id, current_user.id, db)
     _validate_reply_target(db, chat_id, reply_to_message_id)
 
-    if not is_s3_configured():
+    if not is_private_s3_ready():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Media storage (S3) is not configured",
@@ -785,7 +785,7 @@ async def delete_message(
     db.delete(message)
     db.commit()
 
-    if media_key and is_s3_configured():
+    if media_key and is_private_s3_ready():
         try:
             storage = S3StorageService()
             storage.delete_private_object(media_key)

@@ -7,7 +7,7 @@ from app.core.dependencies import get_current_user
 from app.db.database import get_db
 from app.models.user import User
 from app.schemas.user_schema import UserResponse
-from app.services.s3_storage import S3StorageService
+from app.services.s3_storage import S3StorageService, is_s3_configured
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -45,6 +45,12 @@ async def upload_my_avatar(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="File is too large. Max size is 5 MB",
+        )
+
+    if not is_s3_configured():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Public media storage (S3) is not fully configured",
         )
 
     storage = S3StorageService()
