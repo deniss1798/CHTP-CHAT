@@ -59,10 +59,18 @@ def db_check():
     return {"database_connected": value == 1}
 
 
-app.include_router(users_router)
-app.include_router(auth_router)
-app.include_router(chats_router)
-app.include_router(messages_router)
-app.include_router(ws_router)
-app.include_router(ws_inbox_router)
-app.include_router(devices_router)
+# Два набора путей: без префикса (прямой Uvicorn / nginx с rewrite) и с /api
+# (когда клиент: API_BASE_URL=https://host/api — см. mobile_app ApiClient).
+def _include_all_routers(prefix: str = "") -> None:
+    kwargs = {"prefix": prefix} if prefix else {}
+    app.include_router(users_router, **kwargs)
+    app.include_router(auth_router, **kwargs)
+    app.include_router(chats_router, **kwargs)
+    app.include_router(messages_router, **kwargs)
+    app.include_router(ws_router, **kwargs)
+    app.include_router(ws_inbox_router, **kwargs)
+    app.include_router(devices_router, **kwargs)
+
+
+_include_all_routers()
+_include_all_routers("/api")
