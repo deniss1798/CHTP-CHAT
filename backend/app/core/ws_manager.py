@@ -4,6 +4,30 @@ from collections import defaultdict
 from fastapi import WebSocket
 
 
+class InboxConnectionManager:
+    """Одно соединение на пользователя: события для списка чатов (например typing)."""
+
+    def __init__(self):
+        self._user_id_to_ws: dict[int, WebSocket] = {}
+
+    async def connect(self, user_id: int, websocket: WebSocket) -> None:
+        await websocket.accept()
+        self._user_id_to_ws[user_id] = websocket
+
+    def disconnect(self, user_id: int, websocket: WebSocket) -> None:
+        if self._user_id_to_ws.get(user_id) is websocket:
+            del self._user_id_to_ws[user_id]
+
+    async def send_json(self, user_id: int, message: dict) -> None:
+        ws = self._user_id_to_ws.get(user_id)
+        if not ws:
+            return
+        try:
+            await ws.send_json(message)
+        except Exception:
+            self.disconnect(user_id, ws)
+
+
 class ConnectionManager:
     def __init__(self):
         # chat_id -> list of (websocket, user_id)
@@ -48,3 +72,4 @@ class ConnectionManager:
 
 
 manager = ConnectionManager()
+inbox_manager = InboxConnectionManager()

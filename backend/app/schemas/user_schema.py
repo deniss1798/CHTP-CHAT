@@ -22,6 +22,17 @@ class UserResponse(BaseModel):
         from_attributes = True
 
 
+class UserPublicProfile(BaseModel):
+    """Профиль другого пользователя (без email)."""
+
+    id: int
+    username: str
+    avatar_url: str | None = None
+
+    class Config:
+        from_attributes = True
+
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"

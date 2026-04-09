@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_user
@@ -16,6 +16,7 @@ from app.schemas.chat_schema import (
     ChatMemberAddRequest,
     ChatMemberResponse,
     ChatResponse,
+    ChatUpdate,
     MarkChatReadRequest,
     MemberReadState,
     UserShort,
@@ -23,6 +24,69 @@ from app.schemas.chat_schema import (
 from app.services.s3_storage import S3StorageService, is_s3_configured
 
 router = APIRouter(prefix="/chats", tags=["Chats"])
+
+
+def _chat_detail_response(db: Session, chat_id: int, current_user: User) -> ChatDetailResponse:
+    chat = db.query(Chat).filter(Chat.id == chat_id).first()
+
+    if not chat:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Chat not found",
+        )
+
+    chat_member = (
+        db.query(ChatMember)
+        .filter(
+            ChatMember.chat_id == chat_id,
+            ChatMember.user_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not chat_member:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not a member of this chat",
+        )
+
+    users = (
+        db.query(User)
+        .join(ChatMember, ChatMember.user_id == User.id)
+        .filter(ChatMember.chat_id == chat_id)
+        .order_by(User.username.asc())
+        .all()
+    )
+
+    members = [
+        UserShort(
+            id=user.id,
+            username=user.username,
+            email=user.email,
+            avatar_url=user.avatar_url,
+            last_seen_at=user.last_seen_at,
+        )
+        for user in users
+    ]
+
+    chat_title = chat.title
+    chat_avatar_url = chat.avatar_url
+
+    if chat.type == "private":
+        other_user = next((user for user in users if user.id != current_user.id), None)
+        if other_user:
+            chat_title = other_user.username
+            chat_avatar_url = other_user.avatar_url
+
+    return ChatDetailResponse(
+        id=chat.id,
+        type=chat.type,
+        title=chat_title,
+        avatar_url=chat_avatar_url,
+        created_by=chat.created_by,
+        members=members,
+    )
+
 
 def _unread_count_for_user(db: Session, chat_id: int, user_id: int) -> int:
     member = (
@@ -289,65 +353,7 @@ def get_chat_detail(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    chat = db.query(Chat).filter(Chat.id == chat_id).first()
-
-    if not chat:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Chat not found",
-        )
-
-    chat_member = (
-        db.query(ChatMember)
-        .filter(
-            ChatMember.chat_id == chat_id,
-            ChatMember.user_id == current_user.id,
-        )
-        .first()
-    )
-
-    if not chat_member:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You are not a member of this chat",
-        )
-
-    users = (
-        db.query(User)
-        .join(ChatMember, ChatMember.user_id == User.id)
-        .filter(ChatMember.chat_id == chat_id)
-        .order_by(User.username.asc())
-        .all()
-    )
-
-    members = [
-        UserShort(
-            id=user.id,
-            username=user.username,
-            email=user.email,
-            avatar_url=user.avatar_url,
-            last_seen_at=user.last_seen_at,
-        )
-        for user in users
-    ]
-
-    chat_title = chat.title
-    chat_avatar_url = chat.avatar_url
-
-    if chat.type == "private":
-        other_user = next((user for user in users if user.id != current_user.id), None)
-        if other_user:
-            chat_title = other_user.username
-            chat_avatar_url = other_user.avatar_url
-
-    return ChatDetailResponse(
-        id=chat.id,
-        type=chat.type,
-        title=chat_title,
-        avatar_url=chat_avatar_url,
-        created_by=chat.created_by,
-        members=members,
-    )
+    return _chat_detail_response(db, chat_id, current_user)
 
 
 @router.get("/{chat_id}/members", response_model=list[ChatMemberResponse])
@@ -516,12 +522,6 @@ async def upload_chat_avatar(
             detail="You are not a member of this chat",
         )
 
-    if membership.role != "owner":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only group owner can change avatar",
-        )
-
     if not file.content_type or file.content_type not in ALLOWED_IMAGE_TYPES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -569,33 +569,195 @@ async def upload_chat_avatar(
 
     storage.delete_public_object_by_url(old_avatar_url)
 
-    users = (
-        db.query(User)
-        .join(ChatMember, ChatMember.user_id == User.id)
-        .filter(ChatMember.chat_id == chat_id)
-        .order_by(User.username.asc())
-        .all()
-    )
+    return _chat_detail_response(db, chat_id, current_user)
 
-    members = [
-        UserShort(
-            id=user.id,
-            username=user.username,
-            email=user.email,
-            avatar_url=user.avatar_url,
-            last_seen_at=user.last_seen_at,
+
+@router.patch("/{chat_id}", response_model=ChatDetailResponse)
+def update_group_chat(
+    chat_id: int,
+    payload: ChatUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    chat = db.query(Chat).filter(Chat.id == chat_id).first()
+
+    if not chat:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Chat not found",
         )
-        for user in users
-    ]
 
-    return ChatDetailResponse(
-        id=chat.id,
-        type=chat.type,
-        title=chat.title,
-        avatar_url=chat.avatar_url,
-        created_by=chat.created_by,
-        members=members,
+    membership = (
+        db.query(ChatMember)
+        .filter(
+            ChatMember.chat_id == chat_id,
+            ChatMember.user_id == current_user.id,
+        )
+        .first()
     )
+
+    if not membership:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not a member of this chat",
+        )
+
+    if chat.type != "group":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only group chats can be renamed",
+        )
+
+    chat.title = payload.title.strip()
+    db.add(chat)
+    db.commit()
+    db.refresh(chat)
+
+    return _chat_detail_response(db, chat_id, current_user)
+
+
+@router.post("/{chat_id}/leave", status_code=status.HTTP_204_NO_CONTENT)
+def leave_group_chat(
+    chat_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    chat = db.query(Chat).filter(Chat.id == chat_id).first()
+
+    if not chat:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Chat not found",
+        )
+
+    if chat.type != "group":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only group chats can be left",
+        )
+
+    membership = (
+        db.query(ChatMember)
+        .filter(
+            ChatMember.chat_id == chat_id,
+            ChatMember.user_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not membership:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not a member of this chat",
+        )
+
+    uid = current_user.id
+
+    if chat.created_by == uid:
+        others = (
+            db.query(ChatMember)
+            .filter(
+                ChatMember.chat_id == chat_id,
+                ChatMember.user_id != uid,
+            )
+            .order_by(ChatMember.user_id.asc())
+            .all()
+        )
+        if others:
+            next_owner = others[0]
+            chat.created_by = next_owner.user_id
+            next_owner.role = "owner"
+            db.add(chat)
+            db.add(next_owner)
+
+    db.delete(membership)
+    db.flush()
+
+    remaining = (
+        db.query(ChatMember).filter(ChatMember.chat_id == chat_id).count()
+    )
+    if remaining == 0:
+        db.query(Message).filter(Message.chat_id == chat_id).delete()
+        db.delete(chat)
+
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete("/{chat_id}/members/{member_user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_group_member(
+    chat_id: int,
+    member_user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    chat = db.query(Chat).filter(Chat.id == chat_id).first()
+
+    if not chat:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Chat not found",
+        )
+
+    if chat.type != "group":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only for group chats",
+        )
+
+    if chat.created_by != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only group creator can remove members",
+        )
+
+    if member_user_id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Use leave endpoint to exit the group",
+        )
+
+    target = (
+        db.query(ChatMember)
+        .filter(
+            ChatMember.chat_id == chat_id,
+            ChatMember.user_id == member_user_id,
+        )
+        .first()
+    )
+
+    if not target:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User is not a member",
+        )
+
+    was_creator_target = chat.created_by == member_user_id
+    db.delete(target)
+    db.flush()
+
+    if was_creator_target:
+        nxt = (
+            db.query(ChatMember)
+            .filter(ChatMember.chat_id == chat_id)
+            .order_by(ChatMember.user_id.asc())
+            .first()
+        )
+        if nxt:
+            chat.created_by = nxt.user_id
+            nxt.role = "owner"
+            db.add(chat)
+            db.add(nxt)
+
+    remaining = (
+        db.query(ChatMember).filter(ChatMember.chat_id == chat_id).count()
+    )
+    if remaining == 0:
+        db.query(Message).filter(Message.chat_id == chat_id).delete()
+        db.delete(chat)
+
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/{chat_id}/members", response_model=ChatMemberResponse)

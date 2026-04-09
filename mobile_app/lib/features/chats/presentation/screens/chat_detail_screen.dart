@@ -21,6 +21,9 @@ import 'video_note_record_screen.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import '../../data/services/chat_avatar_service.dart';
+import '../../data/services/chats_service.dart';
+import 'group_members_manage_screen.dart';
+import '../../../profile/presentation/screens/user_profile_screen.dart';
 
 class ChatDetailScreen extends StatefulWidget {
   final int chatId;
@@ -535,6 +538,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   final LocalChatStateService _localChatStateService = LocalChatStateService();
   final Dio _dio = ApiClient.dio;
   final ChatAvatarService _chatAvatarService = ChatAvatarService();
+  final ChatsService _chatsService = ChatsService();
   final ImagePicker _imagePicker = ImagePicker();
   final PresenceService _presenceService = PresenceService();
 
@@ -559,6 +563,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   String _chatTitle = '';
   String? _chatAvatarUrl;
+  int? _groupCreatedBy;
 
   final Map<int, String> _memberNames = {};
   final Map<int, String?> _memberAvatarUrls = {};
@@ -1009,14 +1014,24 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
     final title = (map['title'] ?? '').toString().trim();
     final avatarUrl = (map['avatar_url'] ?? '').toString().trim();
+    final rawCreated = map['created_by'];
+    int? createdBy;
+    if (rawCreated is int) {
+      createdBy = rawCreated;
+    } else if (rawCreated != null) {
+      createdBy = int.tryParse(rawCreated.toString());
+    }
 
     if (!mounted) return;
+
+    final isGroup = (map['type'] ?? '').toString() == 'group';
 
     setState(() {
       if (title.isNotEmpty) {
         _chatTitle = title;
       }
       _chatAvatarUrl = avatarUrl.isNotEmpty ? avatarUrl : null;
+      _groupCreatedBy = isGroup ? createdBy : null;
     });
   }
 
@@ -1112,6 +1127,125 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         ),
       );
     }
+  }
+
+  Future<void> _showRenameGroupDialog() async {
+    final controller = TextEditingController(text: _chatTitle.trim());
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text(
+          'Название группы',
+          style: TextStyle(color: AppColors.textPrimary),
+        ),
+        content: TextField(
+          controller: controller,
+          style: const TextStyle(color: AppColors.textPrimary),
+          decoration: const InputDecoration(
+            hintText: 'Название',
+            hintStyle: TextStyle(color: AppColors.textMuted),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Отмена'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Сохранить'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final t = controller.text.trim();
+    if (t.isEmpty) return;
+    try {
+      await _chatsService.updateGroupTitle(chatId: widget.chatId, title: t);
+      await _loadChatDetails();
+      requestChatsListRefresh();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Название обновлено')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _extractErrorMessage(e, fallback: 'Не удалось сохранить название'),
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _leaveGroup() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text(
+          'Покинуть группу?',
+          style: TextStyle(color: AppColors.textPrimary),
+        ),
+        content: const Text(
+          'Вы больше не будете получать сообщения из этой группы.',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Отмена'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(
+              'Покинуть',
+              style: TextStyle(color: Colors.orange.shade300),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      await _chatsService.leaveGroup(chatId: widget.chatId);
+      requestChatsListRefresh();
+      if (!mounted) return;
+      if (widget.onBackOverride != null) {
+        widget.onBackOverride!();
+      } else {
+        Navigator.of(context).pop(true);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _extractErrorMessage(e, fallback: 'Не удалось выйти из группы'),
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _openGroupMembersManage() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => GroupMembersManageScreen(
+          chatId: widget.chatId,
+          createdBy: _groupCreatedBy ?? -1,
+          currentUserId: _currentUserId ?? -1,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    await _loadChatMembers();
+    await _loadChatDetails();
   }
 
   Future<void> _loadMessages() async {
@@ -2807,9 +2941,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
     return Column(
       children: [
+        Expanded(child: _buildMessagesList()),
         if (_typingUserId != null)
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
@@ -2823,7 +2958,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               ),
             ),
           ),
-        Expanded(child: _buildMessagesList()),
         _buildInputBar(),
       ],
     );
@@ -2872,11 +3006,27 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     Expanded(
                       child: Row(
                         children: [
-                          _buildSquareAvatar(
-                            title: visibleTitle,
-                            avatarUrl: _chatAvatarUrl,
-                            size: 42,
-                            showOnlineDot: peerOnline,
+                          GestureDetector(
+                            onTap: () {
+                              if (!_isGroupChat) {
+                                final pid = _privatePeerUserId();
+                                if (pid != null) {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => UserProfileScreen(
+                                        userId: pid,
+                                      ),
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                            child: _buildSquareAvatar(
+                              title: visibleTitle,
+                              avatarUrl: _chatAvatarUrl,
+                              size: 42,
+                              showOnlineDot: peerOnline,
+                            ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -2914,32 +3064,72 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       ),
                     ),
                     if (_isGroupChat)
-  IconButton(
-    tooltip: 'Изменить аватар группы',
-    onPressed: _isUploadingChatAvatar ? null : _pickAndUploadChatAvatar,
-    icon: _isUploadingChatAvatar
-        ? const SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: AppColors.accent,
-            ),
-          )
-        : const Icon(
-            Icons.photo_camera_outlined,
-            color: AppColors.accent,
-          ),
-  ),
-if (_isGroupChat)
-  IconButton(
-    tooltip: 'Добавить участника',
-    onPressed: _openAddMemberScreen,
-    icon: const Icon(
-      Icons.person_add_alt_1_rounded,
-      color: AppColors.accent,
-    ),
-  ),
+                      IconButton(
+                        tooltip: 'Изменить аватар группы',
+                        onPressed:
+                            _isUploadingChatAvatar ? null : _pickAndUploadChatAvatar,
+                        icon: _isUploadingChatAvatar
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppColors.accent,
+                                ),
+                              )
+                            : const Icon(
+                                Icons.photo_camera_outlined,
+                                color: AppColors.accent,
+                              ),
+                      ),
+                    if (_isGroupChat)
+                      IconButton(
+                        tooltip: 'Добавить участника',
+                        onPressed: _openAddMemberScreen,
+                        icon: const Icon(
+                          Icons.person_add_alt_1_rounded,
+                          color: AppColors.accent,
+                        ),
+                      ),
+                    if (_isGroupChat)
+                      PopupMenuButton<String>(
+                        tooltip: 'Меню группы',
+                        icon: const Icon(
+                          Icons.more_vert_rounded,
+                          color: AppColors.textPrimary,
+                        ),
+                        color: AppColors.surface,
+                        onSelected: (value) {
+                          if (value == 'rename') {
+                            unawaited(_showRenameGroupDialog());
+                          } else if (value == 'members') {
+                            unawaited(_openGroupMembersManage());
+                          } else if (value == 'leave') {
+                            unawaited(_leaveGroup());
+                          }
+                        },
+                        itemBuilder: (context) {
+                          final isCreator =
+                              _groupCreatedBy != null &&
+                              _currentUserId != null &&
+                              _groupCreatedBy == _currentUserId;
+                          return [
+                            const PopupMenuItem(
+                              value: 'rename',
+                              child: Text('Переименовать группу'),
+                            ),
+                            if (isCreator)
+                              const PopupMenuItem(
+                                value: 'members',
+                                child: Text('Участники'),
+                              ),
+                            const PopupMenuItem(
+                              value: 'leave',
+                              child: Text('Покинуть группу'),
+                            ),
+                          ];
+                        },
+                      ),
                   ],
                 ),
               ),

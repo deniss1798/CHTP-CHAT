@@ -131,4 +131,50 @@ class ChatsService {
 
     throw Exception('Неожиданный формат ответа при добавлении участника');
   }
+
+  Future<void> updateGroupTitle({
+    required int chatId,
+    required String title,
+  }) async {
+    final token = await SecureStorageService.getAccessToken();
+    if (token == null || token.isEmpty) {
+      throw Exception('Токен не найден');
+    }
+    await _dio.patch(
+      '/chats/$chatId',
+      data: {'title': title},
+      options: Options(
+        headers: {'Authorization': 'Bearer $token'},
+      ),
+    );
+  }
+
+  Future<void> leaveGroup({required int chatId}) async {
+    final token = await SecureStorageService.getAccessToken();
+    if (token == null || token.isEmpty) {
+      throw Exception('Токен не найден');
+    }
+    await _dio.post(
+      '/chats/$chatId/leave',
+      options: Options(
+        headers: {'Authorization': 'Bearer $token'},
+      ),
+    );
+  }
+
+  Future<void> removeGroupMember({
+    required int chatId,
+    required int memberUserId,
+  }) async {
+    final token = await SecureStorageService.getAccessToken();
+    if (token == null || token.isEmpty) {
+      throw Exception('Токен не найден');
+    }
+    await _dio.delete(
+      '/chats/$chatId/members/$memberUserId',
+      options: Options(
+        headers: {'Authorization': 'Bearer $token'},
+      ),
+    );
+  }
 }

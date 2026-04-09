@@ -7,6 +7,7 @@ from app.api.chats_router import router as chats_router
 from app.api.devices_router import router as devices_router
 from app.api.messages_router import router as messages_router
 from app.api.users_router import router as users_router
+from app.api.ws_inbox_router import router as ws_inbox_router
 from app.api.ws_router import router as ws_router
 from app.core.config import get_settings
 from app.db.database import engine
@@ -63,4 +64,5 @@ app.include_router(auth_router)
 app.include_router(chats_router)
 app.include_router(messages_router)
 app.include_router(ws_router)
+app.include_router(ws_inbox_router)
 app.include_router(devices_router)

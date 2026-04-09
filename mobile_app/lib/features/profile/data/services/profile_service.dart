@@ -65,4 +65,31 @@ class ProfileService {
 
     return Map<String, dynamic>.from(response.data as Map);
   }
+
+  Future<Map<String, dynamic>> getUser(int userId) async {
+    final token = await SecureStorageService.getAccessToken();
+    final response = await _dio.get(
+      '/users/$userId',
+      options: Options(
+        headers: {'Authorization': 'Bearer $token'},
+      ),
+    );
+    if (response.data is Map<String, dynamic>) {
+      return response.data as Map<String, dynamic>;
+    }
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  Future<void> deleteMyAccount() async {
+    final token = await SecureStorageService.getAccessToken();
+    if (token == null || token.isEmpty) {
+      throw Exception('Токен не найден');
+    }
+    await _dio.delete(
+      '/users/me',
+      options: Options(
+        headers: {'Authorization': 'Bearer $token'},
+      ),
+    );
+  }
 }

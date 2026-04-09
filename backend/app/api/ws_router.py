@@ -6,7 +6,7 @@ from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.ws_manager import manager
+from app.core.ws_manager import inbox_manager, manager
 from app.db.database import SessionLocal
 from app.models.chat_member import ChatMember
 from app.models.user import User
@@ -66,16 +66,27 @@ async def websocket_chat(
                 continue
             msg_type = data.get("type")
             if msg_type == "typing":
+                sender_row = db.query(User).filter(User.id == user_id).first()
+                typing_payload = {
+                    "type": "typing",
+                    "chat_id": chat_id,
+                    "user_id": user_id,
+                    "username": sender_row.username if sender_row else "",
+                    "typing": bool(data.get("typing", True)),
+                }
                 await manager.broadcast_to_others(
                     chat_id,
-                    {
-                        "type": "typing",
-                        "chat_id": chat_id,
-                        "user_id": user_id,
-                        "typing": bool(data.get("typing", True)),
-                    },
+                    typing_payload,
                     exclude_user_id=user_id,
                 )
+                member_ids = (
+                    db.query(ChatMember.user_id)
+                    .filter(ChatMember.chat_id == chat_id)
+                    .all()
+                )
+                for (member_uid,) in member_ids:
+                    if member_uid != user_id:
+                        await inbox_manager.send_json(member_uid, typing_payload)
     except WebSocketDisconnect:
         manager.disconnect(chat_id, websocket)
     finally:

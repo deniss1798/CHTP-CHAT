@@ -11,8 +11,9 @@ import '../../../../core/notifiers/chats_list_refresh_notifier.dart';
 import '../../../../core/storage/secure_storage_service.dart';
 import '../../../auth/data/services/auth_service.dart';
 import '../../../auth/presentation/screens/auth_screen.dart';
-import '../../../profile/presentation/screens/profile_screen.dart';
+import '../../../settings/presentation/screens/settings_screen.dart';
 import '../../data/services/chats_service.dart';
+import '../../data/services/inbox_socket_service.dart';
 import '../../data/services/presence_service.dart';
 import 'chat_detail_screen.dart';
 import 'group_chat_create_screen.dart';
@@ -58,6 +59,11 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
   Timer? _chatsPollTimer;
   Timer? _presenceTimer;
 
+  final InboxSocketService _inboxSocket = InboxSocketService();
+  StreamSubscription<Map<String, dynamic>>? _inboxSubscription;
+  final Map<int, String> _typingLabelByChatId = {};
+  final Map<int, Timer> _typingInboxTimers = {};
+
   late final VoidCallback _chatsRefreshListener;
 
   @override
@@ -88,6 +94,12 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
     chatsListRefreshNotifier.removeListener(_chatsRefreshListener);
     _presenceTimer?.cancel();
     _chatsPollTimer?.cancel();
+    _inboxSubscription?.cancel();
+    for (final t in _typingInboxTimers.values) {
+      t.cancel();
+    }
+    _typingInboxTimers.clear();
+    _inboxSocket.dispose();
     WidgetsBinding.instance.removeObserver(this);
     _searchController.dispose();
     super.dispose();
@@ -120,6 +132,7 @@ Future<void> _init() async {
     }
 
     await _loadChats();
+    await _connectInbox();
   } catch (_) {
     if (!mounted) return;
 
@@ -129,6 +142,47 @@ Future<void> _init() async {
     });
   }
 }
+
+  Future<void> _connectInbox() async {
+    await _inboxSubscription?.cancel();
+    try {
+      await _inboxSocket.connect(baseHttpUrl: ApiClient.baseUrl);
+      _inboxSubscription = _inboxSocket.messagesStream.listen((msg) {
+        if (msg['type'] != 'typing') return;
+        final cidRaw = msg['chat_id'];
+        int? chatId;
+        if (cidRaw is int) {
+          chatId = cidRaw;
+        } else {
+          chatId = int.tryParse(cidRaw?.toString() ?? '');
+        }
+        if (chatId == null) return;
+        final typing = msg['typing'] != false;
+        if (!typing) {
+          _typingInboxTimers[chatId]?.cancel();
+          _typingInboxTimers.remove(chatId);
+          if (mounted) {
+            setState(() => _typingLabelByChatId.remove(chatId));
+          }
+          return;
+        }
+        final uname = (msg['username'] ?? '').toString().trim();
+        final label =
+            uname.isNotEmpty ? '$uname печатает…' : 'Печатает…';
+        _typingInboxTimers[chatId]?.cancel();
+        _typingInboxTimers[chatId] = Timer(const Duration(seconds: 3), () {
+          if (!mounted) return;
+          setState(() {
+            _typingLabelByChatId.remove(chatId);
+            _typingInboxTimers.remove(chatId);
+          });
+        });
+        if (mounted) {
+          setState(() => _typingLabelByChatId[chatId!] = label);
+        }
+      });
+    } catch (_) {}
+  }
 
   Future<void> _loadChats({bool silent = false}) async {
     if (_currentUserId == null) return;
@@ -702,6 +756,9 @@ Future<void> _init() async {
             chatId = int.tryParse(rawId.toString());
           }
 
+          final typingLabel =
+              chatId != null ? _typingLabelByChatId[chatId] : null;
+
           final isUnread = unreadCount > 0;
           final isSelected =
               widget.selectedChatId != null && chatId == widget.selectedChatId;
@@ -772,14 +829,19 @@ Future<void> _init() async {
                           ),
                           const SizedBox(height: 7),
                           Text(
-                            lastMessage,
+                            typingLabel ?? lastMessage,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: isUnread
-                                  ? AppColors.textPrimary
-                                  : AppColors.textSecondary,
+                              color: typingLabel != null
+                                  ? AppColors.accent
+                                  : (isUnread
+                                      ? AppColors.textPrimary
+                                      : AppColors.textSecondary),
                               fontSize: 14,
+                              fontStyle: typingLabel != null
+                                  ? FontStyle.italic
+                                  : FontStyle.normal,
                               fontWeight:
                                   isUnread ? FontWeight.w700 : FontWeight.w500,
                             ),
@@ -886,14 +948,14 @@ Future<void> _init() async {
                               onPressed: () async {
                                 await Navigator.of(context).push(
                                   MaterialPageRoute(
-                                    builder: (_) => const ProfileScreen(),
+                                    builder: (_) => const SettingsScreen(),
                                   ),
                                 );
 
                                 if (!mounted) return;
                                 await _loadChats(silent: true);
                               },
-                              icon: const Icon(Icons.person_outline),
+                              icon: const Icon(Icons.settings_outlined),
                             ),
                             const SizedBox(width: AppSpacing.sm),
                             IconButton(
