@@ -8,6 +8,7 @@ import '../../../../app/theme/app_icons.dart';
 import '../../../../app/theme/app_shadows.dart';
 import '../../../../app/theme/design_tokens.dart';
 import '../../../../app/widgets/app_screen_background.dart';
+import '../../../../core/formatting/server_time.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/notifiers/chats_list_refresh_notifier.dart';
 import '../../../../core/storage/secure_storage_service.dart';
@@ -557,11 +558,10 @@ Future<void> _init() async {
   }
 
   String _formatShortTime(String raw) {
-    final dt = DateTime.tryParse(raw);
-    if (dt == null) return raw;
+    final local = parseServerUtcInstant(raw)?.toLocal();
+    if (local == null) return raw;
 
     final now = DateTime.now();
-    final local = dt.toLocal();
 
     final sameDay = now.year == local.year &&
         now.month == local.month &&
@@ -619,9 +619,9 @@ Future<void> _init() async {
 
   bool _peerOnlineFromLastSeenRaw(dynamic raw) {
     if (raw == null) return false;
-    final t = DateTime.tryParse(raw.toString());
+    final t = parseServerUtcInstant(raw.toString());
     if (t == null) return false;
-    return DateTime.now().toUtc().difference(t.toUtc()) <= _peerOnlineThreshold;
+    return DateTime.now().toUtc().difference(t) <= _peerOnlineThreshold;
   }
 
   bool _peerOnlineInList(Map<String, dynamic> chat) {

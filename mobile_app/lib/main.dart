@@ -65,6 +65,14 @@ Future<void> _initPush() async {
 
   print('Permission status: ${settings.authorizationStatus}');
 
+  if (defaultTargetPlatform == TargetPlatform.iOS) {
+    await messaging.setForegroundNotificationPresentationOptions(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+  }
+
   final token = await messaging.getToken();
   print('FCM token: $token');
 

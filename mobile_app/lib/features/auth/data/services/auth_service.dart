@@ -66,6 +66,14 @@ Future<void> requestEmailCode({
     await getMe(forceRefresh: true);
   }
 
+  /// Повторная регистрация FCM после cold start (токен мог обновиться, сессия уже есть).
+  Future<void> registerPushTokenIfLoggedIn() async {
+    if (!_fcmDeviceRegistrationSupported) return;
+    final access = await SecureStorageService.getAccessToken();
+    if (access == null || access.isEmpty) return;
+    await _registerDeviceToken(access);
+  }
+
   Future<void> login({
     required String email,
     required String password,
@@ -111,8 +119,8 @@ Future<void> requestEmailCode({
       '/devices/register-token',
       data: {
         'token': fcmToken,
-        'platform': 'android',
-        'device_name': 'android_emulator',
+        'platform': defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android',
+        'device_name': 'mobile',
       },
       options: Options(
         headers: {
@@ -123,16 +131,18 @@ Future<void> requestEmailCode({
 
     FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
       try {
+        final access = await SecureStorageService.getAccessToken();
+        if (access == null || access.isEmpty) return;
         await _dio.post(
           '/devices/register-token',
           data: {
             'token': newToken,
-            'platform': 'android',
-            'device_name': 'android_emulator',
+            'platform': defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android',
+            'device_name': 'mobile',
           },
           options: Options(
             headers: {
-              'Authorization': 'Bearer $accessToken',
+              'Authorization': 'Bearer $access',
             },
           ),
         );

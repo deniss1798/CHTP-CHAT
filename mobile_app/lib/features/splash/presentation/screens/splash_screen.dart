@@ -5,6 +5,7 @@ import '../../../../app/home_chats_route.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/widgets/app_screen_background.dart';
 import '../../../../core/storage/secure_storage_service.dart';
+import '../../../auth/data/services/auth_service.dart';
 import '../../../auth/presentation/screens/auth_screen.dart';
 import '../../../../core/platform/desktop_layout.dart';
 import '../../../chats/presentation/screens/chat_detail_screen.dart';
@@ -31,6 +32,8 @@ class _SplashScreenState extends State<SplashScreen> {
     if (!mounted) return;
 
     if (token != null && token.isNotEmpty) {
+      await AuthService().registerPushTokenIfLoggedIn();
+
       final pendingChatId = consumePendingPushChatId();
 
       Navigator.of(context).pushReplacement(

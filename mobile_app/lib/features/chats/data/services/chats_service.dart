@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import '../../../../core/formatting/server_time.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/secure_storage_service.dart';
 import '../../../../core/network/url_helper.dart';
@@ -37,15 +38,9 @@ class ChatsService {
         .toList();
 
     chats.sort((a, b) {
-      final aDate =
-          DateTime.tryParse(a['last_message_at']?.toString() ?? '') ??
-          DateTime.fromMillisecondsSinceEpoch(0);
-
-      final bDate =
-          DateTime.tryParse(b['last_message_at']?.toString() ?? '') ??
-          DateTime.fromMillisecondsSinceEpoch(0);
-
-      return bDate.compareTo(aDate);
+      final aMs = serverInstantMillis(a['last_message_at']?.toString()) ?? 0;
+      final bMs = serverInstantMillis(b['last_message_at']?.toString()) ?? 0;
+      return bMs.compareTo(aMs);
     });
 
     return chats;

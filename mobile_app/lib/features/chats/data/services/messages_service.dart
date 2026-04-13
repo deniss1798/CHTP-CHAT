@@ -105,6 +105,32 @@ class MessagesService {
     throw Exception('Неожиданный формат ответа при отправке сообщения');
   }
 
+  Future<Map<String, dynamic>> forwardMessage({
+    required int targetChatId,
+    required int sourceMessageId,
+  }) async {
+    final response = await _dio.post(
+      '/messages/forward',
+      data: {
+        'target_chat_id': targetChatId,
+        'source_message_id': sourceMessageId,
+      },
+      options: await _authorizedOptions(),
+    );
+
+    final data = response.data;
+
+    if (data is Map<String, dynamic>) {
+      return data;
+    }
+
+    if (data is Map) {
+      return Map<String, dynamic>.from(data);
+    }
+
+    throw Exception('Неожиданный формат ответа при пересылке');
+  }
+
   Future<Map<String, dynamic>> updateMessage({
     required int messageId,
     required String text,

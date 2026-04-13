@@ -18,6 +18,13 @@ class Message(Base):
         index=True,
     )
 
+    forwarded_from_user_id = Column(
+        BigInteger,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     text = Column(Text, nullable=False)
 
     message_type = Column(String, nullable=False, default="text")

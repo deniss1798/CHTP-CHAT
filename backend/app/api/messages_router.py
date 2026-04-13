@@ -11,7 +11,13 @@ from app.db.database import get_db
 from app.models.chat_member import ChatMember
 from app.models.message import Message
 from app.models.user import User
-from app.schemas.message_schema import MessageCreate, MessageReplyPreview, MessageResponse, MessageUpdate
+from app.schemas.message_schema import (
+    ForwardMessageRequest,
+    MessageCreate,
+    MessageReplyPreview,
+    MessageResponse,
+    MessageUpdate,
+)
 from app.services.s3_storage import S3StorageService, is_private_s3_ready
 from app.services.video_transcode import try_transcode_to_desktop_mp4
 
@@ -139,6 +145,7 @@ def _message_to_response(
         is_updated=bool(message.is_updated) if message.is_updated is not None else False,
         reply_to_message_id=message.reply_to_message_id,
         reply_to=reply_preview,
+        forwarded_from_user_id=message.forwarded_from_user_id,
         delivery_status=delivery_status,
     )
 
@@ -184,6 +191,7 @@ def _message_to_response_batched(
         is_updated=bool(message.is_updated) if message.is_updated is not None else False,
         reply_to_message_id=message.reply_to_message_id,
         reply_to=reply_preview,
+        forwarded_from_user_id=message.forwarded_from_user_id,
         delivery_status=delivery_status,
     )
 
@@ -221,6 +229,7 @@ def _build_message_payload(message: Message, db: Session, storage: S3StorageServ
         "is_updated": message.is_updated,
         "reply_to_message_id": message.reply_to_message_id,
         "reply_to": reply_to_dict,
+        "forwarded_from_user_id": message.forwarded_from_user_id,
     }
 
 
@@ -358,6 +367,84 @@ async def send_message(
             sender_name=sender_name,
             recipient_user_ids=recipient_user_ids,
             message_text=new_message.text,
+        )
+    except Exception as e:
+        print(f"Push sending skipped: {e}")
+
+    return _message_to_response(new_message, db, viewer_user_id=current_user.id)
+
+
+def _push_preview_for_message(message: Message) -> str:
+    t = _safe_message_text(message).strip()
+    if t:
+        return t
+    mt = _safe_message_type(message)
+    if mt == "image":
+        return "📷 Фото"
+    if mt == "video":
+        return "🎥 Видео"
+    if mt == "video_note":
+        return "🎥 Видеосообщение"
+    return "Новое сообщение"
+
+
+@router.post("/forward", response_model=MessageResponse)
+async def forward_message_endpoint(
+    payload: ForwardMessageRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    src = db.query(Message).filter(Message.id == payload.source_message_id).first()
+    if not src:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Message not found",
+        )
+
+    _ensure_chat_member(src.chat_id, current_user.id, db)
+    _ensure_chat_member(payload.target_chat_id, current_user.id, db)
+
+    new_message = Message(
+        chat_id=payload.target_chat_id,
+        sender_id=current_user.id,
+        text=src.text,
+        message_type=_safe_message_type(src),
+        media_key=src.media_key,
+        media_url=src.media_url,
+        media_mime_type=src.media_mime_type,
+        media_size=src.media_size,
+        is_updated=False,
+        reply_to_message_id=None,
+        forwarded_from_user_id=src.sender_id,
+    )
+
+    db.add(new_message)
+    db.commit()
+    db.refresh(new_message)
+
+    await manager.broadcast(
+        payload.target_chat_id,
+        {
+            "type": "new_message",
+            "message": _build_message_payload(new_message, db),
+        },
+    )
+
+    recipient_user_ids = [
+        row.user_id
+        for row in db.query(ChatMember)
+        .filter(ChatMember.chat_id == new_message.chat_id)
+        .all()
+        if row.user_id != current_user.id
+    ]
+
+    try:
+        send_chat_message_push(
+            db=db,
+            chat_id=new_message.chat_id,
+            sender_name=current_user.username,
+            recipient_user_ids=recipient_user_ids,
+            message_text=_push_preview_for_message(new_message),
         )
     except Exception as e:
         print(f"Push sending skipped: {e}")

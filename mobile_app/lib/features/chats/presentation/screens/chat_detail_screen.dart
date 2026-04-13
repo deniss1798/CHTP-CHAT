@@ -11,6 +11,7 @@ import '../../../../app/theme/app_shadows.dart';
 import '../../../../app/theme/design_tokens.dart';
 import '../../../../app/widgets/app_screen_background.dart';
 import '../../../../core/formatting/last_seen_label.dart';
+import '../../../../core/formatting/server_time.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/url_helper.dart';
 import '../../../../core/notifiers/chats_list_refresh_notifier.dart';
@@ -28,6 +29,7 @@ import '../../data/services/chat_avatar_service.dart';
 import '../../data/services/chats_service.dart';
 import 'group_members_manage_screen.dart';
 import '../../../profile/presentation/screens/user_profile_screen.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 
 class ChatDetailScreen extends StatefulWidget {
   final int chatId;
@@ -1092,7 +1094,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             }
             _memberAvatarUrls[userId] = rawAvatar.isNotEmpty ? rawAvatar : null;
             if (rawSeen != null && rawSeen.toString().trim().isNotEmpty) {
-              _memberLastSeen[userId] = DateTime.tryParse(rawSeen.toString());
+              _memberLastSeen[userId] =
+                  parseServerUtcInstant(rawSeen.toString())?.toLocal();
             } else {
               _memberLastSeen[userId] = null;
             }
@@ -1289,14 +1292,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       }).toList();
 
       normalizedMessages.sort((a, b) {
-        final aDate = DateTime.tryParse(a['created_at']?.toString() ?? '');
-        final bDate = DateTime.tryParse(b['created_at']?.toString() ?? '');
-
-        if (aDate == null && bDate == null) return 0;
-        if (aDate == null) return -1;
-        if (bDate == null) return 1;
-
-        return aDate.compareTo(bDate);
+        final am = serverInstantMillis(a['created_at']?.toString());
+        final bm = serverInstantMillis(b['created_at']?.toString());
+        return (am ?? 0).compareTo(bm ?? 0);
       });
 
       if (!mounted) return;
@@ -1469,14 +1467,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       }
       _messages.add(normalized);
       _messages.sort((a, b) {
-        final aDate = DateTime.tryParse(a['created_at']?.toString() ?? '');
-        final bDate = DateTime.tryParse(b['created_at']?.toString() ?? '');
-
-        if (aDate == null && bDate == null) return 0;
-        if (aDate == null) return -1;
-        if (bDate == null) return 1;
-
-        return aDate.compareTo(bDate);
+        final am = serverInstantMillis(a['created_at']?.toString());
+        final bm = serverInstantMillis(b['created_at']?.toString());
+        return (am ?? 0).compareTo(bm ?? 0);
       });
     });
 
@@ -1538,6 +1531,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       'is_updated': raw['is_updated'] == true,
       'reply_to_message_id': replyToId,
       'reply_to': replyTo,
+      'forwarded_from_user_id': _intFromDynamic(raw['forwarded_from_user_id']),
       'delivery_status': raw['delivery_status']?.toString(),
     };
   }
@@ -2012,6 +2006,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   title: const Text('Ответить'),
                   onTap: () => Navigator.of(ctx).pop('reply'),
                 ),
+                ListTile(
+                  leading: const Icon(Icons.forward, color: AppColors.accent),
+                  title: const Text('Переслать'),
+                  onTap: () => Navigator.of(ctx).pop('forward'),
+                ),
                 if (text.isNotEmpty)
                   ListTile(
                     leading: const Icon(AppIcons.copy, color: AppColors.textPrimary),
@@ -2048,6 +2047,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       return;
     }
 
+    if (action == 'forward') {
+      await _pickForwardTarget(message);
+      return;
+    }
+
     if (action == 'copy' && text.isNotEmpty) {
       await Clipboard.setData(ClipboardData(text: text));
       if (!mounted) return;
@@ -2071,6 +2075,151 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
     if (action == 'delete') {
       await _confirmDeleteMessage(messageId);
+    }
+  }
+
+  String _titleForForwardChat(Map<String, dynamic> c) {
+    final t = (c['title'] ?? '').toString().trim();
+    if (t.isNotEmpty) return t;
+    return 'Чат ${c['id'] ?? ''}';
+  }
+
+  Future<void> _pickForwardTarget(Map<String, dynamic> message) async {
+    final sourceId = _intFromDynamic(message['id']);
+    if (sourceId == null || _currentUserId == null) return;
+
+    List<Map<String, dynamic>> chats;
+    try {
+      chats = await ChatsService().getChats(currentUserId: _currentUserId!);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.surfaceSoft,
+          content: Text(
+            _extractErrorMessage(e, fallback: 'Не удалось загрузить чаты'),
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 14, 16, 8),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Переслать в…',
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: chats.length,
+                  itemBuilder: (context, index) {
+                    final c = chats[index];
+                    final tid = _intFromDynamic(c['id'] ?? c['chat_id']);
+                    if (tid == null) return const SizedBox.shrink();
+                    final title = _titleForForwardChat(c);
+                    final chatType = (c['type'] ?? 'private').toString();
+                    return ListTile(
+                      title: Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      onTap: () async {
+                        Navigator.of(ctx).pop();
+                        await _forwardToChat(
+                          sourceId,
+                          tid,
+                          title,
+                          chatType,
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _forwardToChat(
+    int sourceMessageId,
+    int targetChatId,
+    String title,
+    String chatType,
+  ) async {
+    try {
+      final raw = await _messagesService.forwardMessage(
+        targetChatId: targetChatId,
+        sourceMessageId: sourceMessageId,
+      );
+      final created = _normalizeMessageMap(raw);
+
+      if (!mounted) return;
+
+      if (targetChatId == widget.chatId) {
+        setState(() {
+          _messages.add(created);
+          _messages.sort((a, b) {
+            final am = serverInstantMillis(a['created_at']?.toString());
+            final bm = serverInstantMillis(b['created_at']?.toString());
+            return (am ?? 0).compareTo(bm ?? 0);
+          });
+        });
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _scrollToBottom();
+        });
+        requestChatsListRefresh();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Сообщение переслано')),
+        );
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ChatDetailScreen(
+              chatId: targetChatId,
+              title: title,
+              chatType: chatType,
+            ),
+          ),
+        );
+        requestChatsListRefresh();
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.surfaceSoft,
+          content: Text(
+            _extractErrorMessage(e, fallback: 'Не удалось переслать'),
+          ),
+        ),
+      );
     }
   }
 
@@ -2203,10 +2352,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   String _formatTime(String? raw) {
     if (raw == null || raw.trim().isEmpty) return '';
 
-    final dt = DateTime.tryParse(raw);
-    if (dt == null) return '';
+    final local = parseServerUtcInstant(raw)?.toLocal();
+    if (local == null) return '';
 
-    final local = dt.toLocal();
     final hh = local.hour.toString().padLeft(2, '0');
     final mm = local.minute.toString().padLeft(2, '0');
     return '$hh:$mm';
@@ -2215,10 +2363,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   String _formatDateLabel(String? raw) {
     if (raw == null || raw.trim().isEmpty) return '';
 
-    final dt = DateTime.tryParse(raw);
-    if (dt == null) return '';
+    final local = parseServerUtcInstant(raw)?.toLocal();
+    if (local == null) return '';
 
-    final local = dt.toLocal();
     final day = local.day.toString().padLeft(2, '0');
     final month = local.month.toString().padLeft(2, '0');
     final year = local.year.toString();
@@ -2579,6 +2726,23 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     ),
                   ),
                 ),
+              if (_intFromDynamic(message['forwarded_from_user_id']) != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: Text(
+                      'Переслано от ${_senderNameForUserId(_intFromDynamic(message['forwarded_from_user_id'])!)}',
+                      textAlign: TextAlign.left,
+                      style: const TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
+                ),
               _buildReplyQuote(message, isMine),
               mainContent,
               if (!mediaOnly) const SizedBox(height: 8),
@@ -2674,6 +2838,31 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     );
   }
 
+  Widget _buildSlidableMessage(Map<String, dynamic> message) {
+    return Slidable(
+      key: ValueKey('slidable-${message['id']}'),
+      startActionPane: ActionPane(
+        motion: const DrawerMotion(),
+        extentRatio: 0.22,
+        children: [
+          SlidableAction(
+            onPressed: (_) {
+              setState(() {
+                _replyingTo = Map<String, dynamic>.from(message);
+                _editingMessage = null;
+              });
+            },
+            backgroundColor: AppColors.accent,
+            foregroundColor: Colors.white,
+            icon: Icons.reply,
+            label: 'Ответ',
+          ),
+        ],
+      ),
+      child: _buildMessageBubble(message),
+    );
+  }
+
   Widget _buildMessagesList() {
     if (_messages.isEmpty) {
       return const Center(
@@ -2707,7 +2896,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             }
           }
 
-          children.add(_buildMessageBubble(message));
+          children.add(_buildSlidableMessage(message));
 
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 2),
