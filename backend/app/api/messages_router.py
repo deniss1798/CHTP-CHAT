@@ -1,3 +1,5 @@
+import os
+import re
 from collections.abc import Callable
 from datetime import datetime
 
@@ -43,7 +45,25 @@ ALLOWED_VIDEO_TYPES = {
 
 MAX_VIDEO_SIZE = 50 * 1024 * 1024  # 50 MB
 
-PRIVATE_MEDIA_MESSAGE_TYPES = frozenset({"image", "video", "video_note"})
+MAX_DOCUMENT_SIZE = 50 * 1024 * 1024  # 50 MB
+
+# Расширение (нижний регистр, с точкой) → ожидаемый основной MIME.
+# Архивы, исполняемые, скрипты, сырой текст — не принимаем.
+ALLOWED_DOCUMENT_EXTENSIONS: dict[str, str] = {
+    ".pdf": "application/pdf",
+    ".doc": "application/msword",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".xls": "application/vnd.ms-excel",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".ppt": "application/vnd.ms-powerpoint",
+    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ".odt": "application/vnd.oasis.opendocument.text",
+    ".ods": "application/vnd.oasis.opendocument.spreadsheet",
+    ".odp": "application/vnd.oasis.opendocument.presentation",
+    ".rtf": "application/rtf",
+}
+
+PRIVATE_MEDIA_MESSAGE_TYPES = frozenset({"image", "video", "video_note", "document"})
 
 
 def _make_s3_getter(
@@ -385,7 +405,44 @@ def _push_preview_for_message(message: Message) -> str:
         return "🎥 Видео"
     if mt == "video_note":
         return "🎥 Видеосообщение"
+    if mt == "document":
+        return "📎 Файл"
     return "Новое сообщение"
+
+
+def _sanitize_document_filename(name: str | None) -> str:
+    if not name:
+        return "file"
+    base = os.path.basename(str(name).replace("\\", "/"))
+    base = base.strip() or "file"
+    base = re.sub(r"[\x00-\x1f\x7f]", "", base)
+    base = re.sub(r'[^a-zA-Z0-9._\-() \u0400-\u04FF]', "_", base)
+    if len(base) > 200:
+        root, ext = os.path.splitext(base)
+        base = root[:180] + ext
+    return base or "file"
+
+
+def _validate_document_file(
+    upload: UploadFile,
+    sanitized_name: str,
+) -> tuple[str, str]:
+    ext = os.path.splitext(sanitized_name)[1].lower()
+    if ext not in ALLOWED_DOCUMENT_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File type not allowed",
+        )
+    expected_mime = ALLOWED_DOCUMENT_EXTENSIONS[ext]
+    ct_raw = (upload.content_type or "").split(";")[0].strip().lower()
+    if not ct_raw or ct_raw == "application/octet-stream":
+        return ext, expected_mime
+    if ct_raw == expected_mime:
+        return ext, expected_mime
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Content-type does not match file extension",
+    )
 
 
 @router.post("/forward", response_model=MessageResponse)
@@ -807,6 +864,106 @@ async def send_video_note_message(
             sender_name=sender_name,
             recipient_user_ids=recipient_user_ids,
             message_text="🎬 Видеосообщение",
+        )
+    except Exception as e:
+        print(f"Push sending skipped: {e}")
+
+    return _message_to_response(new_message, db, viewer_user_id=current_user.id)
+
+
+@router.post("/document", response_model=MessageResponse)
+async def send_document_message(
+    chat_id: int = Form(...),
+    file: UploadFile = File(...),
+    reply_to_message_id: int | None = Form(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Документы: allowlist расширений, без архивов/исполняемых/текстовых файлов, до 50 МБ."""
+    _ensure_chat_member(chat_id, current_user.id, db)
+    _validate_reply_target(db, chat_id, reply_to_message_id)
+
+    if not is_private_s3_ready():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "Private S3 is not configured. Set S3_ENDPOINT_URL, "
+                "S3_ACCESS_KEY_ID (or AWS_ACCESS_KEY_ID), "
+                "S3_SECRET_ACCESS_KEY (or AWS_SECRET_ACCESS_KEY), "
+                "S3_PRIVATE_BUCKET in .env"
+            ),
+        )
+
+    safe_name = _sanitize_document_filename(file.filename)
+    ext, resolved_mime = _validate_document_file(file, safe_name)
+
+    content = await file.read()
+    if not content:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Empty file",
+        )
+    if len(content) > MAX_DOCUMENT_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File is too large. Max size is 50 MB",
+        )
+
+    storage = S3StorageService()
+    media_key, media_url = storage.upload_private_message_document(
+        content=content,
+        chat_id=chat_id,
+        extension=ext,
+        content_type=resolved_mime,
+    )
+
+    new_message = Message(
+        chat_id=chat_id,
+        sender_id=current_user.id,
+        text=safe_name,
+        message_type="document",
+        media_key=media_key,
+        media_url=media_url,
+        media_mime_type=resolved_mime,
+        media_size=len(content),
+        is_updated=False,
+        reply_to_message_id=reply_to_message_id,
+    )
+
+    db.add(new_message)
+    db.commit()
+    db.refresh(new_message)
+
+    new_message.media_url = storage.generate_private_file_url(
+        object_key=new_message.media_key
+    )
+
+    await manager.broadcast(
+        chat_id,
+        {
+            "type": "new_message",
+            "message": _build_message_payload(new_message, db),
+        },
+    )
+
+    recipient_user_ids = [
+        row.user_id
+        for row in db.query(ChatMember)
+        .filter(ChatMember.chat_id == new_message.chat_id)
+        .all()
+        if row.user_id != current_user.id
+    ]
+
+    sender_name = current_user.username
+    preview = _safe_message_text(new_message).strip() or "📎 Файл"
+
+    try:
+        send_chat_message_push(
+            db=db,
+            chat_id=new_message.chat_id,
+            sender_name=sender_name,
+            recipient_user_ids=recipient_user_ids,
+            message_text=preview,
         )
     except Exception as e:
         print(f"Push sending skipped: {e}")

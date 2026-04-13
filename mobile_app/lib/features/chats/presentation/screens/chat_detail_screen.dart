@@ -1,8 +1,12 @@
 import 'dart:async';
+import 'dart:io' show File;
 
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:dio/dio.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../../../app/theme/app_colors.dart';
@@ -10,8 +14,10 @@ import '../../../../app/theme/app_icons.dart';
 import '../../../../app/theme/app_shadows.dart';
 import '../../../../app/theme/design_tokens.dart';
 import '../../../../app/widgets/app_screen_background.dart';
+import '../../../../core/constants/document_attachments.dart';
 import '../../../../core/formatting/last_seen_label.dart';
 import '../../../../core/formatting/server_time.dart';
+import '../../../../core/platform/desktop_layout.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/url_helper.dart';
 import '../../../../core/notifiers/chats_list_refresh_notifier.dart';
@@ -551,6 +557,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   bool _isUploadingChatAvatar = false;
   bool _isSendingImage = false;
   bool _isSendingVideo = false;
+  bool _isSendingDocument = false;
 
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -1620,7 +1627,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   }
 
   Future<void> _showAttachmentPicker() async {
-    if (_isUploadingChatAvatar) return;
+    if (_isUploadingChatAvatar || _isSendingDocument) return;
 
     final choice = await showModalBottomSheet<String>(
       context: context,
@@ -1646,6 +1653,14 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   subtitle: const Text('Из галереи — обычное видео'),
                   onTap: () => Navigator.of(ctx).pop('video_gallery'),
                 ),
+                ListTile(
+                  leading: const Icon(Icons.insert_drive_file, color: AppColors.accent),
+                  title: const Text('Файл'),
+                  subtitle: const Text(
+                    'PDF, Office, ODF, RTF — до 50 МБ',
+                  ),
+                  onTap: () => Navigator.of(ctx).pop('document'),
+                ),
                 const SizedBox(height: 4),
               ],
             ),
@@ -1665,10 +1680,137 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       await _pickAndSendVideo(source: ImageSource.gallery);
       return;
     }
+
+    if (choice == 'document') {
+      await _pickAndSendDocument();
+      return;
+    }
+  }
+
+  String? _formatDocSize(dynamic raw) {
+    if (raw == null) return null;
+    int? n;
+    if (raw is int) {
+      n = raw;
+    } else {
+      n = int.tryParse(raw.toString());
+    }
+    if (n == null || n <= 0) return null;
+    if (n < 1024) return '$n Б';
+    if (n < 1024 * 1024) return '${(n / 1024).toStringAsFixed(1)} КБ';
+    return '${(n / (1024 * 1024)).toStringAsFixed(1)} МБ';
+  }
+
+  Future<void> _sendDocumentFromLocalPath(String path, {required String displayName}) async {
+    if (_isSendingDocument) return;
+
+    final file = File(path);
+    if (!await file.exists()) return;
+
+    final len = await file.length();
+    if (len > kMaxDocumentBytes) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Файл больше 50 МБ')),
+      );
+      return;
+    }
+
+    if (!isAllowedDocumentFileName(displayName)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Недопустимый тип файла. Разрешены: PDF, Office, ODF, RTF',
+          ),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isSendingDocument = true;
+    });
+
+    try {
+      final replyId = _pendingReplyToMessageId();
+      final createdMessage = _normalizeMessageMap(
+        await _messagesService.sendDocumentMessage(
+          chatId: widget.chatId,
+          filePath: path,
+          fileName: displayName,
+          replyToMessageId: replyId,
+        ),
+      );
+
+      if (!mounted) return;
+
+      final exists = _messages.any((m) => m['id'] == createdMessage['id']);
+
+      setState(() {
+        if (!exists) {
+          _messages.add(createdMessage);
+        }
+        _replyingTo = null;
+        _isSendingDocument = false;
+      });
+
+      await _markCurrentChatAsRead();
+      requestChatsListRefresh();
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToBottom();
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isSendingDocument = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.surfaceSoft,
+          content: Text(
+            _extractErrorMessage(e, fallback: 'Не удалось отправить файл'),
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _onDesktopDocumentsDropped(DropDoneDetails detail) async {
+    if (_isSendingDocument || _isSending || _isSendingImage || _isSendingVideo) {
+      return;
+    }
+    for (final f in detail.files) {
+      final path = f.path;
+      if (path.isEmpty) continue;
+      final name = f.name.isNotEmpty ? f.name : path.split(RegExp(r'[/\\]')).last;
+      await _sendDocumentFromLocalPath(path, displayName: name);
+    }
+  }
+
+  Future<void> _pickAndSendDocument() async {
+    if (_isSendingDocument) return;
+
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: kAllowedDocumentExtensions,
+      allowMultiple: false,
+      withData: false,
+    );
+
+    if (result == null || result.files.isEmpty) return;
+
+    final picked = result.files.single;
+    final path = picked.path;
+    if (path == null || path.isEmpty) return;
+
+    final name = picked.name.trim().isNotEmpty ? picked.name : path.split(RegExp(r'[/\\]')).last;
+    await _sendDocumentFromLocalPath(path, displayName: name);
   }
 
   Future<void> _pickAndSendImage() async {
-    if (_isSendingImage) return;
+    if (_isSendingImage || _isSendingDocument) return;
 
     try {
       final picked = await _imagePicker.pickImage(
@@ -1730,7 +1872,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   }
 
   Future<void> _pickAndSendVideo({required ImageSource source}) async {
-    if (_isSendingVideo) return;
+    if (_isSendingVideo || _isSendingDocument) return;
 
     try {
       final picked = await _imagePicker.pickVideo(
@@ -1796,7 +1938,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   }
 
   Future<void> _openVideoNoteRecorder() async {
-    if (_isSendingVideo) return;
+    if (_isSendingVideo || _isSendingDocument) return;
 
     final path = await Navigator.of(context).push<String>(
       MaterialPageRoute(
@@ -1811,7 +1953,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   }
 
   Future<void> _uploadVideoNote(String videoPath) async {
-    if (_isSendingVideo) return;
+    if (_isSendingVideo || _isSendingDocument) return;
 
     setState(() {
       _isSendingVideo = true;
@@ -1968,6 +2110,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     }
     if (type == 'video_note') {
       return '🎬 Видеосообщение';
+    }
+    if (type == 'document') {
+      final name = (reply['text'] ?? '').toString().trim();
+      return name.isEmpty ? '📎 Файл' : '📎 $name';
     }
 
     final t = (reply['text'] ?? '').toString().trim();
@@ -2428,49 +2574,56 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     final senderLabel = _senderNameForUserId(senderId);
     final preview = _replyPreviewLabel(map);
 
+    final maxQuoteWidth = MediaQuery.sizeOf(context).width * 0.58;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-        decoration: BoxDecoration(
-          color: isMine
-              ? Colors.black.withAlpha(28)
-              : Colors.white.withAlpha(7),
-          borderRadius: BorderRadius.circular(10),
-          border: Border(
-            left: BorderSide(
-              color: AppColors.accentBright.withAlpha(200),
-              width: 3,
+      child: IntrinsicWidth(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxQuoteWidth),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(10, 8, 12, 8),
+            decoration: BoxDecoration(
+              color: isMine
+                  ? Colors.black.withAlpha(28)
+                  : Colors.white.withAlpha(7),
+              borderRadius: BorderRadius.circular(10),
+              border: Border(
+                left: BorderSide(
+                  color: AppColors.accentBright.withAlpha(200),
+                  width: 3,
+                ),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  senderLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: isMine ? AppColors.accentBright : AppColors.accent,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  preview,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: isMine ? AppColors.textSecondary : AppColors.textSecondary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    height: 1.25,
+                  ),
+                ),
+              ],
             ),
           ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              senderLabel,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: isMine ? AppColors.accentBright : AppColors.accent,
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              preview,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: isMine ? AppColors.textSecondary : AppColors.textSecondary,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                height: 1.25,
-              ),
-            ),
-          ],
         ),
       ),
     );
@@ -2497,6 +2650,77 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   Widget _buildMessageContent(Map<String, dynamic> message, bool isMine) {
     final messageType = (message['message_type'] ?? 'text').toString();
     final mediaUrl = (message['media_url'] ?? '').toString().trim();
+
+    if (messageType == 'document' && mediaUrl.isNotEmpty) {
+      final name = (message['text'] ?? '').toString().trim();
+      final sizeLabel = _formatDocSize(message['media_size']);
+      return ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 280),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () async {
+              final uri = Uri.tryParse(mediaUrl);
+              if (uri == null) return;
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              }
+            },
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: isMine
+                    ? Colors.black.withAlpha(28)
+                    : Colors.white.withAlpha(10),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white.withAlpha(18)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.insert_drive_file,
+                    color: AppColors.accentBright,
+                    size: 28,
+                  ),
+                  const SizedBox(width: 10),
+                  Flexible(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          name.isEmpty ? 'Файл' : name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: isMine
+                                ? AppColors.textPrimary
+                                : AppColors.textPrimary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        if (sizeLabel != null)
+                          Text(
+                            sizeLabel,
+                            style: const TextStyle(
+                              color: AppColors.textMuted,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
     if (messageType == 'video_note' && mediaUrl.isNotEmpty) {
       return SizedBox(
@@ -3025,9 +3249,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             Row(
               children: [
                 Tooltip(
-                  message: 'Фото или видео из галереи',
+                  message: 'Фото, видео или файл',
                   child: GestureDetector(
-                    onTap: (isEditing || _isSendingImage || _isSendingVideo)
+                    onTap: (isEditing || _isSendingImage || _isSendingVideo || _isSendingDocument)
                         ? null
                         : () => _showAttachmentPicker(),
                     child: Container(
@@ -3040,7 +3264,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                         boxShadow: AppShadows.lift,
                       ),
                       alignment: Alignment.center,
-                      child: (_isSendingImage || _isSendingVideo)
+                      child: (_isSendingImage || _isSendingVideo || _isSendingDocument)
                           ? const SizedBox(
                               width: 18,
                               height: 18,
@@ -3058,7 +3282,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 Tooltip(
                   message: 'Видеосообщение (кружок) — удерживайте кнопку записи',
                   child: GestureDetector(
-                    onTap: (isEditing || _isSendingImage || _isSendingVideo)
+                    onTap: (isEditing || _isSendingImage || _isSendingVideo || _isSendingDocument)
                         ? null
                         : _openVideoNoteRecorder,
                     child: Container(
@@ -3071,7 +3295,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                         boxShadow: AppShadows.lift,
                       ),
                       alignment: Alignment.center,
-                      child: (_isSendingImage || _isSendingVideo)
+                      child: (_isSendingImage || _isSendingVideo || _isSendingDocument)
                           ? const SizedBox(
                               width: 18,
                               height: 18,
@@ -3184,7 +3408,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       );
     }
 
-    return Column(
+    final chatColumn = Column(
       children: [
         Expanded(child: _buildMessagesList()),
         if (_typingUserId != null)
@@ -3207,6 +3431,17 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           ),
         _buildInputBar(),
       ],
+    );
+
+    if (!isDesktopMessengerLayout) {
+      return chatColumn;
+    }
+
+    return DropTarget(
+      onDragDone: (DropDoneDetails detail) {
+        _onDesktopDocumentsDropped(detail);
+      },
+      child: chatColumn,
     );
   }
 

@@ -186,6 +186,31 @@ class S3StorageService:
 
         return object_key, f"s3://{self.settings.s3_private_bucket}/{object_key}"
 
+    def upload_private_message_document(
+        self,
+        *,
+        content: bytes,
+        chat_id: int,
+        extension: str,
+        content_type: str | None = None,
+    ) -> tuple[str, str]:
+        object_key = f"messages/documents/{chat_id}/{uuid4().hex}{extension}"
+
+        resolved_content_type = (
+            content_type
+            or mimetypes.guess_type(object_key)[0]
+            or "application/octet-stream"
+        )
+
+        self.client.put_object(
+            Bucket=self.settings.s3_private_bucket,
+            Key=object_key,
+            Body=content,
+            ContentType=resolved_content_type,
+        )
+
+        return object_key, f"s3://{self.settings.s3_private_bucket}/{object_key}"
+
     def generate_private_file_url(
         self,
         *,

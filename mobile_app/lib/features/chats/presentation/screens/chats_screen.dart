@@ -506,6 +506,8 @@ Future<void> _init() async {
         return 'Файл';
       case 'sticker':
         return 'Стикер';
+      case 'document':
+        return 'Файл';
       case 'text':
         return null;
       default:
