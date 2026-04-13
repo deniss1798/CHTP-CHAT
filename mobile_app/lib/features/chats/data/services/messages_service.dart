@@ -316,7 +316,7 @@ class MessagesService {
     });
 
     final response = await _dio.post(
-      '/messages/document',
+      '/messages/file',
       data: formData,
       options: (await _authorizedOptions()).copyWith(
         contentType: 'multipart/form-data',

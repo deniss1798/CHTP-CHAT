@@ -13,6 +13,7 @@ const List<String> kAllowedDocumentExtensions = [
   'ods',
   'odp',
   'rtf',
+  'txt',
 ];
 
 bool isAllowedDocumentFileName(String name) {

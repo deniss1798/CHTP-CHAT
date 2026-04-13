@@ -48,7 +48,7 @@ MAX_VIDEO_SIZE = 50 * 1024 * 1024  # 50 MB
 MAX_DOCUMENT_SIZE = 50 * 1024 * 1024  # 50 MB
 
 # Расширение (нижний регистр, с точкой) → ожидаемый основной MIME.
-# Архивы, исполняемые, скрипты, сырой текст — не принимаем.
+# Архивы и исполняемые файлы не принимаем; .txt — только text/plain.
 ALLOWED_DOCUMENT_EXTENSIONS: dict[str, str] = {
     ".pdf": "application/pdf",
     ".doc": "application/msword",
@@ -61,6 +61,7 @@ ALLOWED_DOCUMENT_EXTENSIONS: dict[str, str] = {
     ".ods": "application/vnd.oasis.opendocument.spreadsheet",
     ".odp": "application/vnd.oasis.opendocument.presentation",
     ".rtf": "application/rtf",
+    ".txt": "text/plain",
 }
 
 PRIVATE_MEDIA_MESSAGE_TYPES = frozenset({"image", "video", "video_note", "document"})
@@ -871,6 +872,7 @@ async def send_video_note_message(
     return _message_to_response(new_message, db, viewer_user_id=current_user.id)
 
 
+@router.post("/file", response_model=MessageResponse)
 @router.post("/document", response_model=MessageResponse)
 async def send_document_message(
     chat_id: int = Form(...),
@@ -879,7 +881,7 @@ async def send_document_message(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Документы: allowlist расширений, без архивов/исполняемых/текстовых файлов, до 50 МБ."""
+    """Документы: allowlist расширений, без архивов/исполняемых, до 50 МБ. Дублирующий путь: POST /file."""
     _ensure_chat_member(chat_id, current_user.id, db)
     _validate_reply_target(db, chat_id, reply_to_message_id)
 

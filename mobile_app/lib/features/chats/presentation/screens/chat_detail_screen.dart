@@ -1657,7 +1657,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   leading: const Icon(Icons.insert_drive_file, color: AppColors.accent),
                   title: const Text('Файл'),
                   subtitle: const Text(
-                    'PDF, Office, ODF, RTF — до 50 МБ',
+                    'PDF, Office, ODF, RTF, TXT — до 50 МБ',
                   ),
                   onTap: () => Navigator.of(ctx).pop('document'),
                 ),
@@ -1721,7 +1721,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Недопустимый тип файла. Разрешены: PDF, Office, ODF, RTF',
+            'Недопустимый тип файла. Разрешены: PDF, Office, ODF, RTF, TXT',
           ),
         ),
       );
