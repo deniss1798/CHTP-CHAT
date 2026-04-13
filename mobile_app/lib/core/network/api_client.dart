@@ -1,6 +1,18 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
+/// Глобальный `Content-Type: application/json` ломает multipart: boundary не подставляется,
+/// nginx/FastAPI могут ответить 405 / не распарсить тело. Для FormData не задаём Content-Type вручную.
+class _MultipartContentTypeInterceptor extends Interceptor {
+  @override
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    if (options.data is FormData) {
+      options.headers.remove(Headers.contentTypeHeader);
+    }
+    handler.next(options);
+  }
+}
+
 class ApiLoggerInterceptor extends Interceptor {
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
@@ -71,9 +83,25 @@ class ApiClient {
       receiveTimeout: const Duration(seconds: 60),
       // Загрузка фото/видео (до десятков МБ) по мобильной сети часто > 15 с
       sendTimeout: const Duration(minutes: 5),
-      headers: {
-        'Content-Type': 'application/json',
-      },
     ),
-  )..interceptors.add(ApiLoggerInterceptor());
+  )..interceptors.addAll([
+          _MultipartContentTypeInterceptor(),
+          ApiLoggerInterceptor(),
+        ]);
+
+  /// Отдельный клиент для multipart: без `baseUrl`, запросы только через [Dio.postUri].
+  /// Так надёжнее на Windows и не смешивается с опциями основного [dio].
+  static Dio? _multipartDio;
+  static Dio get multipartDio {
+    return _multipartDio ??= Dio(
+      BaseOptions(
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 60),
+        sendTimeout: const Duration(minutes: 5),
+      ),
+    )..interceptors.addAll([
+          _MultipartContentTypeInterceptor(),
+          ApiLoggerInterceptor(),
+        ]);
+  }
 }

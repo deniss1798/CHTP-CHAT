@@ -2025,6 +2025,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   String _extractErrorMessage(Object e, {required String fallback}) {
     if (e is DioException) {
+      final code = e.response?.statusCode;
+      if (code == 405) {
+        return '405 Method Not Allowed. Проверьте API_BASE_URL: при reverse-proxy часто нужен '
+            'точный префикс /api или наоборот без него (см. лог [API ERROR] — полный URI). '
+            'Сейчас база: ${ApiClient.baseUrl}';
+      }
       final data = e.response?.data;
 
       if (data is Map<String, dynamic>) {

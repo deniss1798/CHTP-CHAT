@@ -8,6 +8,70 @@ import '../../../../core/storage/secure_storage_service.dart';
 class MessagesService {
   final Dio _dio = ApiClient.dio;
 
+  String _trimRightSlash(String s) {
+    var t = s.trim();
+    while (t.endsWith('/')) {
+      t = t.substring(0, t.length - 1);
+    }
+    return t;
+  }
+
+  /// Multipart через отдельный [ApiClient.multipartDio] и полный URL.
+  /// При 405 — один повтор с «другой» базой: без последнего сегмента `api` или с суффиксом `/api`.
+  String _alternateOriginFor405(String root) {
+    final r = _trimRightSlash(root);
+    final uri = Uri.parse(r);
+    final segs = uri.pathSegments.where((s) => s.isNotEmpty).toList();
+    if (segs.isNotEmpty && segs.last == 'api') {
+      final parent = uri.replace(
+        pathSegments: segs.sublist(0, segs.length - 1),
+      );
+      return _trimRightSlash(parent.toString());
+    }
+    return '$r/api';
+  }
+
+  Future<Response> _postMultipartForm(
+    String path,
+    Future<FormData> Function() buildForm,
+  ) async {
+    final opts = await _authorizedOptions();
+    final root = _trimRightSlash(ApiClient.baseUrl);
+    var rel = path;
+    if (!rel.startsWith('/')) {
+      rel = '/$rel';
+    }
+
+    Future<Response> sendTo(String origin) async {
+      final fd = await buildForm();
+      final uri = Uri.parse('$origin$rel');
+      return ApiClient.multipartDio.postUri(uri, data: fd, options: opts);
+    }
+
+    try {
+      return await sendTo(root);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 405) {
+        final alt = _alternateOriginFor405(root);
+        if (alt != root) {
+          return await sendTo(alt);
+        }
+      }
+      rethrow;
+    }
+  }
+
+  Map<String, dynamic> _responseMap(Response response) {
+    final data = response.data;
+    if (data is Map<String, dynamic>) {
+      return data;
+    }
+    if (data is Map) {
+      return Map<String, dynamic>.from(data);
+    }
+    throw Exception('Неожиданный формат ответа');
+  }
+
   Future<Options> _authorizedOptions() async {
     final token = await SecureStorageService.getAccessToken();
 
@@ -170,38 +234,27 @@ class MessagesService {
     final mimeType = lookupMimeType(imagePath) ?? lookupMimeType(fileName) ?? 'application/octet-stream';
     final mimeParts = mimeType.split('/');
 
-    final formData = FormData.fromMap({
-      'chat_id': chatId.toString(),
-      if (replyToMessageId != null)
-        'reply_to_message_id': replyToMessageId.toString(),
-      'file': await MultipartFile.fromFile(
-        imagePath,
-        filename: fileName,
-        contentType: mimeParts.length == 2
-            ? MediaType(mimeParts[0], mimeParts[1])
-            : MediaType('application', 'octet-stream'),
-      ),
-    });
-
-    final response = await _dio.post(
+    final response = await _postMultipartForm(
       '/messages/photo',
-      data: formData,
-      options: (await _authorizedOptions()).copyWith(
-        contentType: 'multipart/form-data',
-      ),
+      () async => FormData.fromMap({
+        'chat_id': chatId.toString(),
+        if (replyToMessageId != null)
+          'reply_to_message_id': replyToMessageId.toString(),
+        'file': await MultipartFile.fromFile(
+          imagePath,
+          filename: fileName,
+          contentType: mimeParts.length == 2
+              ? MediaType(mimeParts[0], mimeParts[1])
+              : MediaType('application', 'octet-stream'),
+        ),
+      }),
     );
 
-    final data = response.data;
-
-    if (data is Map<String, dynamic>) {
-      return data;
+    try {
+      return _responseMap(response);
+    } catch (_) {
+      throw Exception('Неожиданный формат ответа при отправке фото');
     }
-
-    if (data is Map) {
-      return Map<String, dynamic>.from(data);
-    }
-
-    throw Exception('Неожиданный формат ответа при отправке фото');
   }
 
   Future<Map<String, dynamic>> sendVideoMessage({
@@ -214,38 +267,27 @@ class MessagesService {
         lookupMimeType(videoPath) ?? lookupMimeType(fileName) ?? 'application/octet-stream';
     final mimeParts = mimeType.split('/');
 
-    final formData = FormData.fromMap({
-      'chat_id': chatId.toString(),
-      if (replyToMessageId != null)
-        'reply_to_message_id': replyToMessageId.toString(),
-      'file': await MultipartFile.fromFile(
-        videoPath,
-        filename: fileName,
-        contentType: mimeParts.length == 2
-            ? MediaType(mimeParts[0], mimeParts[1])
-            : MediaType('application', 'octet-stream'),
-      ),
-    });
-
-    final response = await _dio.post(
+    final response = await _postMultipartForm(
       '/messages/video',
-      data: formData,
-      options: (await _authorizedOptions()).copyWith(
-        contentType: 'multipart/form-data',
-      ),
+      () async => FormData.fromMap({
+        'chat_id': chatId.toString(),
+        if (replyToMessageId != null)
+          'reply_to_message_id': replyToMessageId.toString(),
+        'file': await MultipartFile.fromFile(
+          videoPath,
+          filename: fileName,
+          contentType: mimeParts.length == 2
+              ? MediaType(mimeParts[0], mimeParts[1])
+              : MediaType('application', 'octet-stream'),
+        ),
+      }),
     );
 
-    final data = response.data;
-
-    if (data is Map<String, dynamic>) {
-      return data;
+    try {
+      return _responseMap(response);
+    } catch (_) {
+      throw Exception('Неожиданный формат ответа при отправке видео');
     }
-
-    if (data is Map) {
-      return Map<String, dynamic>.from(data);
-    }
-
-    throw Exception('Неожиданный формат ответа при отправке видео');
   }
 
   Future<Map<String, dynamic>> sendVideoNoteMessage({
@@ -258,38 +300,27 @@ class MessagesService {
         lookupMimeType(videoPath) ?? lookupMimeType(fileName) ?? 'application/octet-stream';
     final mimeParts = mimeType.split('/');
 
-    final formData = FormData.fromMap({
-      'chat_id': chatId.toString(),
-      if (replyToMessageId != null)
-        'reply_to_message_id': replyToMessageId.toString(),
-      'file': await MultipartFile.fromFile(
-        videoPath,
-        filename: fileName,
-        contentType: mimeParts.length == 2
-            ? MediaType(mimeParts[0], mimeParts[1])
-            : MediaType('application', 'octet-stream'),
-      ),
-    });
-
-    final response = await _dio.post(
+    final response = await _postMultipartForm(
       '/messages/video_note',
-      data: formData,
-      options: (await _authorizedOptions()).copyWith(
-        contentType: 'multipart/form-data',
-      ),
+      () async => FormData.fromMap({
+        'chat_id': chatId.toString(),
+        if (replyToMessageId != null)
+          'reply_to_message_id': replyToMessageId.toString(),
+        'file': await MultipartFile.fromFile(
+          videoPath,
+          filename: fileName,
+          contentType: mimeParts.length == 2
+              ? MediaType(mimeParts[0], mimeParts[1])
+              : MediaType('application', 'octet-stream'),
+        ),
+      }),
     );
 
-    final data = response.data;
-
-    if (data is Map<String, dynamic>) {
-      return data;
+    try {
+      return _responseMap(response);
+    } catch (_) {
+      throw Exception('Неожиданный формат ответа при отправке видеосообщения');
     }
-
-    if (data is Map) {
-      return Map<String, dynamic>.from(data);
-    }
-
-    throw Exception('Неожиданный формат ответа при отправке видеосообщения');
   }
 
   Future<Map<String, dynamic>> sendDocumentMessage({
@@ -302,37 +333,26 @@ class MessagesService {
         lookupMimeType(filePath) ?? lookupMimeType(fileName) ?? 'application/octet-stream';
     final mimeParts = mimeType.split('/');
 
-    final formData = FormData.fromMap({
-      'chat_id': chatId.toString(),
-      if (replyToMessageId != null)
-        'reply_to_message_id': replyToMessageId.toString(),
-      'file': await MultipartFile.fromFile(
-        filePath,
-        filename: fileName,
-        contentType: mimeParts.length == 2
-            ? MediaType(mimeParts[0], mimeParts[1])
-            : MediaType('application', 'octet-stream'),
-      ),
-    });
-
-    final response = await _dio.post(
+    final response = await _postMultipartForm(
       '/messages/file',
-      data: formData,
-      options: (await _authorizedOptions()).copyWith(
-        contentType: 'multipart/form-data',
-      ),
+      () async => FormData.fromMap({
+        'chat_id': chatId.toString(),
+        if (replyToMessageId != null)
+          'reply_to_message_id': replyToMessageId.toString(),
+        'file': await MultipartFile.fromFile(
+          filePath,
+          filename: fileName,
+          contentType: mimeParts.length == 2
+              ? MediaType(mimeParts[0], mimeParts[1])
+              : MediaType('application', 'octet-stream'),
+        ),
+      }),
     );
 
-    final data = response.data;
-
-    if (data is Map<String, dynamic>) {
-      return data;
+    try {
+      return _responseMap(response);
+    } catch (_) {
+      throw Exception('Неожиданный формат ответа при отправке файла');
     }
-
-    if (data is Map) {
-      return Map<String, dynamic>.from(data);
-    }
-
-    throw Exception('Неожиданный формат ответа при отправке файла');
   }
 }
