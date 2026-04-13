@@ -34,19 +34,20 @@ class _SplashScreenState extends State<SplashScreen> {
     if (token != null && token.isNotEmpty) {
       await AuthService().registerPushTokenIfLoggedIn();
 
-      final pendingChatId = consumePendingPushChatId();
+      final pendingPush = consumePendingPush();
 
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => buildHomeChatsScreen()),
       );
 
-      if (pendingChatId != null) {
+      if (pendingPush != null) {
         Future.delayed(const Duration(milliseconds: 150), () {
           if (isDesktopMessengerLayout) {
             desktopChatOpenRequest.value = DesktopChatOpenRequest(
-              chatId: pendingChatId,
+              chatId: pendingPush.chatId,
               title: 'Чат',
               chatType: 'private',
+              avatarUrl: pendingPush.avatarUrl,
             );
             return;
           }
@@ -57,9 +58,10 @@ class _SplashScreenState extends State<SplashScreen> {
           navigator.push(
             MaterialPageRoute(
               builder: (_) => ChatDetailScreen(
-                chatId: pendingChatId,
+                chatId: pendingPush.chatId,
                 title: 'Чат',
                 chatType: 'private',
+                avatarUrl: pendingPush.avatarUrl,
               ),
             ),
           );

@@ -46,10 +46,7 @@ Future<void> main() async {
   if (_firebasePushSupported) {
     final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
     if (initialMessage != null) {
-      final chatId = _extractChatId(initialMessage.data);
-      if (chatId != null) {
-        setPendingPushChatId(chatId);
-      }
+      setPendingPush(_pendingPushFromMessageData(initialMessage.data));
     }
   }
 }
@@ -85,9 +82,9 @@ Future<void> _initPush() async {
 
   FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
     print('Opened from push: ${message.data}');
-    final chatId = _extractChatId(message.data);
-    if (chatId != null) {
-      _openChat(chatId);
+    final payload = _pendingPushFromMessageData(message.data);
+    if (payload != null) {
+      _openChat(payload);
     }
   });
 }
@@ -98,15 +95,32 @@ int? _extractChatId(Map<String, dynamic> data) {
   return int.tryParse(rawChatId.toString());
 }
 
-void _openChat(int chatId) {
+String? _extractChatAvatarUrl(Map<String, dynamic> data) {
+  final raw = data['chat_avatar_url'];
+  if (raw == null) return null;
+  final s = raw.toString().trim();
+  return s.isEmpty ? null : s;
+}
+
+PendingPushPayload? _pendingPushFromMessageData(Map<String, dynamic> data) {
+  final chatId = _extractChatId(data);
+  if (chatId == null) return null;
+  return PendingPushPayload(
+    chatId: chatId,
+    avatarUrl: _extractChatAvatarUrl(data),
+  );
+}
+
+void _openChat(PendingPushPayload payload) {
   final navigator = appNavigatorKey.currentState;
   if (navigator == null) return;
 
   if (isDesktopMessengerLayout) {
     desktopChatOpenRequest.value = DesktopChatOpenRequest(
-      chatId: chatId,
+      chatId: payload.chatId,
       title: 'Чат',
       chatType: 'private',
+      avatarUrl: payload.avatarUrl,
     );
     return;
   }
@@ -114,9 +128,10 @@ void _openChat(int chatId) {
   navigator.push(
     MaterialPageRoute(
       builder: (_) => ChatDetailScreen(
-        chatId: chatId,
+        chatId: payload.chatId,
         title: 'Чат',
         chatType: 'private',
+        avatarUrl: payload.avatarUrl,
       ),
     ),
   );

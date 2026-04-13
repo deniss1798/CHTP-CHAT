@@ -4,15 +4,26 @@ import 'theme/app_theme.dart';
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
-int? _pendingPushChatId;
+/// Данные из FCM при cold start (открытие чата из уведомления).
+class PendingPushPayload {
+  const PendingPushPayload({
+    required this.chatId,
+    this.avatarUrl,
+  });
 
-void setPendingPushChatId(int chatId) {
-  _pendingPushChatId = chatId;
+  final int chatId;
+  final String? avatarUrl;
 }
 
-int? consumePendingPushChatId() {
-  final value = _pendingPushChatId;
-  _pendingPushChatId = null;
+PendingPushPayload? _pendingPush;
+
+void setPendingPush(PendingPushPayload? payload) {
+  _pendingPush = payload;
+}
+
+PendingPushPayload? consumePendingPush() {
+  final value = _pendingPush;
+  _pendingPush = null;
   return value;
 }
 
