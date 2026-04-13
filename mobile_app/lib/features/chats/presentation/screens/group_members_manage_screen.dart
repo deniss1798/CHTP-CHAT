@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/app_icons.dart';
 import '../../../../app/widgets/app_screen_background.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/secure_storage_service.dart';
@@ -168,7 +169,7 @@ class _GroupMembersManageScreenState extends State<GroupMembersManageScreen> {
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(true),
                     icon: const Icon(
-                      Icons.arrow_back_ios_new_rounded,
+                      AppIcons.back,
                       color: AppColors.textPrimary,
                     ),
                   ),
@@ -177,8 +178,8 @@ class _GroupMembersManageScreenState extends State<GroupMembersManageScreen> {
                       'Участники',
                       style: TextStyle(
                         color: AppColors.textPrimary,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
@@ -280,7 +281,7 @@ class _GroupMembersManageScreenState extends State<GroupMembersManageScreen> {
                                         onPressed: () =>
                                             _remove(uid, username),
                                         icon: const Icon(
-                                          Icons.person_remove_outlined,
+                                          AppIcons.personRemove,
                                           color: Colors.redAccent,
                                         ),
                                       ),

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/app_shadows.dart';
+import '../../../../app/theme/design_tokens.dart';
 import '../models/chat_preview_model.dart';
 
 class ChatTile extends StatelessWidget {
@@ -26,35 +28,38 @@ class ChatTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 18),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(22),
-        onTap: onTap,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          onTap: onTap,
+          child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            color: AppColors.surface,
+            border: Border.all(color: Colors.white.withAlpha(8)),
+            boxShadow: AppShadows.lift,
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
             Stack(
               clipBehavior: Clip.none,
               children: [
                 Container(
-                  width: 64,
-                  height: 64,
+                  width: 52,
+                  height: 52,
                   decoration: BoxDecoration(
                     color: avatarColor,
-                    borderRadius: BorderRadius.circular(22),
-                    boxShadow: [
-                      BoxShadow(
-                        color: avatarColor.withAlpha(70),
-                        blurRadius: 20,
-                        spreadRadius: 1,
-                      ),
-                    ],
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                   ),
                   alignment: Alignment.center,
                   child: Text(
                     chat.initials,
                     style: const TextStyle(
-                      fontSize: 18,
+                      fontSize: 16,
                       fontWeight: FontWeight.w800,
                       color: Colors.black,
                     ),
@@ -65,10 +70,10 @@ class ChatTile extends StatelessWidget {
                     right: -1,
                     bottom: -1,
                     child: Container(
-                      width: 16,
-                      height: 16,
+                      width: 12,
+                      height: 12,
                       decoration: BoxDecoration(
-                        color: AppColors.success,
+                        color: AppColors.accent,
                         shape: BoxShape.circle,
                         border: Border.all(
                           color: AppColors.background,
@@ -79,7 +84,7 @@ class ChatTile extends StatelessWidget {
                   ),
               ],
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -90,25 +95,25 @@ class ChatTile extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: AppColors.textPrimary,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   Text(
                     chat.lastMessage,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: AppColors.textSecondary,
-                      fontSize: 15,
+                      fontSize: 14,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -116,46 +121,42 @@ class ChatTile extends StatelessWidget {
                   chat.timeLabel,
                   style: const TextStyle(
                     color: AppColors.accent,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 6),
                 if (chat.unreadCount > 0)
                   Container(
                     constraints: const BoxConstraints(
-                      minWidth: 30,
-                      minHeight: 30,
+                      minWidth: 22,
+                      minHeight: 22,
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 7),
                     decoration: BoxDecoration(
                       color: AppColors.accent,
                       shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.accent.withAlpha(90),
-                          blurRadius: 18,
-                          spreadRadius: 2,
-                        ),
-                      ],
+                      boxShadow: AppShadows.primaryButton,
                     ),
                     alignment: Alignment.center,
                     child: Text(
                       '${chat.unreadCount}',
                       style: const TextStyle(
                         color: Colors.black,
-                        fontSize: 13,
+                        fontSize: 11,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
                   )
                 else
-                  const SizedBox(height: 30),
+                  const SizedBox(height: 22),
               ],
             ),
           ],
         ),
+        ),
       ),
+    ),
     );
   }
 }

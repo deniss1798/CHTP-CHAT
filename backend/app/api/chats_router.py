@@ -26,6 +26,15 @@ from app.services.s3_storage import S3StorageService, is_s3_configured
 router = APIRouter(prefix="/chats", tags=["Chats"])
 
 
+def _message_type_for_chat_list(m: Message | None) -> str | None:
+    if m is None:
+        return None
+    mt = m.message_type
+    if mt is None or (isinstance(mt, str) and not mt.strip()):
+        return "text"
+    return str(mt)
+
+
 def _chat_detail_response(db: Session, chat_id: int, current_user: User) -> ChatDetailResponse:
     chat = db.query(Chat).filter(Chat.id == chat_id).first()
 
@@ -183,6 +192,7 @@ def get_my_chats(
                 avatar_url=chat_avatar_url,
                 created_by=chat.created_by,
                 last_message=last_message.text if last_message else None,
+                last_message_type=_message_type_for_chat_list(last_message),
                 last_message_at=last_message.created_at if last_message else None,
                 last_message_sender_id=last_message.sender_id if last_message else None,
                 last_message_id=last_message.id if last_message else None,
@@ -270,6 +280,7 @@ def create_chat(
                     avatar_url=other_user.avatar_url if other_user else chat.avatar_url,
                     created_by=chat.created_by,
                     last_message=last_message.text if last_message else None,
+                    last_message_type=_message_type_for_chat_list(last_message),
                     last_message_at=last_message.created_at if last_message else None,
                     last_message_sender_id=last_message.sender_id if last_message else None,
                     last_message_id=last_message.id if last_message else None,
@@ -338,6 +349,7 @@ def create_chat(
         avatar_url=chat.avatar_url,
         created_by=chat.created_by,
         last_message=None,
+        last_message_type=None,
         last_message_at=None,
         last_message_sender_id=None,
         last_message_id=None,

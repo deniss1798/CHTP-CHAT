@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'desktop_chat_session.dart';
 import 'theme/app_colors.dart';
+import 'theme/app_icons.dart';
 import '../features/chats/presentation/screens/chat_detail_screen.dart';
 import '../features/chats/presentation/screens/chats_screen.dart';
 
@@ -142,7 +143,7 @@ class _DesktopEmptyChatPane extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              Icons.chat_bubble_outline_rounded,
+              AppIcons.chat,
               size: 72,
               color: AppColors.textMuted.withAlpha(180),
             ),

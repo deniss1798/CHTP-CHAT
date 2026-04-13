@@ -2,6 +2,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/app_icons.dart';
+import '../../../../app/theme/app_shadows.dart';
 import '../../../../app/theme/design_tokens.dart';
 import '../../../../app/home_chats_route.dart';
 import '../../../../app/widgets/app_screen_background.dart';
@@ -162,50 +164,39 @@ class _EmailCodeScreenState extends State<EmailCodeScreen> {
                       const SizedBox(height: AppSpacing.xxxl),
                       Container(
                         width: double.infinity,
-                        padding: const EdgeInsets.all(AppSpacing.xl),
+                        padding: const EdgeInsets.all(AppSpacing.lg),
                         decoration: BoxDecoration(
-                          color: AppColors.surface.withAlpha(248),
+                          color: AppColors.surface,
                           borderRadius: BorderRadius.circular(AppRadius.xl),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withAlpha(100),
-                              blurRadius: 40,
-                              offset: const Offset(0, 16),
-                            ),
-                          ],
+                          border: Border.all(color: Colors.white.withAlpha(14)),
+                          boxShadow: AppShadows.card,
                         ),
                         child: Form(
                           key: _formKey,
                           child: Column(
                             children: [
                               Container(
-                                width: 112,
-                                height: 84,
+                                width: 96,
+                                height: 72,
                                 decoration: BoxDecoration(
                                   color: AppColors.accent,
                                   borderRadius:
-                                      BorderRadius.circular(AppRadius.lg),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: AppColors.accent.withAlpha(48),
-                                      blurRadius: 24,
-                                      offset: const Offset(0, 8),
-                                    ),
-                                  ],
+                                      BorderRadius.circular(AppRadius.md),
+                                  boxShadow: AppShadows.primaryButton,
                                 ),
                                 alignment: Alignment.center,
                                 child: const Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 8),
+                                  padding: EdgeInsets.symmetric(horizontal: 6),
                                   child: FittedBox(
                                     fit: BoxFit.scaleDown,
                                     child: Text(
                                       'ЧТП ЧАТ',
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.w900,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w800,
                                         color: Colors.black,
-                                        letterSpacing: 0.5,
+                                        letterSpacing: 0.3,
                                       ),
                                     ),
                                   ),
@@ -258,7 +249,7 @@ class _EmailCodeScreenState extends State<EmailCodeScreen> {
                                 decoration: const InputDecoration(
                                   hintText: 'Код подтверждения',
                                   prefixIcon: Icon(
-                                    Icons.verified_outlined,
+                                    AppIcons.verified,
                                     color: AppColors.textMuted,
                                   ),
                                 ),
@@ -268,38 +259,19 @@ class _EmailCodeScreenState extends State<EmailCodeScreen> {
                                 width: double.infinity,
                                 child: ElevatedButton(
                                   onPressed: isLoading ? null : submit,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.accent,
-                                    foregroundColor: Colors.black,
-                                    disabledBackgroundColor:
-                                        AppColors.accent.withAlpha(140),
-                                    elevation: 0,
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 18,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(18),
-                                    ),
-                                  ),
                                   child: isLoading
                                       ? const SizedBox(
-                                          width: 22,
-                                          height: 22,
+                                          width: 20,
+                                          height: 20,
                                           child: CircularProgressIndicator(
-                                            strokeWidth: 2.4,
+                                            strokeWidth: 2,
                                             valueColor:
                                                 AlwaysStoppedAnimation(
                                               Colors.black,
                                             ),
                                           ),
                                         )
-                                      : const Text(
-                                          'Подтвердить',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
+                                      : const Text('Подтвердить'),
                                 ),
                               ),
                               const SizedBox(height: 12),

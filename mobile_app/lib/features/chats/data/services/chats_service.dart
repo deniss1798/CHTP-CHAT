@@ -75,6 +75,8 @@ class ChatsService {
     raw['avatar_url'] ?? raw['avatarUrl'],
   );
   chat['last_message'] = raw['last_message'] ?? raw['lastMessage'];
+  chat['last_message_type'] =
+      raw['last_message_type'] ?? raw['lastMessageType'];
   chat['last_message_at'] = raw['last_message_at'] ?? raw['lastMessageAt'];
   chat['last_message_sender_id'] =
       raw['last_message_sender_id'] ?? raw['lastMessageSenderId'];

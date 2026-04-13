@@ -4,6 +4,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/app_icons.dart';
+import '../../../../app/theme/app_shadows.dart';
 import '../../../../app/theme/design_tokens.dart';
 import '../../../../core/network/api_client.dart';
 import '../../data/services/create_chat_service.dart';
@@ -154,13 +156,14 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
   Widget _buildUserAvatar({
     required String title,
     required String? avatarUrl,
-    double size = 54,
+    double size = AppSizes.listAvatar,
   }) {
     final safeUrl = (avatarUrl ?? '').trim();
+    final r = size * 0.28;
 
     if (safeUrl.isNotEmpty) {
       return ClipRRect(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(r),
         child: Image.network(
           safeUrl,
           width: size,
@@ -172,14 +175,14 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
               height: size,
               decoration: BoxDecoration(
                 color: AppColors.accent,
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(r),
               ),
               alignment: Alignment.center,
               child: Text(
                 _initials(title),
-                style: const TextStyle(
+                style: TextStyle(
                   color: Colors.black,
-                  fontSize: 18,
+                  fontSize: size * 0.36,
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -194,14 +197,14 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
       height: size,
       decoration: BoxDecoration(
         color: AppColors.accent,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(r),
       ),
       alignment: Alignment.center,
       child: Text(
         _initials(title),
-        style: const TextStyle(
+        style: TextStyle(
           color: Colors.black,
-          fontSize: 18,
+          fontSize: size * 0.36,
           fontWeight: FontWeight.w800,
         ),
       ),
@@ -352,20 +355,21 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
         return GestureDetector(
           onTap: _isCreating ? null : () => _createPrivateChat(user),
           child: Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              color: AppColors.surface.withAlpha(210),
-              borderRadius: BorderRadius.circular(22),
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: AppColors.accentBorder.withAlpha(110),
+                color: Colors.white.withAlpha(10),
               ),
+              boxShadow: AppShadows.lift,
             ),
             child: Row(
               children: [
                 _buildUserAvatar(
                   title: username,
                   avatarUrl: avatarUrl,
-                  size: 54,
+                  size: 48,
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -403,7 +407,7 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
                         ),
                       )
                     : const Icon(
-                        Icons.arrow_forward_ios_rounded,
+                        AppIcons.chevronRight,
                         color: AppColors.textMuted,
                         size: 18,
                       ),
@@ -433,7 +437,7 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
                     IconButton(
                       onPressed: () => Navigator.of(context).pop(),
                       icon: const Icon(
-                        Icons.arrow_back_ios_new_rounded,
+                        AppIcons.back,
                         color: AppColors.textPrimary,
                       ),
                     ),
@@ -442,8 +446,8 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
                         'Выбор пользователя',
                         style: TextStyle(
                           color: AppColors.textPrimary,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
@@ -469,7 +473,7 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
                       borderSide: BorderSide.none,
                     ),
                     prefixIcon: const Icon(
-                      Icons.search,
+                      AppIcons.search,
                       color: AppColors.textMuted,
                     ),
                   ),

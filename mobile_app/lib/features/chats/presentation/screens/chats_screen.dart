@@ -4,6 +4,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/app_icons.dart';
+import '../../../../app/theme/app_shadows.dart';
 import '../../../../app/theme/design_tokens.dart';
 import '../../../../app/widgets/app_screen_background.dart';
 import '../../../../core/network/api_client.dart';
@@ -167,8 +169,10 @@ Future<void> _init() async {
           return;
         }
         final uname = (msg['username'] ?? '').toString().trim();
-        final label =
-            uname.isNotEmpty ? '$uname печатает…' : 'Печатает…';
+        final isPrivate = _chatTypeById(chatId) == 'private';
+        final label = isPrivate
+            ? 'Печатает…'
+            : (uname.isNotEmpty ? '$uname печатает…' : 'Печатает…');
         _typingInboxTimers[chatId]?.cancel();
         _typingInboxTimers[chatId] = Timer(const Duration(seconds: 3), () {
           if (!mounted) return;
@@ -311,7 +315,7 @@ Future<void> _init() async {
       context: context,
       backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
       ),
       builder: (context) {
         return SafeArea(
@@ -333,20 +337,20 @@ Future<void> _init() async {
                   'Создать чат',
                   style: TextStyle(
                     color: AppColors.textPrimary,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 18),
                 _CreateChatOption(
-                  icon: Icons.person_outline,
+                  icon: AppIcons.person,
                   title: 'Личный чат',
                   subtitle: 'Выбрать пользователя по username',
                   onTap: () => Navigator.of(context).pop('private'),
                 ),
                 const SizedBox(height: 12),
                 _CreateChatOption(
-                  icon: Icons.group_outlined,
+                  icon: AppIcons.group,
                   title: 'Групповой чат',
                   subtitle: 'Создать группу с несколькими участниками',
                   onTap: () => Navigator.of(context).pop('group'),
@@ -469,23 +473,72 @@ Future<void> _init() async {
     return null;
   }
 
-  String _lastMessage(Map<String, dynamic> chat) {
-  final possible = [
-    chat['last_message'],
-    chat['lastMessage'],
-    chat['message'],
-    chat['last_message_text'],
-    chat['content'],
-  ];
+  String? _chatTypeById(int chatId) {
+    for (final c in _allChats) {
+      final rawId = c['id'] ?? c['chat_id'];
+      int? id;
+      if (rawId is int) {
+        id = rawId;
+      } else {
+        id = int.tryParse(rawId?.toString() ?? '');
+      }
+      if (id == chatId) {
+        return (c['type'] ?? '').toString();
+      }
+    }
+    return null;
+  }
 
-  for (final value in possible) {
-    if (value != null && value.toString().trim().isNotEmpty) {
-      return value.toString().trim();
+  String? _previewForLastMessageType(String rawType) {
+    final mt = rawType.trim().toLowerCase();
+    switch (mt) {
+      case 'image':
+        return 'Фото';
+      case 'video':
+        return 'Видео';
+      case 'video_note':
+        return 'Видеосообщение';
+      case 'audio':
+        return 'Аудио';
+      case 'document':
+      case 'file':
+        return 'Файл';
+      case 'sticker':
+        return 'Стикер';
+      case 'text':
+        return null;
+      default:
+        return 'Медиа';
     }
   }
 
-  return chat['type'] == 'private' ? 'Личный чат' : 'Групповой чат';
-}
+  String _lastMessage(Map<String, dynamic> chat) {
+    final possible = [
+      chat['last_message'],
+      chat['lastMessage'],
+      chat['message'],
+      chat['last_message_text'],
+      chat['content'],
+    ];
+
+    for (final value in possible) {
+      if (value != null && value.toString().trim().isNotEmpty) {
+        return value.toString().trim();
+      }
+    }
+
+    final mt = (chat['last_message_type'] ?? chat['lastMessageType'])
+        ?.toString()
+        .trim();
+    if (mt != null && mt.isNotEmpty) {
+      final preview = _previewForLastMessageType(mt);
+      if (preview != null) {
+        return preview;
+      }
+    }
+
+    return chat['type'] == 'private' ? 'Личный чат' : 'Групповой чат';
+  }
 
   String _timeText(Map<String, dynamic> chat) {
     final possible = [
@@ -600,7 +653,7 @@ Future<void> _init() async {
   Widget _buildChatAvatar({
     required String title,
     required String? avatarUrl,
-    double size = 62,
+    double size = 52,
     bool showOnlineDot = false,
   }) {
     final safeUrl = (avatarUrl ?? '').trim();
@@ -609,7 +662,7 @@ Future<void> _init() async {
 
     if (safeUrl.isNotEmpty) {
       inner = ClipRRect(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         child: Image.network(
           safeUrl,
           width: size,
@@ -621,14 +674,14 @@ Future<void> _init() async {
               height: size,
               decoration: BoxDecoration(
                 color: AppColors.accent,
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(16),
               ),
               alignment: Alignment.center,
               child: Text(
                 _initials(title),
                 style: const TextStyle(
                   color: Colors.black,
-                  fontSize: 18,
+                  fontSize: 16,
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -642,14 +695,14 @@ Future<void> _init() async {
         height: size,
         decoration: BoxDecoration(
           color: AppColors.accent,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
         ),
         alignment: Alignment.center,
         child: Text(
           _initials(title),
           style: const TextStyle(
             color: Colors.black,
-            fontSize: 18,
+            fontSize: 16,
             fontWeight: FontWeight.w800,
           ),
         ),
@@ -665,15 +718,15 @@ Future<void> _init() async {
         Positioned(
           right: 0,
           bottom: 0,
-          child: Container(
-            width: 14,
-            height: 14,
-            decoration: BoxDecoration(
-              color: AppColors.success,
-              shape: BoxShape.circle,
-              border: Border.all(color: AppColors.background, width: 2),
+            child: Container(
+              width: 12,
+              height: 12,
+              decoration: BoxDecoration(
+                color: AppColors.accent,
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.background, width: 2),
+              ),
             ),
-          ),
         ),
       ],
     );
@@ -777,16 +830,17 @@ Future<void> _init() async {
               child: Container(
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? AppColors.accent.withAlpha(42)
+                      ? AppColors.accent.withAlpha(22)
                       : (isUnread
-                          ? AppColors.accent.withAlpha(20)
-                          : AppColors.surface.withAlpha(230)),
-                  border: isSelected
-                      ? Border.all(
-                          color: AppColors.accent.withAlpha(200),
-                          width: 1.5,
-                        )
-                      : null,
+                          ? AppColors.accent.withAlpha(10)
+                          : AppColors.surface),
+                  border: Border.all(
+                    color: isSelected
+                        ? AppColors.accent.withAlpha(160)
+                        : Colors.white.withAlpha(isUnread ? 10 : 8),
+                    width: 1,
+                  ),
+                  boxShadow: AppShadows.lift,
                 ),
                 child: IntrinsicHeight(
                   child: Row(
@@ -806,7 +860,7 @@ Future<void> _init() async {
                   _buildChatAvatar(
                     title: title,
                     avatarUrl: avatarUrl,
-                    size: 62,
+                    size: 52,
                     showOnlineDot: _peerOnlineInList(chat),
                   ),
                   const SizedBox(width: 14),
@@ -875,6 +929,7 @@ Future<void> _init() async {
                           decoration: BoxDecoration(
                             color: AppColors.accent,
                             borderRadius: BorderRadius.circular(999),
+                            boxShadow: AppShadows.primaryButton,
                           ),
                           child: Text(
                             unreadCount > 99 ? '99+' : unreadCount.toString(),
@@ -924,22 +979,35 @@ Future<void> _init() async {
                       children: [
                         Row(
                           children: [
-                            const Expanded(
-                              child: Text(
-                                'ЧТП',
-                                style: TextStyle(
-                                  color: AppColors.accent,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 4,
-                                ),
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 3,
+                                    height: 18,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.accent,
+                                      borderRadius: BorderRadius.circular(2),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  const Text(
+                                    'ЧТП',
+                                    style: TextStyle(
+                                      color: AppColors.textPrimary,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 6,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                             IconButton(
                               style: IconButton.styleFrom(
                                 backgroundColor:
-                                    AppColors.surface.withAlpha(200),
-                                foregroundColor: AppColors.accent,
+                                    Colors.white.withAlpha(10),
+                                foregroundColor: AppColors.textPrimary,
                                 shape: RoundedRectangleBorder(
                                   borderRadius:
                                       BorderRadius.circular(AppRadius.sm),
@@ -955,21 +1023,21 @@ Future<void> _init() async {
                                 if (!mounted) return;
                                 await _loadChats(silent: true);
                               },
-                              icon: const Icon(Icons.settings_outlined),
+                              icon: const Icon(AppIcons.settings),
                             ),
                             const SizedBox(width: AppSpacing.sm),
                             IconButton(
                               style: IconButton.styleFrom(
                                 backgroundColor:
-                                    AppColors.surface.withAlpha(200),
-                                foregroundColor: AppColors.accent,
+                                    Colors.white.withAlpha(10),
+                                foregroundColor: AppColors.textPrimary,
                                 shape: RoundedRectangleBorder(
                                   borderRadius:
                                       BorderRadius.circular(AppRadius.sm),
                                 ),
                               ),
                               onPressed: () => _logout(context),
-                              icon: const Icon(Icons.logout),
+                              icon: const Icon(AppIcons.logout),
                             ),
                           ],
                         ),
@@ -978,8 +1046,9 @@ Future<void> _init() async {
                           'Сообщения',
                           style: TextStyle(
                             color: AppColors.textPrimary,
-                            fontSize: 34,
-                            fontWeight: FontWeight.w800,
+                            fontSize: 28,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.6,
                             height: 1,
                           ),
                         ),
@@ -1004,17 +1073,35 @@ Future<void> _init() async {
                               color: AppColors.textMuted,
                             ),
                             filled: true,
-                            fillColor: AppColors.surfaceSoft,
+                            fillColor: AppColors.inputFill,
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 18,
                               vertical: 16,
                             ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius:
+                                  BorderRadius.circular(AppRadius.lg),
+                              borderSide: BorderSide(
+                                color: Colors.white.withAlpha(20),
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius:
+                                  BorderRadius.circular(AppRadius.lg),
+                              borderSide: const BorderSide(
+                                color: AppColors.accent,
+                                width: 1.2,
+                              ),
+                            ),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(22),
-                              borderSide: BorderSide.none,
+                              borderRadius:
+                                  BorderRadius.circular(AppRadius.lg),
+                              borderSide: BorderSide(
+                                color: Colors.white.withAlpha(20),
+                              ),
                             ),
                             prefixIcon: const Icon(
-                              Icons.search,
+                              AppIcons.search,
                               color: AppColors.textMuted,
                             ),
                           ),
@@ -1034,28 +1121,18 @@ Future<void> _init() async {
                 child: GestureDetector(
                   onTap: _openCreateChatSheet,
                   child: Container(
-                    width: 72,
-                    height: 72,
+                    width: AppSizes.fab,
+                    height: AppSizes.fab,
                     decoration: BoxDecoration(
                       color: AppColors.accent,
                       shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withAlpha(90),
-                          blurRadius: 16,
-                          offset: const Offset(0, 8),
-                        ),
-                        BoxShadow(
-                          color: AppColors.accent.withAlpha(45),
-                          blurRadius: 20,
-                        ),
-                      ],
+                      boxShadow: AppShadows.accentFab(),
                     ),
                     alignment: Alignment.center,
                     child: const Icon(
-                      Icons.add,
+                      AppIcons.add,
                       color: Colors.black,
-                      size: 34,
+                      size: 22,
                     ),
                   ),
                 ),
@@ -1088,30 +1165,26 @@ class _CreateChatOption extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(AppSpacing.lg),
         decoration: BoxDecoration(
-          color: AppColors.surfaceSoft,
+          color: AppColors.surface,
           borderRadius: BorderRadius.circular(AppRadius.md),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withAlpha(50),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          border: Border.all(color: Colors.white.withAlpha(10)),
+          boxShadow: AppShadows.lift,
         ),
         child: Row(
           children: [
             Container(
-              width: 52,
-              height: 52,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
                 color: AppColors.accent,
                 borderRadius: BorderRadius.circular(AppRadius.sm),
+                boxShadow: AppShadows.primaryButton,
               ),
               alignment: Alignment.center,
               child: Icon(
                 icon,
                 color: Colors.black,
-                size: 24,
+                size: AppSizes.iconMd,
               ),
             ),
             const SizedBox(width: 14),
@@ -1141,7 +1214,7 @@ class _CreateChatOption extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             const Icon(
-              Icons.arrow_forward_ios_rounded,
+              AppIcons.chevronRight,
               color: AppColors.textMuted,
               size: 18,
             ),

@@ -12,10 +12,20 @@ abstract final class AppSpacing {
 }
 
 abstract final class AppRadius {
-  static const double sm = 12;
-  static const double md = 16;
-  static const double lg = 20;
-  static const double xl = 28;
+  static const double sm = 10;
+  static const double md = 14;
+  static const double lg = 18;
+  static const double xl = 22;
+}
+
+/// Компактные контролы: плоские кнопки без «колхозных» полотен.
+abstract final class AppSizes {
+  static const double btnHeight = 40;
+  static const double fab = 56;
+  static const double inputAction = 40;
+  static const double iconSm = 18;
+  static const double iconMd = 20;
+  static const double listAvatar = 48;
 }
 
 /// Узкая колонка для форм на широком окне (десктоп / большое окно).
@@ -24,15 +34,15 @@ abstract final class AppBreakpoints {
   static const double wideLayoutMinWidth = 720;
 }
 
-/// Фон экранов — ваши исходные цвета градиента.
+/// Почти плоский фон: лёгкий градиент вниз, без «цветных» полос.
 abstract final class AppGradients {
   static const LinearGradient background = LinearGradient(
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
     colors: [
-      Color(0xFF0B0B0D),
-      Color(0xFF09090B),
-      Color(0xFF140A02),
+      Color(0xFF050505),
+      Color(0xFF000000),
+      Color(0xFF080402),
     ],
   );
 }

@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/app_icons.dart';
+import '../../../../app/theme/app_shadows.dart';
 import '../../../../app/theme/design_tokens.dart';
 import '../../data/services/chats_service.dart';
 import '../../data/services/users_service.dart';
@@ -249,29 +251,30 @@ class _ChatMemberAddScreenState extends State<ChatMemberAddScreen> {
         return GestureDetector(
           onTap: _isAdding ? null : () => _addMember(user),
           child: Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              color: AppColors.surface.withAlpha(210),
-              borderRadius: BorderRadius.circular(22),
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: AppColors.accentBorder.withAlpha(110),
+                color: Colors.white.withAlpha(10),
               ),
+              boxShadow: AppShadows.lift,
             ),
             child: Row(
               children: [
                 Container(
-                  width: 54,
-                  height: 54,
+                  width: 48,
+                  height: 48,
                   decoration: BoxDecoration(
                     color: AppColors.accent,
-                    borderRadius: BorderRadius.circular(18),
+                    borderRadius: BorderRadius.circular(13),
                   ),
                   alignment: Alignment.center,
                   child: Text(
                     username.isNotEmpty ? username[0].toUpperCase() : '?',
                     style: const TextStyle(
                       color: Colors.black,
-                      fontSize: 20,
+                      fontSize: 18,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
@@ -298,7 +301,7 @@ class _ChatMemberAddScreenState extends State<ChatMemberAddScreen> {
                         ),
                       )
                     : const Icon(
-                        Icons.person_add_alt_1_rounded,
+                        AppIcons.personAdd,
                         color: AppColors.accent,
                       ),
               ],
@@ -323,10 +326,10 @@ class _ChatMemberAddScreenState extends State<ChatMemberAddScreen> {
               Container(
                 padding: const EdgeInsets.fromLTRB(10, 10, 14, 10),
                 decoration: BoxDecoration(
-                  color: AppColors.surface.withAlpha(185),
+                  color: AppColors.background,
                   border: Border(
                     bottom: BorderSide(
-                      color: AppColors.accentBorder.withAlpha(90),
+                      color: Colors.white.withAlpha(10),
                     ),
                   ),
                 ),
@@ -335,7 +338,7 @@ class _ChatMemberAddScreenState extends State<ChatMemberAddScreen> {
                     IconButton(
                       onPressed: () => Navigator.of(context).pop(),
                       icon: const Icon(
-                        Icons.arrow_back_ios_new_rounded,
+                        AppIcons.back,
                         color: AppColors.textPrimary,
                       ),
                     ),
@@ -346,8 +349,8 @@ class _ChatMemberAddScreenState extends State<ChatMemberAddScreen> {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: AppColors.textPrimary,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
@@ -363,7 +366,7 @@ class _ChatMemberAddScreenState extends State<ChatMemberAddScreen> {
                     hintText: 'Поиск по имени',
                     hintStyle: const TextStyle(color: AppColors.textMuted),
                     prefixIcon: const Icon(
-                      Icons.search_rounded,
+                      AppIcons.search,
                       color: AppColors.textMuted,
                     ),
                     filled: true,

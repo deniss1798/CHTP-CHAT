@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/app_icons.dart';
 
 /// Запись круглого видеосообщения в стиле Telegram: удерживайте кнопку записи.
 class VideoNoteRecordScreen extends StatefulWidget {
@@ -162,7 +163,7 @@ class _VideoNoteRecordScreenState extends State<VideoNoteRecordScreen> {
               alignment: Alignment.centerLeft,
               child: IconButton(
                 onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                icon: const Icon(AppIcons.close, color: Colors.white70),
               ),
             ),
             const Text(
@@ -209,26 +210,18 @@ class _VideoNoteRecordScreenState extends State<VideoNoteRecordScreen> {
                 onPointerCancel: (_) => _onPointerUp(),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 120),
-                  width: 92,
-                  height: 92,
+                  width: 72,
+                  height: 72,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: _recording ? Colors.redAccent : AppColors.accent,
-                    border: Border.all(color: Colors.white24, width: 4),
-                    boxShadow: [
-                      BoxShadow(
-                        color: (_recording ? Colors.redAccent : AppColors.accent)
-                            .withAlpha(80),
-                        blurRadius: _recording ? 28 : 18,
-                        spreadRadius: 1,
-                      ),
-                    ],
+                    border: Border.all(color: Colors.white24, width: 2),
                   ),
                   alignment: Alignment.center,
                   child: Icon(
-                    Icons.fiber_manual_record,
+                    AppIcons.record,
                     color: Colors.black,
-                    size: _recording ? 36 : 32,
+                    size: _recording ? 28 : 24,
                   ),
                 ),
               ),

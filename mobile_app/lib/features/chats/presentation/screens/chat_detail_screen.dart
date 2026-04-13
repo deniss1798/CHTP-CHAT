@@ -6,7 +6,11 @@ import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/app_icons.dart';
+import '../../../../app/theme/app_shadows.dart';
+import '../../../../app/theme/design_tokens.dart';
 import '../../../../app/widgets/app_screen_background.dart';
+import '../../../../core/formatting/last_seen_label.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/url_helper.dart';
 import '../../../../core/notifiers/chats_list_refresh_notifier.dart';
@@ -155,7 +159,7 @@ class _VideoMessageWidgetState extends State<_VideoMessageWidget> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.videocam_off_outlined,
+              AppIcons.videocamOff,
               color: AppColors.textMuted,
               size: 32,
             ),
@@ -181,7 +185,7 @@ class _VideoMessageWidgetState extends State<_VideoMessageWidget> {
             ),
             TextButton.icon(
               onPressed: () => setState(_attachController),
-              icon: const Icon(Icons.refresh_rounded, size: 18),
+              icon: const Icon(AppIcons.refresh, size: 18),
               label: const Text('Повторить'),
             ),
           ],
@@ -246,8 +250,8 @@ class _VideoMessageWidgetState extends State<_VideoMessageWidget> {
                 alignment: Alignment.center,
                 child: Icon(
                   c.value.isPlaying
-                      ? Icons.pause_rounded
-                      : Icons.play_arrow_rounded,
+                      ? AppIcons.pause
+                      : AppIcons.play,
                   color: Colors.white,
                   size: 24,
                 ),
@@ -273,7 +277,7 @@ class _VideoMessageWidgetState extends State<_VideoMessageWidget> {
             ),
             alignment: Alignment.center,
             child: const Icon(
-              Icons.play_arrow_rounded,
+              AppIcons.play,
               color: Colors.white,
               size: 24,
             ),
@@ -297,7 +301,7 @@ class _FullscreenImageViewer extends StatelessWidget {
         backgroundColor: Colors.black,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close_rounded, color: Colors.white),
+          icon: const Icon(AppIcons.close, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -430,7 +434,7 @@ class _FullscreenVideoPageState extends State<_FullscreenVideoPage> {
         backgroundColor: Colors.black,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close_rounded, color: Colors.white),
+          icon: const Icon(AppIcons.close, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -456,7 +460,7 @@ class _FullscreenVideoPageState extends State<_FullscreenVideoPage> {
               const SizedBox(height: 16),
               TextButton.icon(
                 onPressed: () => setState(_attach),
-                icon: const Icon(Icons.refresh_rounded, color: AppColors.accent),
+                icon: const Icon(AppIcons.refresh, color: AppColors.accent),
                 label: const Text(
                   'Повторить',
                   style: TextStyle(color: AppColors.accent),
@@ -519,7 +523,7 @@ class _FullscreenVideoPageState extends State<_FullscreenVideoPage> {
               ),
               alignment: Alignment.center,
               child: Icon(
-                c.value.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                c.value.isPlaying ? AppIcons.pause : AppIcons.play,
                 color: Colors.white,
                 size: 28,
               ),
@@ -571,6 +575,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   Timer? _presenceTimer;
   Timer? _socketReconnectTimer;
+  /// Обновление подписи «N мин/ч назад» в шапке личного чата.
+  Timer? _lastSeenSubtitleTimer;
 
   static const Duration _peerOnlineThreshold = Duration(seconds: 180);
 
@@ -622,12 +628,19 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     _chatTitle = widget.title;
     _chatAvatarUrl = widget.avatarUrl;
     _messageController.addListener(_onMessageTextChanged);
+    if (!_isGroupChat) {
+      _lastSeenSubtitleTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+        if (!mounted) return;
+        setState(() {});
+      });
+    }
     _initChat();
   }
 
   @override
   void dispose() {
     _socketReconnectTimer?.cancel();
+    _lastSeenSubtitleTimer?.cancel();
     _presenceTimer?.cancel();
     _typingDebounce?.cancel();
     _localTypingStopTimer?.cancel();
@@ -878,7 +891,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             width: 13,
             height: 13,
             decoration: BoxDecoration(
-              color: AppColors.success,
+              color: AppColors.accent,
               shape: BoxShape.circle,
               border: Border.all(
                 color: AppColors.surface,
@@ -1629,12 +1642,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 ListTile(
-                  leading: const Icon(Icons.photo_outlined, color: AppColors.accent),
+                  leading: const Icon(AppIcons.photo, color: AppColors.accent),
                   title: const Text('Фото'),
                   onTap: () => Navigator.of(ctx).pop('photo'),
                 ),
                 ListTile(
-                  leading: const Icon(Icons.video_collection_outlined, color: AppColors.accent),
+                  leading: const Icon(AppIcons.videoLibrary, color: AppColors.accent),
                   title: const Text('Видео (файл)'),
                   subtitle: const Text('Из галереи — обычное видео'),
                   onTap: () => Navigator.of(ctx).pop('video_gallery'),
@@ -1995,25 +2008,25 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 ListTile(
-                  leading: const Icon(Icons.reply_rounded, color: AppColors.accent),
+                  leading: const Icon(AppIcons.reply, color: AppColors.accent),
                   title: const Text('Ответить'),
                   onTap: () => Navigator.of(ctx).pop('reply'),
                 ),
                 if (text.isNotEmpty)
                   ListTile(
-                    leading: const Icon(Icons.copy_rounded, color: AppColors.textPrimary),
+                    leading: const Icon(AppIcons.copy, color: AppColors.textPrimary),
                     title: const Text('Копировать'),
                     onTap: () => Navigator.of(ctx).pop('copy'),
                   ),
                 if (isMine && messageType == 'text' && text.isNotEmpty)
                   ListTile(
-                    leading: const Icon(Icons.edit_rounded, color: AppColors.textPrimary),
+                    leading: const Icon(AppIcons.edit, color: AppColors.textPrimary),
                     title: const Text('Изменить'),
                     onTap: () => Navigator.of(ctx).pop('edit'),
                   ),
                 if (isMine)
                   ListTile(
-                    leading: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+                    leading: const Icon(AppIcons.delete, color: Colors.redAccent),
                     title: const Text('Удалить'),
                     onTap: () => Navigator.of(ctx).pop('delete'),
                   ),
@@ -2485,6 +2498,18 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                           ),
                         ),
                       ),
+                    if (isMine) ...[
+                      Icon(
+                        (message['delivery_status']?.toString() == 'read')
+                            ? AppIcons.doneAll
+                            : AppIcons.done,
+                        size: 15,
+                        color: (message['delivery_status']?.toString() == 'read')
+                            ? AppColors.accentBright
+                            : AppColors.textMuted,
+                      ),
+                      const SizedBox(width: 5),
+                    ],
                     Text(
                       time,
                       style: const TextStyle(
@@ -2505,10 +2530,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     final bubbleShape = videoNoteCircleLayout
         ? BorderRadius.circular(110)
         : BorderRadius.only(
-            topLeft: const Radius.circular(16),
-            topRight: const Radius.circular(16),
-            bottomLeft: Radius.circular(isMine ? 16 : 4),
-            bottomRight: Radius.circular(isMine ? 4 : 16),
+            topLeft: const Radius.circular(14),
+            topRight: const Radius.circular(14),
+            bottomLeft: Radius.circular(isMine ? 14 : 4),
+            bottomRight: Radius.circular(isMine ? 4 : 14),
           );
 
     final bubble = Material(
@@ -2531,6 +2556,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 ? Colors.transparent
                 : (isMine ? AppColors.bubbleMine : AppColors.bubbleOther),
             borderRadius: bubbleShape,
+            border: mediaOnly || !isMine
+                ? null
+                : Border.all(
+                    color: AppColors.accentBorder.withAlpha(100),
+                    width: 1,
+                  ),
           ),
           child: Column(
             crossAxisAlignment:
@@ -2572,8 +2603,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     if (isMine) ...[
                       Icon(
                         (message['delivery_status']?.toString() == 'read')
-                            ? Icons.done_all_rounded
-                            : Icons.done_rounded,
+                            ? AppIcons.doneAll
+                            : AppIcons.done,
                         size: 15,
                         color: (message['delivery_status']?.toString() == 'read')
                             ? AppColors.accentBright
@@ -2597,30 +2628,49 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       ),
     );
 
-    if (_isGroupChat && !isMine) {
+    if (isMine) {
       return Align(
-        alignment: Alignment.centerLeft,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(right: 8, bottom: 6),
-              child: _buildCircleAvatar(
-                title: senderName,
-                avatarUrl: senderAvatarUrl,
-                size: 34,
-              ),
-            ),
-            Flexible(child: bubble),
-          ],
-        ),
+        alignment: Alignment.centerRight,
+        child: bubble,
       );
     }
 
+    final senderId = _intFromDynamic(message['sender_id']);
+    final avatarChild = Padding(
+      padding: const EdgeInsets.only(right: 8, bottom: 6),
+      child: _buildCircleAvatar(
+        title: senderName,
+        avatarUrl: senderAvatarUrl,
+        size: 34,
+      ),
+    );
+    final Widget leadingAvatar = (senderId != null &&
+            senderId != _currentUserId)
+        ? MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => UserProfileScreen(userId: senderId),
+                  ),
+                );
+              },
+              child: avatarChild,
+            ),
+          )
+        : avatarChild;
+
     return Align(
-      alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
-      child: bubble,
+      alignment: Alignment.centerLeft,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          leadingAvatar,
+          Flexible(child: bubble),
+        ],
+      ),
     );
   }
 
@@ -2680,12 +2730,13 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       child: Container(
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
         decoration: BoxDecoration(
-          color: AppColors.background.withAlpha(245),
+          color: AppColors.background,
           border: Border(
             top: BorderSide(
-              color: Colors.white.withAlpha(14),
+              color: Colors.white.withAlpha(10),
             ),
           ),
+          boxShadow: AppShadows.topBar,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -2702,7 +2753,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.edit_rounded, color: AppColors.accent, size: 20),
+                      const Icon(AppIcons.edit, color: AppColors.accent, size: 20),
                       const SizedBox(width: 10),
                       const Expanded(
                         child: Text(
@@ -2718,7 +2769,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       ),
                       IconButton(
                         onPressed: _cancelEdit,
-                        icon: const Icon(Icons.close_rounded, color: AppColors.textSecondary),
+                        icon: const Icon(AppIcons.close, color: AppColors.textSecondary),
                       ),
                     ],
                   ),
@@ -2776,7 +2827,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       ),
                       IconButton(
                         onPressed: _cancelReply,
-                        icon: const Icon(Icons.close_rounded, color: AppColors.textSecondary),
+                        icon: const Icon(AppIcons.close, color: AppColors.textSecondary),
                       ),
                     ],
                   ),
@@ -2791,23 +2842,25 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                         ? null
                         : () => _showAttachmentPicker(),
                     child: Container(
-                      width: 46,
-                      height: 46,
+                      width: AppSizes.inputAction,
+                      height: AppSizes.inputAction,
                       decoration: BoxDecoration(
                         color: AppColors.surfaceSoft,
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                        border: Border.all(color: Colors.white.withAlpha(10)),
+                        boxShadow: AppShadows.lift,
                       ),
                       alignment: Alignment.center,
                       child: (_isSendingImage || _isSendingVideo)
                           ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2.2),
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : Icon(
-                              Icons.perm_media_outlined,
+                              AppIcons.permMedia,
                               color: isEditing ? AppColors.textMuted : AppColors.accentBright,
-                              size: 22,
+                              size: AppSizes.iconMd,
                             ),
                     ),
                   ),
@@ -2820,23 +2873,25 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                         ? null
                         : _openVideoNoteRecorder,
                     child: Container(
-                      width: 46,
-                      height: 46,
+                      width: AppSizes.inputAction,
+                      height: AppSizes.inputAction,
                       decoration: BoxDecoration(
                         color: AppColors.surfaceSoft,
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                        border: Border.all(color: Colors.white.withAlpha(10)),
+                        boxShadow: AppShadows.lift,
                       ),
                       alignment: Alignment.center,
                       child: (_isSendingImage || _isSendingVideo)
                           ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2.2),
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : Icon(
-                              Icons.videocam_outlined,
+                              AppIcons.videocam,
                               color: isEditing ? AppColors.textMuted : AppColors.accentBright,
-                              size: 22,
+                              size: AppSizes.iconMd,
                             ),
                     ),
                   ),
@@ -2857,11 +2912,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       filled: true,
                       fillColor: AppColors.surfaceSoft,
                       contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 14,
+                        horizontal: 14,
+                        vertical: 12,
                       ),
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(18),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
                         borderSide: BorderSide.none,
                       ),
                     ),
@@ -2871,27 +2926,28 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 GestureDetector(
                   onTap: _isSending ? null : _sendMessage,
                   child: Container(
-                    width: 54,
-                    height: 54,
+                    width: AppSizes.fab - 8,
+                    height: AppSizes.fab - 8,
                     decoration: BoxDecoration(
                       color: AppColors.accent,
-                      borderRadius: BorderRadius.circular(16),
+                      shape: BoxShape.circle,
+                      boxShadow: AppShadows.primaryButton,
                     ),
                     alignment: Alignment.center,
                     child: _isSending
                         ? const SizedBox(
-                            width: 22,
-                            height: 22,
+                            width: 18,
+                            height: 18,
                             child: CircularProgressIndicator(
-                              strokeWidth: 2.4,
+                              strokeWidth: 2,
                               valueColor:
-                                  AlwaysStoppedAnimation<Color>(Color(0xFF0C0E12)),
+                                  AlwaysStoppedAnimation<Color>(Colors.black),
                             ),
                           )
                         : Icon(
-                            isEditing ? Icons.check_rounded : Icons.send_rounded,
-                            color: const Color(0xFF0C0E12),
-                            size: 24,
+                            isEditing ? AppIcons.check : AppIcons.send,
+                            color: Colors.black,
+                            size: AppSizes.iconMd,
                           ),
                   ),
                 ),
@@ -2948,7 +3004,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                '${_senderNameForUserId(_typingUserId)} печатает…',
+                _isGroupChat
+                    ? '${_senderNameForUserId(_typingUserId)} печатает…'
+                    : 'Печатает…',
                 style: const TextStyle(
                   color: AppColors.textSecondary,
                   fontSize: 13,
@@ -2970,6 +3028,13 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     final peerOnline = !_isGroupChat &&
         peerId != null &&
         _isPeerOnlineFromLastSeen(_memberLastSeen[peerId]);
+    final peerSubtitle = !_isGroupChat
+        ? (peerOnline
+            ? 'в сети'
+            : LastSeenLabel.formatOffline(
+                peerId != null ? _memberLastSeen[peerId] : null,
+              ))
+        : '';
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -2981,10 +3046,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               Container(
                 padding: const EdgeInsets.fromLTRB(10, 10, 14, 10),
                 decoration: BoxDecoration(
-                  color: AppColors.surface.withAlpha(240),
+                  color: AppColors.background,
                   border: Border(
                     bottom: BorderSide(
-                      color: Colors.white.withAlpha(12),
+                      color: Colors.white.withAlpha(10),
                     ),
                   ),
                 ),
@@ -2999,7 +3064,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                         }
                       },
                       icon: const Icon(
-                        Icons.arrow_back_ios_new_rounded,
+                        AppIcons.back,
                         color: AppColors.textPrimary,
                       ),
                     ),
@@ -3040,17 +3105,17 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
                                     color: AppColors.textPrimary,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w800,
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
                                 if (!_isGroupChat) ...[
                                   const SizedBox(height: 2),
                                   Text(
-                                    peerOnline ? 'в сети' : 'не в сети',
+                                    peerSubtitle,
                                     style: TextStyle(
                                       color: peerOnline
-                                          ? AppColors.success
+                                          ? AppColors.accentBright
                                           : AppColors.textMuted,
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
@@ -3078,7 +3143,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                                 ),
                               )
                             : const Icon(
-                                Icons.photo_camera_outlined,
+                                AppIcons.photoCamera,
                                 color: AppColors.accent,
                               ),
                       ),
@@ -3087,7 +3152,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                         tooltip: 'Добавить участника',
                         onPressed: _openAddMemberScreen,
                         icon: const Icon(
-                          Icons.person_add_alt_1_rounded,
+                          AppIcons.personAdd,
                           color: AppColors.accent,
                         ),
                       ),
@@ -3095,7 +3160,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       PopupMenuButton<String>(
                         tooltip: 'Меню группы',
                         icon: const Icon(
-                          Icons.more_vert_rounded,
+                          AppIcons.moreVert,
                           color: AppColors.textPrimary,
                         ),
                         color: AppColors.surface,

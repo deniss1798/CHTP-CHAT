@@ -2,6 +2,9 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/app_icons.dart';
+import '../../../../app/theme/app_shadows.dart';
+import '../../../../app/theme/design_tokens.dart';
 import '../../../../app/widgets/app_screen_background.dart';
 import '../../../../core/network/url_helper.dart';
 import '../../data/services/profile_service.dart';
@@ -65,112 +68,199 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    final isWide = size.width >= AppBreakpoints.wideLayoutMinWidth;
+    final avatarSize = isWide ? 168.0 : 120.0;
+    final cardMaxWidth = isWide ? 440.0 : double.infinity;
     final username = (_user?['username'] ?? 'Пользователь').toString();
 
     return Scaffold(
       backgroundColor: AppColors.background,
       body: AppScreenBackground(
-        child: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              IconButton(
-                onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(
-                  Icons.arrow_back_ios_new_rounded,
-                  color: AppColors.textPrimary,
+        child: Stack(
+          children: [
+            Positioned(
+              top: MediaQuery.paddingOf(context).top + 4,
+              left: 8,
+              child: Material(
+                color: Colors.transparent,
+                child: IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.white.withAlpha(10),
+                    foregroundColor: AppColors.textPrimary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                    ),
+                  ),
+                  icon: const Icon(AppIcons.back, size: 18),
                 ),
               ),
-              Expanded(
-                child: _loading
-                    ? const Center(
-                        child: CircularProgressIndicator(
-                          color: AppColors.accent,
-                        ),
-                      )
-                    : _error != null
-                        ? Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(24),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    _error!,
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      color: AppColors.textPrimary,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  ElevatedButton(
-                                    onPressed: _load,
-                                    child: const Text('Повторить'),
-                                  ),
-                                ],
+            ),
+            SafeArea(
+              child: Center(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isWide ? AppSpacing.xxxl : AppSpacing.xxl,
+                    vertical: AppSpacing.xxxl,
+                  ),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: cardMaxWidth),
+                    child: _loading
+                        ? _loadingBlock(isWide)
+                        : _error != null
+                            ? _errorBlock(isWide)
+                            : _profileCard(
+                                username: username,
+                                avatarSize: avatarSize,
+                                isWide: isWide,
                               ),
-                            ),
-                          )
-                        : SingleChildScrollView(
-                            padding: const EdgeInsets.symmetric(horizontal: 24),
-                            child: Column(
-                              children: [
-                                const SizedBox(height: 24),
-                                _buildAvatar(username),
-                                const SizedBox(height: 20),
-                                Text(
-                                  username,
-                                  style: const TextStyle(
-                                    color: AppColors.textPrimary,
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                  ),
+                ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildAvatar(String title) {
+  Widget _loadingBlock(bool isWide) {
+    return SizedBox(
+      height: isWide ? 320 : 240,
+      child: const Center(
+        child: CircularProgressIndicator(color: AppColors.accent),
+      ),
+    );
+  }
+
+  Widget _errorBlock(bool isWide) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.xxl),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        border: Border.all(color: Colors.white.withAlpha(14)),
+        boxShadow: AppShadows.card,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            _error!,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _load,
+              child: const Text('Повторить'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _profileCard({
+    required String username,
+    required double avatarSize,
+    required bool isWide,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(
+        horizontal: isWide ? AppSpacing.xxxl : AppSpacing.xxl,
+        vertical: isWide ? 40 : AppSpacing.xxxl,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        border: Border.all(
+          color: Colors.white.withAlpha(14),
+          width: 1,
+        ),
+        boxShadow: AppShadows.card,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Профиль',
+            style: TextStyle(
+              color: AppColors.textMuted,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.2,
+            ),
+          ),
+          SizedBox(height: isWide ? 28 : AppSpacing.xl),
+          _buildAvatar(username, avatarSize),
+          SizedBox(height: isWide ? 28 : AppSpacing.xl),
+          Text(
+            username,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: isWide ? 22 : 20,
+              fontWeight: FontWeight.w700,
+              height: 1.15,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'Участник ЧТП ЧАТ',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: isWide ? 15 : 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAvatar(String title, double size) {
     final url = _avatarUrl();
+    final radius = size * 0.22;
     if (url != null && url.isNotEmpty) {
       return ClipRRect(
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(radius),
         child: Image.network(
           url,
-          width: 120,
-          height: 120,
+          width: size,
+          height: size,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _fallbackAvatar(title),
+          errorBuilder: (_, _, _) => _fallbackAvatar(title, size, radius),
         ),
       );
     }
-    return _fallbackAvatar(title);
+    return _fallbackAvatar(title, size, radius);
   }
 
-  Widget _fallbackAvatar(String title) {
+  Widget _fallbackAvatar(String title, double size, double radius) {
     final ch = title.isNotEmpty ? title[0].toUpperCase() : '?';
     return Container(
-      width: 120,
-      height: 120,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
         color: AppColors.accent,
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(radius),
       ),
       alignment: Alignment.center,
       child: Text(
         ch,
-        style: const TextStyle(
+        style: TextStyle(
           color: Colors.black,
-          fontSize: 48,
+          fontSize: size * 0.36,
           fontWeight: FontWeight.w900,
         ),
       ),

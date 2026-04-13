@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/app_icons.dart';
+import '../../../../app/theme/app_shadows.dart';
+import '../../../../app/theme/design_tokens.dart';
 import '../../../../app/widgets/app_screen_background.dart';
 import '../../../auth/data/services/auth_service.dart';
 import '../../data/services/profile_service.dart';
@@ -188,11 +191,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     if (avatarUrl != null && avatarUrl.isNotEmpty) {
       return ClipRRect(
-        borderRadius: BorderRadius.circular(32),
+        borderRadius: BorderRadius.circular(28),
         child: Image.network(
           avatarUrl,
-          width: 112,
-          height: 112,
+          width: 96,
+          height: 96,
           fit: BoxFit.cover,
           errorBuilder: (_, __, ___) {
             return _buildAvatarFallback(initials);
@@ -206,19 +209,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildAvatarFallback(String initials) {
     return Container(
-      width: 112,
-      height: 112,
+      width: 96,
+      height: 96,
       decoration: BoxDecoration(
         color: AppColors.accent,
-        borderRadius: BorderRadius.circular(32),
+        borderRadius: BorderRadius.circular(28),
       ),
       alignment: Alignment.center,
       child: Text(
         initials,
         style: const TextStyle(
           color: Colors.black,
-          fontSize: 32,
-          fontWeight: FontWeight.w900,
+          fontSize: 28,
+          fontWeight: FontWeight.w800,
         ),
       ),
     );
@@ -231,32 +234,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.surfaceSoft,
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(40),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: Colors.white.withAlpha(10)),
+        boxShadow: AppShadows.lift,
       ),
       child: Row(
         children: [
           Container(
-            width: 46,
-            height: 46,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
               color: AppColors.accent,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+              boxShadow: AppShadows.primaryButton,
             ),
             alignment: Alignment.center,
             child: Icon(
               icon,
               color: Colors.black,
-              size: 22,
+              size: 20,
             ),
           ),
           const SizedBox(width: 14),
@@ -339,8 +338,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: GestureDetector(
                   onTap: _isUploading ? null : _pickAndUploadAvatar,
                   child: Container(
-                    width: 38,
-                    height: 38,
+                    width: 34,
+                    height: 34,
                     decoration: BoxDecoration(
                       color: AppColors.accent,
                       shape: BoxShape.circle,
@@ -352,17 +351,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     alignment: Alignment.center,
                     child: _isUploading
                         ? const SizedBox(
-                            width: 18,
-                            height: 18,
+                            width: 16,
+                            height: 16,
                             child: CircularProgressIndicator(
-                              strokeWidth: 2.2,
+                              strokeWidth: 2,
                               color: Colors.black,
                             ),
                           )
                         : const Icon(
-                            Icons.edit,
+                            AppIcons.edit,
                             color: Colors.black,
-                            size: 20,
+                            size: 18,
                           ),
                   ),
                 ),
@@ -374,8 +373,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _username(),
             style: const TextStyle(
               color: AppColors.textPrimary,
-              fontSize: 24,
-              fontWeight: FontWeight.w800,
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 8),
@@ -392,13 +391,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _buildInfoCard(
             label: 'Username',
             value: _username(),
-            icon: Icons.alternate_email_rounded,
+            icon: AppIcons.email,
           ),
           const SizedBox(height: 12),
           _buildInfoCard(
             label: 'Email',
             value: _email(),
-            icon: Icons.mail_outline_rounded,
+            icon: AppIcons.mail,
           ),
           if (_error != null) ...[
             const SizedBox(height: 16),

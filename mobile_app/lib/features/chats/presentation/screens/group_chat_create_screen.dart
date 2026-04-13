@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/app_icons.dart';
+import '../../../../app/theme/app_shadows.dart';
 import '../../../../app/theme/design_tokens.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../auth/data/services/auth_service.dart';
@@ -253,13 +255,14 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
   Widget _buildUserAvatar({
     required String title,
     required String? avatarUrl,
-    double size = 54,
+    double size = AppSizes.listAvatar,
   }) {
     final safeUrl = (avatarUrl ?? '').trim();
+    final r = size * 0.28;
 
     if (safeUrl.isNotEmpty) {
       return ClipRRect(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(r),
         child: Image.network(
           safeUrl,
           width: size,
@@ -271,14 +274,14 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
               height: size,
               decoration: BoxDecoration(
                 color: AppColors.accent,
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(r),
               ),
               alignment: Alignment.center,
               child: Text(
                 _initials(title),
-                style: const TextStyle(
+                style: TextStyle(
                   color: Colors.black,
-                  fontSize: 18,
+                  fontSize: size * 0.36,
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -293,14 +296,14 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
       height: size,
       decoration: BoxDecoration(
         color: AppColors.accent,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(r),
       ),
       alignment: Alignment.center,
       child: Text(
         _initials(title),
-        style: const TextStyle(
+        style: TextStyle(
           color: Colors.black,
-          fontSize: 18,
+          fontSize: size * 0.36,
           fontWeight: FontWeight.w800,
         ),
       ),
@@ -334,30 +337,30 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
 
     if (_selectedAvatarFile != null) {
       return ClipRRect(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(20),
         child: Image.file(
           _selectedAvatarFile!,
-          width: 84,
-          height: 84,
+          width: 72,
+          height: 72,
           fit: BoxFit.cover,
         ),
       );
     }
 
     return Container(
-      width: 84,
-      height: 84,
+      width: 72,
+      height: 72,
       decoration: BoxDecoration(
         color: AppColors.accent,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(20),
       ),
       alignment: Alignment.center,
       child: Text(
         _initials(title),
         style: const TextStyle(
           color: Colors.black,
-          fontSize: 26,
-          fontWeight: FontWeight.w900,
+          fontSize: 22,
+          fontWeight: FontWeight.w800,
         ),
       ),
     );
@@ -505,7 +508,7 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
                 children: [
                   OutlinedButton.icon(
                     onPressed: _isCreating ? null : _pickGroupAvatar,
-                    icon: const Icon(Icons.photo_library_outlined),
+                    icon: const Icon(AppIcons.photoLibrary),
                     label: Text(
                       _selectedAvatarFile == null
                           ? 'Выбрать аватар'
@@ -516,7 +519,7 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
                     const SizedBox(width: 10),
                     OutlinedButton.icon(
                       onPressed: _isCreating ? null : _removeGroupAvatar,
-                      icon: const Icon(Icons.close),
+                      icon: const Icon(AppIcons.close),
                       label: const Text('Убрать'),
                     ),
                   ],
@@ -537,11 +540,11 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
               filled: true,
               fillColor: AppColors.surfaceSoft,
               contentPadding: const EdgeInsets.symmetric(
-                horizontal: 18,
-                vertical: 16,
+                horizontal: 14,
+                vertical: 14,
               ),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(AppRadius.md),
                 borderSide: BorderSide.none,
               ),
             ),
@@ -558,14 +561,14 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
               filled: true,
               fillColor: AppColors.surfaceSoft,
               contentPadding: const EdgeInsets.symmetric(
-                horizontal: 18,
-                vertical: 16,
+                horizontal: 14,
+                vertical: 14,
               ),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(AppRadius.md),
                 borderSide: BorderSide.none,
               ),
-              prefixIcon: const Icon(Icons.search, color: AppColors.textMuted),
+              prefixIcon: const Icon(AppIcons.search, color: AppColors.textMuted),
             ),
           ),
         ),
@@ -590,17 +593,17 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
         SafeArea(
           top: false,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
             child: SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: _isCreating ? null : _createGroupChat,
                 child: _isCreating
                     ? const SizedBox(
-                        width: 22,
-                        height: 22,
+                        width: 18,
+                        height: 18,
                         child: CircularProgressIndicator(
-                          strokeWidth: 2.2,
+                          strokeWidth: 2,
                           valueColor:
                               AlwaysStoppedAnimation<Color>(Colors.black),
                         ),
@@ -721,25 +724,26 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
     return GestureDetector(
       onTap: () => _toggleUser(user),
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
           color: isSelected
-              ? const Color(0xFF17131B)
-              : AppColors.surface.withAlpha(210),
-          borderRadius: BorderRadius.circular(22),
+              ? AppColors.accent.withAlpha(18)
+              : AppColors.surface,
+          borderRadius: BorderRadius.circular(AppRadius.md),
           border: Border.all(
             color: isSelected
-                ? AppColors.accent
-                : AppColors.accentBorder.withAlpha(110),
-            width: isSelected ? 1.4 : 1,
+                ? AppColors.accent.withAlpha(180)
+                : Colors.white.withAlpha(10),
+            width: 1,
           ),
+          boxShadow: AppShadows.lift,
         ),
         child: Row(
           children: [
             _buildUserAvatar(
               title: username,
               avatarUrl: avatarUrl,
-              size: 54,
+              size: AppSizes.listAvatar,
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -769,8 +773,9 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
             const SizedBox(width: 10),
             Icon(
               isSelected
-                  ? Icons.check_circle
-                  : Icons.radio_button_unchecked,
+                  ? AppIcons.checkCircle
+                  : AppIcons.radioOff,
+              size: AppSizes.iconMd,
               color: isSelected
                   ? AppColors.accent
                   : AppColors.textMuted,
@@ -799,7 +804,7 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
                     IconButton(
                       onPressed: () => Navigator.of(context).pop(),
                       icon: const Icon(
-                        Icons.arrow_back_ios_new_rounded,
+                        AppIcons.back,
                         color: AppColors.textPrimary,
                       ),
                     ),
@@ -808,8 +813,8 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
                         'Новая группа',
                         style: TextStyle(
                           color: AppColors.textPrimary,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),

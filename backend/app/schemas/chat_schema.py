@@ -46,6 +46,7 @@ class ChatResponse(BaseModel):
     created_by: int | None
 
     last_message: str | None = None
+    last_message_type: str | None = None
     last_message_at: datetime | None = None
     last_message_sender_id: int | None = None
     last_message_id: int | None = None

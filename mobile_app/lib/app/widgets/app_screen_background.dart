@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/design_tokens.dart';
 
-/// Стандартный фон: градиент + мягкие «ореолы» акцентного цвета (без перегруза).
+/// Плоский тёмный фон с одним мягким «ореолом» — без визуального шума.
 class AppScreenBackground extends StatelessWidget {
   const AppScreenBackground({
     super.key,
@@ -25,24 +25,15 @@ class AppScreenBackground extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          if (showAmbientGlow) ...[
+          if (showAmbientGlow)
             Positioned(
-              top: 100,
-              left: -70,
+              top: -40,
+              right: -80,
               child: _AmbientBlob(
-                size: 200,
-                color: AppColors.accent.withAlpha(22),
+                size: 280,
+                color: AppColors.accent.withAlpha(14),
               ),
             ),
-            Positioned(
-              bottom: 80,
-              right: -50,
-              child: _AmbientBlob(
-                size: 220,
-                color: AppColors.accent.withAlpha(28),
-              ),
-            ),
-          ],
           child,
         ],
       ),
@@ -70,8 +61,8 @@ class _AmbientBlob extends StatelessWidget {
           boxShadow: [
             BoxShadow(
               color: color,
-              blurRadius: size * 0.45,
-              spreadRadius: 12,
+              blurRadius: size * 0.5,
+              spreadRadius: 0,
             ),
           ],
         ),
