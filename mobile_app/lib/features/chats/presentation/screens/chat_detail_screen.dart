@@ -1454,7 +1454,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     if (_isGroupChat) return;
     final uid = _intFromDynamic(incoming['user_id']);
     if (uid == null || uid == _currentUserId) return;
-    if (_privatePeerUserId() != uid) return;
+    // Пока участники ещё не подгрузились, _privatePeerUserId() == null — не отбрасываем звонок.
+    final peer = _privatePeerUserId();
+    if (peer != null && peer != uid) return;
     final callId = incoming['call_id']?.toString() ?? '';
     if (callId.isEmpty) return;
     if (!VoiceCallRing.tryStart(callId)) return;

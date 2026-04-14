@@ -1,7 +1,8 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+    show debugPrint, kDebugMode, kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_colors.dart';
@@ -65,6 +66,7 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
 
   Timer? _chatsPollTimer;
   Timer? _presenceTimer;
+  Timer? _inboxPingTimer;
 
   final InboxSocketService _inboxSocket = InboxSocketService();
   StreamSubscription<Map<String, dynamic>>? _inboxSubscription;
@@ -101,6 +103,7 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
     chatsListRefreshNotifier.removeListener(_chatsRefreshListener);
     _presenceTimer?.cancel();
     _chatsPollTimer?.cancel();
+    _inboxPingTimer?.cancel();
     _inboxSubscription?.cancel();
     for (final t in _typingInboxTimers.values) {
       t.cancel();
@@ -124,78 +127,112 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && _currentUserId != null) {
       _loadChats(silent: true);
+      if (!_inboxSocket.isConnected) {
+        unawaited(_connectInboxWithRetry());
+      }
     }
   }
 
-Future<void> _init() async {
-  try {
-    final me = await _authService.getMe();
-    final rawId = me['id'];
-
-    if (rawId is int) {
-      _currentUserId = rawId;
-    } else {
-      _currentUserId = int.tryParse(rawId.toString());
-    }
-
-    await _loadChats();
-    await _connectInbox();
-  } catch (_) {
-    if (!mounted) return;
-
-    setState(() {
-      _error = 'Не удалось инициализировать список чатов';
-      _isLoading = false;
-    });
-  }
-}
-
-  Future<void> _connectInbox() async {
-    await _inboxSubscription?.cancel();
+  Future<void> _init() async {
     try {
-      await _inboxSocket.connect(baseHttpUrl: ApiClient.baseUrl);
-      _inboxSubscription = _inboxSocket.messagesStream.listen((msg) {
-        final t = msg['type']?.toString();
-        if (t == 'call_e2e_init') {
-          _handleInboxIncomingCall(msg);
-          return;
-        }
-        if (msg['type'] != 'typing') return;
-        final cidRaw = msg['chat_id'];
-        int? chatId;
-        if (cidRaw is int) {
-          chatId = cidRaw;
-        } else {
-          chatId = int.tryParse(cidRaw?.toString() ?? '');
-        }
-        if (chatId == null) return;
-        final typing = msg['typing'] != false;
-        if (!typing) {
-          _typingInboxTimers[chatId]?.cancel();
-          _typingInboxTimers.remove(chatId);
-          if (mounted) {
-            setState(() => _typingLabelByChatId.remove(chatId));
-          }
-          return;
-        }
-        final uname = (msg['username'] ?? '').toString().trim();
-        final isPrivate = _chatTypeById(chatId) == 'private';
-        final label = isPrivate
-            ? 'Печатает…'
-            : (uname.isNotEmpty ? '$uname печатает…' : 'Печатает…');
-        _typingInboxTimers[chatId]?.cancel();
-        _typingInboxTimers[chatId] = Timer(const Duration(seconds: 3), () {
-          if (!mounted) return;
-          setState(() {
-            _typingLabelByChatId.remove(chatId);
-            _typingInboxTimers.remove(chatId);
-          });
-        });
-        if (mounted) {
-          setState(() => _typingLabelByChatId[chatId!] = label);
-        }
+      final me = await _authService.getMe();
+      final rawId = me['id'];
+
+      if (rawId is int) {
+        _currentUserId = rawId;
+      } else {
+        _currentUserId = int.tryParse(rawId.toString());
+      }
+
+      await _loadChats();
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        _error = 'Не удалось инициализировать список чатов';
+        _isLoading = false;
       });
-    } catch (_) {}
+    }
+
+    if (_currentUserId != null) {
+      await _connectInboxWithRetry();
+    }
+  }
+
+  void _onInboxMessage(Map<String, dynamic> msg) {
+    final t = msg['type']?.toString();
+    if (t == 'call_e2e_init') {
+      _handleInboxIncomingCall(msg);
+      return;
+    }
+    if (msg['type'] != 'typing') return;
+    final cidRaw = msg['chat_id'];
+    int? chatId;
+    if (cidRaw is int) {
+      chatId = cidRaw;
+    } else {
+      chatId = int.tryParse(cidRaw?.toString() ?? '');
+    }
+    if (chatId == null) return;
+    final typing = msg['typing'] != false;
+    if (!typing) {
+      _typingInboxTimers[chatId]?.cancel();
+      _typingInboxTimers.remove(chatId);
+      if (mounted) {
+        setState(() => _typingLabelByChatId.remove(chatId));
+      }
+      return;
+    }
+    final uname = (msg['username'] ?? '').toString().trim();
+    final isPrivate = _chatTypeById(chatId) == 'private';
+    final label = isPrivate
+        ? 'Печатает…'
+        : (uname.isNotEmpty ? '$uname печатает…' : 'Печатает…');
+    _typingInboxTimers[chatId]?.cancel();
+    _typingInboxTimers[chatId] = Timer(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      setState(() {
+        _typingLabelByChatId.remove(chatId);
+        _typingInboxTimers.remove(chatId);
+      });
+    });
+    if (mounted) {
+      setState(() => _typingLabelByChatId[chatId!] = label);
+    }
+  }
+
+  Future<void> _connectInboxWithRetry() async {
+    await _inboxSubscription?.cancel();
+    _inboxSubscription = null;
+    _inboxPingTimer?.cancel();
+    _inboxPingTimer = null;
+
+    for (var attempt = 0; attempt < 5; attempt++) {
+      try {
+        await _inboxSocket.connect(baseHttpUrl: ApiClient.baseUrl);
+        _inboxSubscription =
+            _inboxSocket.messagesStream.listen(_onInboxMessage);
+        _inboxPingTimer = Timer.periodic(const Duration(seconds: 25), (_) {
+          if (!_inboxSocket.isConnected) return;
+          _inboxSocket.sendPing();
+        });
+        if (kDebugMode) {
+          debugPrint(
+            'ChatsScreen: inbox WebSocket connected (${ApiClient.baseUrl})',
+          );
+        }
+        return;
+      } catch (e) {
+        debugPrint('ChatsScreen: inbox connect attempt ${attempt + 1}/5: $e');
+        await Future<void>.delayed(
+          Duration(milliseconds: 400 + attempt * 350),
+        );
+      }
+    }
+    debugPrint(
+      'ChatsScreen: inbox WebSocket failed after retries — '
+      'входящие звонки/typing по списку не придут',
+    );
   }
 
   Future<void> _loadChats({bool silent = false}) async {
@@ -527,7 +564,8 @@ Future<void> _init() async {
       chatId = int.tryParse(cidRaw?.toString() ?? '');
     }
     if (chatId == null) return;
-    if (_chatTypeById(chatId) != 'private') return;
+    // Пока список чатов не подгрузился, тип null — не блокируем личный звонок.
+    if (_chatTypeById(chatId) == 'group') return;
 
     final uRaw = msg['user_id'];
     int? callerId;
