@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/material.dart';
 import '../../../../app/app.dart';
 import '../../../../app/desktop_chat_session.dart';
@@ -32,7 +34,13 @@ class _SplashScreenState extends State<SplashScreen> {
     if (!mounted) return;
 
     if (token != null && token.isNotEmpty) {
-      await AuthService().registerPushTokenIfLoggedIn();
+      // FCM getToken() / POST /devices может долго висеть на Android — не блокируем сплэш.
+      unawaited(
+        AuthService().registerPushTokenIfLoggedIn().catchError(
+          (Object e, StackTrace st) =>
+              debugPrint('registerPushTokenIfLoggedIn: $e\n$st'),
+        ),
+      );
 
       final pendingPush = consumePendingPush();
 
@@ -41,7 +49,7 @@ class _SplashScreenState extends State<SplashScreen> {
       );
 
       if (pendingPush != null) {
-        Future.delayed(const Duration(milliseconds: 150), () {
+        void openChatFromPush() {
           if (isDesktopMessengerLayout) {
             desktopChatOpenRequest.value = DesktopChatOpenRequest(
               chatId: pendingPush.chatId,
@@ -65,6 +73,10 @@ class _SplashScreenState extends State<SplashScreen> {
               ),
             ),
           );
+        }
+
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Future<void>.delayed(const Duration(milliseconds: 120), openChatFromPush);
         });
       }
     } else {

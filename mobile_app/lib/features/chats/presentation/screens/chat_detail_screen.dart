@@ -4,6 +4,7 @@ import 'dart:io' show File;
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -23,6 +24,8 @@ import '../../../../core/network/url_helper.dart';
 import '../../../../core/notifiers/chats_list_refresh_notifier.dart';
 import '../../../../core/storage/secure_storage_service.dart';
 import '../../../auth/data/services/auth_service.dart';
+import '../../../calls/presentation/screens/voice_call_screen.dart';
+import '../../../calls/voice_call_ring.dart';
 import '../../data/services/chat_socket_service.dart';
 import '../../data/services/local_chat_state_service.dart';
 import '../../data/services/messages_service.dart';
@@ -1352,6 +1355,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   }
 
   void _handleSocketEvent(Map<String, dynamic> incoming) {
+    if (incoming['type'] == 'call_e2e_init') {
+      _handleIncomingCallSignal(incoming);
+      return;
+    }
     if (incoming['type'] == 'typing') {
       final uid = _intFromDynamic(incoming['user_id']);
       if (uid == null || uid == _currentUserId) return;
@@ -1441,6 +1448,105 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     if (incoming['type'] == 'new_message' || incoming.containsKey('message')) {
       _handleNewMessage(incoming);
     }
+  }
+
+  void _handleIncomingCallSignal(Map<String, dynamic> incoming) {
+    if (_isGroupChat) return;
+    final uid = _intFromDynamic(incoming['user_id']);
+    if (uid == null || uid == _currentUserId) return;
+    if (_privatePeerUserId() != uid) return;
+    final callId = incoming['call_id']?.toString() ?? '';
+    if (callId.isEmpty) return;
+    if (!VoiceCallRing.tryStart(callId)) return;
+    _showIncomingCallDialog(incoming);
+  }
+
+  void _showIncomingCallDialog(Map<String, dynamic> init) {
+    final callId = init['call_id']?.toString() ?? '';
+    final visibleTitle =
+        _chatTitle.trim().isNotEmpty ? _chatTitle : widget.title;
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text(
+          'Входящий звонок',
+          style: TextStyle(color: AppColors.textPrimary),
+        ),
+        content: Text(
+          '$visibleTitle звонит вам',
+          style: const TextStyle(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              VoiceCallRing.end(callId);
+              _chatSocketService.sendJson({
+                'type': 'call_e2e_hangup',
+                'call_id': callId,
+              });
+              Navigator.of(ctx).pop();
+            },
+            child: const Text('Отклонить'),
+          ),
+          TextButton(
+            onPressed: () {
+              VoiceCallRing.end(callId);
+              Navigator.of(ctx).pop();
+              final peer = _privatePeerUserId();
+              final me = _currentUserId;
+              if (peer == null || me == null) return;
+              unawaited(
+                Navigator.of(context).push<void>(
+                  MaterialPageRoute<void>(
+                    builder: (_) => VoiceCallScreen(
+                      chatId: widget.chatId,
+                      peerTitle: visibleTitle,
+                      peerUserId: peer,
+                      myUserId: me,
+                      existingSocket: _chatSocketService,
+                      incomingInit: init,
+                    ),
+                  ),
+                ),
+              );
+            },
+            child: const Text('Принять'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _startVoiceCall() async {
+    if (kIsWeb) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Звонки в браузере не поддерживаются'),
+        ),
+      );
+      return;
+    }
+    final peer = _privatePeerUserId();
+    final me = _currentUserId;
+    if (peer == null || me == null) return;
+    await _ensureSocketConnected();
+    if (!mounted) return;
+    final visibleTitle =
+        _chatTitle.trim().isNotEmpty ? _chatTitle : widget.title;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => VoiceCallScreen(
+          chatId: widget.chatId,
+          peerTitle: visibleTitle,
+          peerUserId: peer,
+          myUserId: me,
+          existingSocket: _chatSocketService,
+        ),
+      ),
+    );
   }
 
   Future<void> _handleNewMessage(Map<String, dynamic> incoming) async {
@@ -3558,6 +3664,15 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                         ],
                       ),
                     ),
+                    if (!_isGroupChat)
+                      IconButton(
+                        tooltip: 'Голосовой звонок',
+                        onPressed: _startVoiceCall,
+                        icon: const Icon(
+                          AppIcons.call,
+                          color: AppColors.accent,
+                        ),
+                      ),
                     if (_isGroupChat)
                       IconButton(
                         tooltip: 'Изменить аватар группы',

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_colors.dart';
@@ -16,7 +17,10 @@ import '../../../auth/data/services/auth_service.dart';
 import '../../../auth/presentation/screens/auth_screen.dart';
 import '../../../settings/presentation/screens/settings_screen.dart';
 import '../../data/services/chats_service.dart';
+import '../../data/services/chat_socket_service.dart';
 import '../../data/services/inbox_socket_service.dart';
+import '../../../calls/presentation/screens/voice_call_screen.dart';
+import '../../../calls/voice_call_ring.dart';
 import '../../data/services/presence_service.dart';
 import 'chat_detail_screen.dart';
 import 'group_chat_create_screen.dart';
@@ -151,6 +155,11 @@ Future<void> _init() async {
     try {
       await _inboxSocket.connect(baseHttpUrl: ApiClient.baseUrl);
       _inboxSubscription = _inboxSocket.messagesStream.listen((msg) {
+        final t = msg['type']?.toString();
+        if (t == 'call_e2e_init') {
+          _handleInboxIncomingCall(msg);
+          return;
+        }
         if (msg['type'] != 'typing') return;
         final cidRaw = msg['chat_id'];
         int? chatId;
@@ -490,6 +499,111 @@ Future<void> _init() async {
     return null;
   }
 
+  String? _titleForChatId(int chatId) {
+    for (final c in _allChats) {
+      final rawId = c['id'] ?? c['chat_id'];
+      int? id;
+      if (rawId is int) {
+        id = rawId;
+      } else {
+        id = int.tryParse(rawId?.toString() ?? '');
+      }
+      if (id == chatId) {
+        final t = (c['title'] ?? '').toString().trim();
+        return t.isNotEmpty ? t : null;
+      }
+    }
+    return null;
+  }
+
+  Future<void> _handleInboxIncomingCall(Map<String, dynamic> msg) async {
+    if (kIsWeb) return;
+    if (_currentUserId == null) return;
+    final cidRaw = msg['chat_id'];
+    int? chatId;
+    if (cidRaw is int) {
+      chatId = cidRaw;
+    } else {
+      chatId = int.tryParse(cidRaw?.toString() ?? '');
+    }
+    if (chatId == null) return;
+    if (_chatTypeById(chatId) != 'private') return;
+
+    final uRaw = msg['user_id'];
+    int? callerId;
+    if (uRaw is int) {
+      callerId = uRaw;
+    } else {
+      callerId = int.tryParse(uRaw?.toString() ?? '');
+    }
+    if (callerId == null || callerId == _currentUserId) return;
+
+    final callId = msg['call_id']?.toString() ?? '';
+    if (callId.isEmpty) return;
+    if (!VoiceCallRing.tryStart(callId)) return;
+
+    final title = _titleForChatId(chatId) ?? 'Чат';
+    if (!mounted) return;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text(
+          'Входящий звонок',
+          style: TextStyle(color: AppColors.textPrimary),
+        ),
+        content: Text(
+          '$title звонит вам',
+          style: const TextStyle(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              VoiceCallRing.end(callId);
+              Navigator.of(ctx).pop();
+              final socket = ChatSocketService();
+              try {
+                await socket.connect(
+                  chatId: chatId!,
+                  baseHttpUrl: ApiClient.baseUrl,
+                );
+                socket.sendJson({
+                  'type': 'call_e2e_hangup',
+                  'call_id': callId,
+                });
+                await Future<void>.delayed(const Duration(milliseconds: 400));
+              } catch (_) {}
+              await socket.disconnect();
+            },
+            child: const Text('Отклонить'),
+          ),
+          TextButton(
+            onPressed: () {
+              VoiceCallRing.end(callId);
+              Navigator.of(ctx).pop();
+              unawaited(
+                Navigator.of(context).push<void>(
+                  MaterialPageRoute<void>(
+                    builder: (_) => VoiceCallScreen(
+                      chatId: chatId!,
+                      peerTitle: title,
+                      peerUserId: callerId!,
+                      myUserId: _currentUserId!,
+                      incomingInit: msg,
+                    ),
+                  ),
+                ),
+              );
+            },
+            child: const Text('Принять'),
+          ),
+        ],
+      ),
+    );
+  }
+
   String? _previewForLastMessageType(String rawType) {
     final mt = rawType.trim().toLowerCase();
     switch (mt) {
@@ -506,8 +620,6 @@ Future<void> _init() async {
         return 'Файл';
       case 'sticker':
         return 'Стикер';
-      case 'document':
-        return 'Файл';
       case 'text':
         return null;
       default:

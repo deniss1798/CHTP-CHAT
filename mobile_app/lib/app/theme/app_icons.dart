@@ -39,6 +39,10 @@ abstract final class AppIcons {
   static const IconData videoLibrary = Icons.video_library_outlined;
   static const IconData videocam = Icons.videocam_outlined;
   static const IconData videocamOff = Icons.videocam_off_outlined;
+  static const IconData call = Icons.call_rounded;
+  static const IconData callEnd = Icons.call_end_rounded;
+  static const IconData mic = Icons.mic_rounded;
+  static const IconData micOff = Icons.mic_off_rounded;
   static const IconData permMedia = Icons.perm_media_outlined;
   static const IconData play = Icons.play_arrow_rounded;
   static const IconData pause = Icons.pause_rounded;

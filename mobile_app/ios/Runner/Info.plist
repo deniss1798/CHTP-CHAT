@@ -67,6 +67,8 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<!-- API на http:// (без TLS); иначе iOS блокирует запросы (ATS) -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Приложению нужен микрофон для голосовых звонков.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>

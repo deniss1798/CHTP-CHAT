@@ -14,6 +14,17 @@ from app.models.user import User
 router = APIRouter(tags=["WebSocket"])
 settings = get_settings()
 
+_CALL_SIGNAL_TYPES = frozenset(
+    {
+        "call_e2e_init",
+        "call_e2e_ack",
+        "call_e2e_offer",
+        "call_e2e_answer",
+        "call_e2e_ice",
+        "call_e2e_hangup",
+    }
+)
+
 
 @router.websocket("/ws/chat/{chat_id}")
 async def websocket_chat(
@@ -87,6 +98,24 @@ async def websocket_chat(
                 for (member_uid,) in member_ids:
                     if member_uid != user_id:
                         await inbox_manager.send_json(member_uid, typing_payload)
+            elif msg_type in _CALL_SIGNAL_TYPES:
+                call_payload = dict(data)
+                call_payload["type"] = msg_type
+                call_payload["chat_id"] = chat_id
+                call_payload["user_id"] = user_id
+                await manager.broadcast_to_others(
+                    chat_id,
+                    call_payload,
+                    exclude_user_id=user_id,
+                )
+                member_ids = (
+                    db.query(ChatMember.user_id)
+                    .filter(ChatMember.chat_id == chat_id)
+                    .all()
+                )
+                for (member_uid,) in member_ids:
+                    if member_uid != user_id:
+                        await inbox_manager.send_json(member_uid, call_payload)
     except WebSocketDisconnect:
         manager.disconnect(chat_id, websocket)
     finally:

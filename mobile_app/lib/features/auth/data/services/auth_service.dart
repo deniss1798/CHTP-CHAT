@@ -1,3 +1,5 @@
+import 'dart:async' show TimeoutException;
+
 import 'package:dio/dio.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform, kIsWeb;
@@ -108,7 +110,15 @@ Future<void> requestEmailCode({
   Future<void> _registerDeviceToken(String accessToken) async {
     if (!_fcmDeviceRegistrationSupported) return;
 
-    final fcmToken = await FirebaseMessaging.instance.getToken();
+    String? fcmToken;
+    try {
+      fcmToken = await FirebaseMessaging.instance
+          .getToken()
+          .timeout(const Duration(seconds: 12));
+    } on TimeoutException catch (_) {
+      print('FCM getToken timed out, skip device registration');
+      return;
+    }
 
     if (fcmToken == null || fcmToken.isEmpty) {
       print('FCM token is null or empty, skip device registration');
