@@ -20,6 +20,8 @@ import '../../../settings/presentation/screens/settings_screen.dart';
 import '../../data/services/chats_service.dart';
 import '../../data/services/chat_socket_service.dart';
 import '../../data/services/inbox_socket_service.dart';
+import '../../../calls/incoming_call_ringtone.dart';
+import '../../../calls/presentation/screens/group_call_screen.dart';
 import '../../../calls/presentation/screens/voice_call_screen.dart';
 import '../../../calls/voice_call_ring.dart';
 import '../../data/services/presence_service.dart';
@@ -161,6 +163,10 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
 
   void _onInboxMessage(Map<String, dynamic> msg) {
     final t = msg['type']?.toString();
+    if (t == 'group_call_invite') {
+      unawaited(_handleInboxGroupInvite(msg));
+      return;
+    }
     if (t == 'call_e2e_init') {
       _handleInboxIncomingCall(msg);
       return;
@@ -583,63 +589,169 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
     final title = _titleForChatId(chatId) ?? 'Чат';
     if (!mounted) return;
 
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        title: const Text(
-          'Входящий звонок',
-          style: TextStyle(color: AppColors.textPrimary),
-        ),
-        content: Text(
-          '$title звонит вам',
-          style: const TextStyle(color: AppColors.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              VoiceCallRing.end(callId);
-              Navigator.of(ctx).pop();
-              final socket = ChatSocketService();
-              try {
-                await socket.connect(
-                  chatId: chatId!,
-                  baseHttpUrl: ApiClient.baseUrl,
-                );
-                socket.sendJson({
-                  'type': 'call_e2e_hangup',
-                  'call_id': callId,
-                });
-                await Future<void>.delayed(const Duration(milliseconds: 400));
-              } catch (_) {}
-              await socket.disconnect();
-            },
-            child: const Text('Отклонить'),
+    await IncomingCallRingtone.instance.start();
+    if (!mounted) {
+      await IncomingCallRingtone.instance.stop();
+      return;
+    }
+    try {
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: AppColors.surface,
+          title: const Text(
+            'Входящий звонок',
+            style: TextStyle(color: AppColors.textPrimary),
           ),
-          TextButton(
-            onPressed: () {
-              VoiceCallRing.end(callId);
-              Navigator.of(ctx).pop();
-              unawaited(
-                Navigator.of(context).push<void>(
-                  MaterialPageRoute<void>(
-                    builder: (_) => VoiceCallScreen(
-                      chatId: chatId!,
-                      peerTitle: title,
-                      peerUserId: callerId!,
-                      myUserId: _currentUserId!,
-                      incomingInit: msg,
+          content: Text(
+            '$title звонит вам',
+            style: const TextStyle(color: AppColors.textSecondary),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                VoiceCallRing.end(callId);
+                Navigator.of(ctx).pop();
+                final socket = ChatSocketService();
+                try {
+                  await socket.connect(
+                    chatId: chatId!,
+                    baseHttpUrl: ApiClient.baseUrl,
+                  );
+                  socket.sendJson({
+                    'type': 'call_e2e_hangup',
+                    'call_id': callId,
+                  });
+                  await Future<void>.delayed(const Duration(milliseconds: 400));
+                } catch (_) {}
+                await socket.disconnect();
+              },
+              child: const Text('Отклонить'),
+            ),
+            TextButton(
+              onPressed: () {
+                VoiceCallRing.end(callId);
+                Navigator.of(ctx).pop();
+                unawaited(
+                  Navigator.of(context).push<void>(
+                    MaterialPageRoute<void>(
+                      builder: (_) => VoiceCallScreen(
+                        chatId: chatId!,
+                        peerTitle: title,
+                        peerUserId: callerId!,
+                        myUserId: _currentUserId!,
+                        incomingInit: msg,
+                      ),
                     ),
                   ),
-                ),
-              );
-            },
-            child: const Text('Принять'),
+                );
+              },
+              child: const Text('Принять'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      await IncomingCallRingtone.instance.stop();
+    }
+  }
+
+  Future<void> _handleInboxGroupInvite(Map<String, dynamic> msg) async {
+    if (kIsWeb) return;
+    if (_currentUserId == null) return;
+    final cidRaw = msg['chat_id'];
+    int? chatId;
+    if (cidRaw is int) {
+      chatId = cidRaw;
+    } else {
+      chatId = int.tryParse(cidRaw?.toString() ?? '');
+    }
+    if (chatId == null) return;
+    if (_chatTypeById(chatId) != 'group') return;
+
+    final uRaw = msg['user_id'];
+    int? callerId;
+    if (uRaw is int) {
+      callerId = uRaw;
+    } else {
+      callerId = int.tryParse(uRaw?.toString() ?? '');
+    }
+    if (callerId == null || callerId == _currentUserId) return;
+
+    final callId = msg['call_id']?.toString() ?? '';
+    if (callId.isEmpty) return;
+    if (!VoiceCallRing.tryStart(callId)) return;
+
+    int? startedBy;
+    final sb = msg['started_by'];
+    if (sb is int) {
+      startedBy = sb;
+    } else {
+      startedBy = int.tryParse(sb?.toString() ?? '') ?? callerId;
+    }
+    final withVideo = msg['video'] == true;
+
+    final title = _titleForChatId(chatId) ?? 'Чат';
+    if (!mounted) return;
+
+    await IncomingCallRingtone.instance.start();
+    if (!mounted) {
+      await IncomingCallRingtone.instance.stop();
+      return;
+    }
+    try {
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: AppColors.surface,
+          title: const Text(
+            'Групповой звонок',
+            style: TextStyle(color: AppColors.textPrimary),
           ),
-        ],
-      ),
-    );
+          content: Text(
+            'Вас зовут в звонок «$title»',
+            style: const TextStyle(color: AppColors.textSecondary),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                VoiceCallRing.end(callId);
+                Navigator.of(ctx).pop();
+              },
+              child: const Text('Отклонить'),
+            ),
+            TextButton(
+              onPressed: () {
+                VoiceCallRing.end(callId);
+                Navigator.of(ctx).pop();
+                unawaited(
+                  Navigator.of(context).push<void>(
+                    MaterialPageRoute<void>(
+                      builder: (_) => GroupCallScreen(
+                        chatId: chatId!,
+                        chatTitle: title,
+                        myUserId: _currentUserId!,
+                        callId: callId,
+                        startedByUserId: startedBy!,
+                        memberNames: const <int, String>{},
+                        isHost: false,
+                        startWithVideo: withVideo,
+                        incomingInvite: msg,
+                      ),
+                    ),
+                  ),
+                );
+              },
+              child: const Text('Принять'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      await IncomingCallRingtone.instance.stop();
+    }
   }
 
   String? _previewForLastMessageType(String rawType) {

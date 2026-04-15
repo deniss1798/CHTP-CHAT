@@ -24,6 +24,8 @@ import '../../../../core/network/url_helper.dart';
 import '../../../../core/notifiers/chats_list_refresh_notifier.dart';
 import '../../../../core/storage/secure_storage_service.dart';
 import '../../../auth/data/services/auth_service.dart';
+import '../../../calls/incoming_call_ringtone.dart';
+import '../../../calls/presentation/screens/group_call_screen.dart';
 import '../../../calls/presentation/screens/voice_call_screen.dart';
 import '../../../calls/voice_call_ring.dart';
 import '../../data/services/chat_socket_service.dart';
@@ -1355,6 +1357,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   }
 
   void _handleSocketEvent(Map<String, dynamic> incoming) {
+    if (incoming['type'] == 'group_call_invite') {
+      _handleGroupCallInvite(incoming);
+      return;
+    }
     if (incoming['type'] == 'call_e2e_init') {
       _handleIncomingCallSignal(incoming);
       return;
@@ -1450,6 +1456,89 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     }
   }
 
+  void _handleGroupCallInvite(Map<String, dynamic> incoming) {
+    if (!_isGroupChat) return;
+    final uid = _intFromDynamic(incoming['user_id']);
+    if (uid == null || uid == _currentUserId) return;
+    final callId = incoming['call_id']?.toString() ?? '';
+    if (callId.isEmpty) return;
+    if (!VoiceCallRing.tryStart(callId)) return;
+    unawaited(_showGroupIncomingCallDialog(incoming));
+  }
+
+  Future<void> _showGroupIncomingCallDialog(Map<String, dynamic> init) async {
+    final callId = init['call_id']?.toString() ?? '';
+    final callerId = _intFromDynamic(init['user_id']);
+    if (callerId == null || _currentUserId == null) return;
+    final startedBy = _intFromDynamic(init['started_by']) ?? callerId;
+    final withVideo = init['video'] == true;
+    final name = (_memberNames[callerId] ?? '').trim();
+    final visibleTitle = _chatTitle.trim().isNotEmpty ? _chatTitle : widget.title;
+    final callerLabel =
+        name.isNotEmpty ? name : 'Участник $callerId';
+
+    await IncomingCallRingtone.instance.start();
+    if (!mounted) {
+      await IncomingCallRingtone.instance.stop();
+      return;
+    }
+    try {
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: AppColors.surface,
+          title: const Text(
+            'Групповой звонок',
+            style: TextStyle(color: AppColors.textPrimary),
+          ),
+          content: Text(
+            '$callerLabel зовёт в звонок «$visibleTitle»',
+            style: const TextStyle(color: AppColors.textSecondary),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                VoiceCallRing.end(callId);
+                Navigator.of(ctx).pop();
+              },
+              child: const Text('Отклонить'),
+            ),
+            TextButton(
+              onPressed: () {
+                VoiceCallRing.end(callId);
+                Navigator.of(ctx).pop();
+                final me = _currentUserId;
+                if (me == null) return;
+                unawaited(
+                  Navigator.of(context).push<void>(
+                    MaterialPageRoute<void>(
+                      builder: (_) => GroupCallScreen(
+                        chatId: widget.chatId,
+                        chatTitle: visibleTitle,
+                        myUserId: me,
+                        callId: callId,
+                        startedByUserId: startedBy,
+                        memberNames: Map<int, String>.from(_memberNames),
+                        existingSocket: _chatSocketService,
+                        isHost: false,
+                        startWithVideo: withVideo,
+                        incomingInvite: init,
+                      ),
+                    ),
+                  ),
+                );
+              },
+              child: const Text('Принять'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      await IncomingCallRingtone.instance.stop();
+    }
+  }
+
   void _handleIncomingCallSignal(Map<String, dynamic> incoming) {
     if (_isGroupChat) return;
     final uid = _intFromDynamic(incoming['user_id']);
@@ -1460,63 +1549,107 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     final callId = incoming['call_id']?.toString() ?? '';
     if (callId.isEmpty) return;
     if (!VoiceCallRing.tryStart(callId)) return;
-    _showIncomingCallDialog(incoming);
+    unawaited(_showIncomingCallDialog(incoming));
   }
 
-  void _showIncomingCallDialog(Map<String, dynamic> init) {
+  Future<void> _showIncomingCallDialog(Map<String, dynamic> init) async {
     final callId = init['call_id']?.toString() ?? '';
     final visibleTitle =
         _chatTitle.trim().isNotEmpty ? _chatTitle : widget.title;
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        title: const Text(
-          'Входящий звонок',
-          style: TextStyle(color: AppColors.textPrimary),
-        ),
-        content: Text(
-          '$visibleTitle звонит вам',
-          style: const TextStyle(color: AppColors.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              VoiceCallRing.end(callId);
-              _chatSocketService.sendJson({
-                'type': 'call_e2e_hangup',
-                'call_id': callId,
-              });
-              Navigator.of(ctx).pop();
-            },
-            child: const Text('Отклонить'),
+    await IncomingCallRingtone.instance.start();
+    if (!mounted) {
+      await IncomingCallRingtone.instance.stop();
+      return;
+    }
+    try {
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: AppColors.surface,
+          title: const Text(
+            'Входящий звонок',
+            style: TextStyle(color: AppColors.textPrimary),
           ),
-          TextButton(
-            onPressed: () {
-              VoiceCallRing.end(callId);
-              Navigator.of(ctx).pop();
-              final peer = _privatePeerUserId();
-              final me = _currentUserId;
-              if (peer == null || me == null) return;
-              unawaited(
-                Navigator.of(context).push<void>(
-                  MaterialPageRoute<void>(
-                    builder: (_) => VoiceCallScreen(
-                      chatId: widget.chatId,
-                      peerTitle: visibleTitle,
-                      peerUserId: peer,
-                      myUserId: me,
-                      existingSocket: _chatSocketService,
-                      incomingInit: init,
+          content: Text(
+            '$visibleTitle звонит вам',
+            style: const TextStyle(color: AppColors.textSecondary),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                VoiceCallRing.end(callId);
+                _chatSocketService.sendJson({
+                  'type': 'call_e2e_hangup',
+                  'call_id': callId,
+                });
+                Navigator.of(ctx).pop();
+              },
+              child: const Text('Отклонить'),
+            ),
+            TextButton(
+              onPressed: () {
+                VoiceCallRing.end(callId);
+                Navigator.of(ctx).pop();
+                final peer = _privatePeerUserId();
+                final me = _currentUserId;
+                if (peer == null || me == null) return;
+                unawaited(
+                  Navigator.of(context).push<void>(
+                    MaterialPageRoute<void>(
+                      builder: (_) => VoiceCallScreen(
+                        chatId: widget.chatId,
+                        peerTitle: visibleTitle,
+                        peerUserId: peer,
+                        myUserId: me,
+                        existingSocket: _chatSocketService,
+                        incomingInit: init,
+                      ),
                     ),
                   ),
-                ),
-              );
-            },
-            child: const Text('Принять'),
-          ),
-        ],
+                );
+              },
+              child: const Text('Принять'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      await IncomingCallRingtone.instance.stop();
+    }
+  }
+
+  Future<void> _startGroupCall() async {
+    if (kIsWeb) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Групповые звонки в браузере пока не поддерживаются'),
+        ),
+      );
+      return;
+    }
+    final me = _currentUserId;
+    if (me == null) return;
+    await _ensureSocketConnected();
+    if (!mounted) return;
+    final callId =
+        '${DateTime.now().microsecondsSinceEpoch}_gc${widget.chatId}_$me';
+    final visibleTitle =
+        _chatTitle.trim().isNotEmpty ? _chatTitle : widget.title;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => GroupCallScreen(
+          chatId: widget.chatId,
+          chatTitle: visibleTitle,
+          myUserId: me,
+          callId: callId,
+          startedByUserId: me,
+          memberNames: Map<int, String>.from(_memberNames),
+          existingSocket: _chatSocketService,
+          isHost: true,
+          startWithVideo: true,
+        ),
       ),
     );
   }
@@ -3672,6 +3805,15 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                         onPressed: _startVoiceCall,
                         icon: const Icon(
                           AppIcons.call,
+                          color: AppColors.accent,
+                        ),
+                      ),
+                    if (_isGroupChat)
+                      IconButton(
+                        tooltip: 'Групповой звонок',
+                        onPressed: _startGroupCall,
+                        icon: const Icon(
+                          Icons.groups,
                           color: AppColors.accent,
                         ),
                       ),

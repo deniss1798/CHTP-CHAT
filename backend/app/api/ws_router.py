@@ -22,6 +22,13 @@ _CALL_SIGNAL_TYPES = frozenset(
         "call_e2e_answer",
         "call_e2e_ice",
         "call_e2e_hangup",
+        # Групповой звонок (mesh): сигналинг идёт через тот же WS, без E2E SDP.
+        "group_call_invite",
+        "group_call_join",
+        "group_call_sdp",
+        "group_call_ice",
+        "group_call_leave",
+        "group_call_end",
     }
 )
 
