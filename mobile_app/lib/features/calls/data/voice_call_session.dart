@@ -2,7 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:cryptography/cryptography.dart';
-import 'package:flutter/foundation.dart' show VoidCallback, kIsWeb;
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, VoidCallback, defaultTargetPlatform, kIsWeb;
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -83,6 +84,11 @@ class VoiceCallSession {
   MediaStream? _cameraStream;
   MediaStreamTrack? _localVideoTrack;
   bool _cameraOn = false;
+
+  /// Один поток на удалённую сторону: при onTrack без streams сначала приходит audio, потом video —
+  /// иначе видео затирается или теряется.
+  MediaStream? _remoteCombinedStream;
+
   final RTCVideoRenderer remoteRenderer = RTCVideoRenderer();
   final RTCVideoRenderer localRenderer = RTCVideoRenderer();
 
@@ -251,13 +257,19 @@ class VoiceCallSession {
 
     pc.onTrack = (RTCTrackEvent e) {
       if (e.streams.isNotEmpty) {
-        remoteRenderer.srcObject = e.streams[0];
-      } else if (e.track.kind == 'audio') {
-        unawaited(_attachRemoteAudioOnlyTrack(e.track));
+        final s = e.streams[0];
+        for (final t in s.getTracks()) {
+          t.enabled = true;
+        }
+        _remoteCombinedStream = s;
+        remoteRenderer.srcObject = s;
+        _attachRemoteVideoUiListeners(s);
+        try {
+          onTracksChanged?.call();
+        } catch (_) {}
+      } else {
+        unawaited(_mergeRemoteTrackWithoutStreams(e.track));
       }
-      try {
-        onTracksChanged?.call();
-      } catch (_) {}
     };
 
     pc.onConnectionState = (RTCPeerConnectionState s) {
@@ -266,6 +278,16 @@ class VoiceCallSession {
         _hadP2PConnected = true;
         _connectedAt ??= DateTime.now();
         onStatus('В эфире');
+        // На desktop переключение «динамик» может обрубить вывод; только Android/iOS.
+        if (!kIsWeb &&
+            (defaultTargetPlatform == TargetPlatform.android ||
+                defaultTargetPlatform == TargetPlatform.iOS)) {
+          unawaited(() async {
+            try {
+              await Helper.setSpeakerphoneOn(true);
+            } catch (_) {}
+          }());
+        }
         return;
       }
       if (s == RTCPeerConnectionState.RTCPeerConnectionStateFailed) {
@@ -288,6 +310,22 @@ class VoiceCallSession {
     try {
       localRenderer.srcObject = stream;
     } catch (_) {}
+  }
+
+  /// Когда собеседник включает/выключает камеру, снова [onTrack] не приходит — дергаем UI.
+  void _attachRemoteVideoUiListeners(MediaStream s) {
+    for (final t in s.getVideoTracks()) {
+      t.onUnMute = () {
+        try {
+          onTracksChanged?.call();
+        } catch (_) {}
+      };
+      t.onMute = () {
+        try {
+          onTracksChanged?.call();
+        } catch (_) {}
+      };
+    }
   }
 
   bool get isCameraOn => _cameraOn;
@@ -425,13 +463,33 @@ class VoiceCallSession {
     } catch (_) {}
   }
 
-  /// На части платформ (в т.ч. Windows) в [RTCTrackEvent.streams] пусто, трек только в [RTCTrackEvent.track].
-  Future<void> _attachRemoteAudioOnlyTrack(MediaStreamTrack track) async {
+  /// На части платформ в [RTCTrackEvent.streams] пусто; дорожки приходят по одной (audio, затем video).
+  Future<void> _mergeRemoteTrackWithoutStreams(MediaStreamTrack track) async {
     if (_ended) return;
+    if (track.kind != 'audio' && track.kind != 'video') return;
     try {
-      final ms = await createLocalMediaStream('remote-audio');
-      await ms.addTrack(track);
-      remoteRenderer.srcObject = ms;
+      track.enabled = true;
+      var ms = _remoteCombinedStream ?? remoteRenderer.srcObject;
+      if (ms == null) {
+        ms = await createLocalMediaStream('remote-$peerUserId');
+        _remoteCombinedStream = ms;
+        remoteRenderer.srcObject = ms;
+      } else {
+        _remoteCombinedStream = ms;
+      }
+      var already = false;
+      for (final t in ms.getTracks()) {
+        if (t.id == track.id) {
+          already = true;
+          break;
+        }
+      }
+      if (!already) {
+        await ms.addTrack(track);
+      }
+      if (track.kind == 'video') {
+        _attachRemoteVideoUiListeners(ms);
+      }
       try {
         onTracksChanged?.call();
       } catch (_) {}
@@ -668,6 +726,7 @@ class VoiceCallSession {
     _pc = null;
 
     try {
+      _remoteCombinedStream = null;
       remoteRenderer.srcObject = null;
     } catch (_) {}
 

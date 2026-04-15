@@ -8,6 +8,7 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_icons.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../chats/data/services/chat_socket_service.dart';
+import '../../../chats/data/services/chats_service.dart';
 import '../../data/group_call_session.dart';
 import '../widgets/call_participant_tile.dart';
 
@@ -52,10 +53,18 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
   int _participantCount = 1;
   bool _micOn = true;
   bool _camOn = false;
+  bool _allowRoutePop = false;
+
+  late Map<int, String> _memberNames;
+  late Map<int, String?> _memberAvatars;
 
   @override
   void initState() {
     super.initState();
+    _memberNames = Map<int, String>.from(widget.memberNames);
+    _memberAvatars = widget.memberAvatarUrls != null
+        ? Map<int, String?>.from(widget.memberAvatarUrls!)
+        : <int, String?>{};
     if (kIsWeb) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
@@ -93,6 +102,20 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
       }
     }
 
+    try {
+      final roster = await ChatsService().loadChatMembersRoster(widget.chatId);
+      if (mounted) {
+        setState(() {
+          for (final e in roster.names.entries) {
+            _memberNames[e.key] = e.value;
+          }
+          for (final e in roster.avatars.entries) {
+            _memberAvatars[e.key] = e.value;
+          }
+        });
+      }
+    } catch (_) {}
+
     final session = GroupCallSession(
       callId: widget.callId,
       chatId: widget.chatId,
@@ -107,7 +130,12 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
         if (mounted) setState(() => _participantCount = n);
       },
       onEnded: () {
-        if (mounted) Navigator.of(context).maybePop();
+        if (!mounted) return;
+        setState(() => _allowRoutePop = true);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          Navigator.of(context).pop();
+        });
       },
       startWithVideo: widget.startWithVideo,
       isHost: widget.isHost,
@@ -145,15 +173,13 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
   }
 
   String _nameFor(int userId) {
-    final n = widget.memberNames[userId];
+    final n = _memberNames[userId];
     if (n != null && n.trim().isNotEmpty) return n.trim();
     return 'Участник $userId';
   }
 
   String? _avatarForUser(int userId) {
-    final m = widget.memberAvatarUrls;
-    if (m == null) return null;
-    return m[userId];
+    return _memberAvatars[userId];
   }
 
   @override
@@ -161,7 +187,7 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
     final session = _session;
 
     return PopScope(
-      canPop: false,
+      canPop: _allowRoutePop,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
         _session?.leave();

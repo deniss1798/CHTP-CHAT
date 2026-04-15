@@ -17,9 +17,11 @@ import '../../../../core/storage/secure_storage_service.dart';
 import '../../../auth/data/services/auth_service.dart';
 import '../../../auth/presentation/screens/auth_screen.dart';
 import '../../../settings/presentation/screens/settings_screen.dart';
+import '../../../../core/push/local_notifications_service.dart';
 import '../../data/services/chats_service.dart';
 import '../../data/services/chat_socket_service.dart';
 import '../../data/services/inbox_socket_service.dart';
+import '../../data/services/local_chat_state_service.dart';
 import '../../../calls/incoming_call_ringtone.dart';
 import '../../../calls/presentation/screens/group_call_screen.dart';
 import '../../../calls/presentation/screens/voice_call_screen.dart';
@@ -71,6 +73,7 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
   Timer? _inboxPingTimer;
 
   final InboxSocketService _inboxSocket = InboxSocketService();
+  final LocalChatStateService _localChatStateService = LocalChatStateService();
   StreamSubscription<Map<String, dynamic>>? _inboxSubscription;
   final Map<int, String> _typingLabelByChatId = {};
   final Map<int, Timer> _typingInboxTimers = {};
@@ -163,8 +166,45 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
 
   void _onInboxMessage(Map<String, dynamic> msg) {
     final t = msg['type']?.toString();
+    if (t == 'inbox_new_message') {
+      final cidRaw = msg['chat_id'];
+      int? chatId;
+      if (cidRaw is int) {
+        chatId = cidRaw;
+      } else {
+        chatId = int.tryParse(cidRaw?.toString() ?? '');
+      }
+      if (chatId != null) {
+        final viewingThis =
+            widget.embedded && widget.selectedChatId == chatId;
+        if (!viewingThis && LocalNotificationsService.supported) {
+          final sender = (msg['sender_name'] ?? '').toString().trim();
+          final preview = (msg['preview'] ?? '').toString().trim();
+          final av = (msg['chat_avatar_url'] ?? '').toString().trim();
+          unawaited(
+            LocalNotificationsService.instance.showChatMessage(
+              notificationId: chatId,
+              title: sender.isNotEmpty ? sender : 'Чат',
+              body: preview.isNotEmpty ? preview : 'Новое сообщение',
+              avatarUrl: av.isNotEmpty ? av : null,
+              chatId: chatId,
+              avatarUrlForOpen: av.isNotEmpty ? av : null,
+            ),
+          );
+        }
+        requestChatsListRefresh();
+      }
+      return;
+    }
     if (t == 'group_call_invite') {
       unawaited(_handleInboxGroupInvite(msg));
+      return;
+    }
+    if (t == 'call_e2e_hangup') {
+      final callId = msg['call_id']?.toString() ?? '';
+      if (callId.isNotEmpty) {
+        VoiceCallRing.dismissIncomingDialog(callId);
+      }
       return;
     }
     if (t == 'call_e2e_init') {
@@ -257,6 +297,40 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
       );
 
       if (!mounted) return;
+
+      final localReads = await _localChatStateService.getAllLastReadMessageIds();
+      for (final c in chats) {
+        final cid = _intFromChatField(c['id']);
+        if (cid == null) continue;
+        final lrLocal = localReads[cid];
+        if (lrLocal != null) {
+          final sr = _intFromChatField(
+                c['my_last_read_message_id'] ?? c['myLastReadMessageId'],
+              ) ??
+              0;
+          if (lrLocal > sr) {
+            c['my_last_read_message_id'] = lrLocal;
+          }
+        }
+        final serverUnread = _parseUnreadRaw(c['unread_count'] ?? c['unreadCount']);
+        final lastId = _intFromChatField(
+          c['last_message_id'] ?? c['lastMessageId'],
+        );
+        final lastSender = _intFromChatField(
+          c['last_message_sender_id'] ?? c['lastMessageSenderId'],
+        );
+        final myRead = _intFromChatField(
+              c['my_last_read_message_id'] ?? c['myLastReadMessageId'],
+            ) ??
+            0;
+        if (serverUnread > 0 &&
+            lastId != null &&
+            lastSender != null &&
+            lastSender != _currentUserId &&
+            myRead >= lastId) {
+          c['unread_count'] = 0;
+        }
+      }
 
       setState(() {
         _allChats = chats;
@@ -598,7 +672,11 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
       await showDialog<void>(
         context: context,
         barrierDismissible: false,
-        builder: (ctx) => AlertDialog(
+        builder: (ctx) {
+          VoiceCallRing.registerIncomingDismiss(callId, () {
+            if (Navigator.of(ctx).canPop()) Navigator.of(ctx).pop();
+          });
+          return AlertDialog(
           backgroundColor: AppColors.surface,
           title: const Text(
             'Входящий звонок',
@@ -650,9 +728,11 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
               child: const Text('Принять'),
             ),
           ],
-        ),
+        );
+        },
       );
     } finally {
+      VoiceCallRing.unregisterIncomingDismiss(callId);
       await IncomingCallRingtone.instance.stop();
     }
   }

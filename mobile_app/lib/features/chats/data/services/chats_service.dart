@@ -159,6 +159,48 @@ class ChatsService {
     );
   }
 
+  /// Имена и аватары участников (для UI группового звонка, если список не был загружен в чате).
+  Future<({Map<int, String> names, Map<int, String?> avatars})>
+      loadChatMembersRoster(int chatId) async {
+    final token = await SecureStorageService.getAccessToken();
+    if (token == null || token.isEmpty) {
+      throw Exception('Токен не найден');
+    }
+    final response = await _dio.get(
+      '/chats/$chatId/members',
+      options: Options(
+        headers: {'Authorization': 'Bearer $token'},
+      ),
+    );
+    final names = <int, String>{};
+    final avatars = <int, String?>{};
+    final data = response.data;
+    if (data is List) {
+      for (final item in data) {
+        if (item is! Map) continue;
+        final map = Map<String, dynamic>.from(item);
+        final rawId = map['id'];
+        int? userId;
+        if (rawId is int) {
+          userId = rawId;
+        } else {
+          userId = int.tryParse(rawId?.toString() ?? '');
+        }
+        if (userId == null) continue;
+        final username = (map['username'] ?? '').toString().trim();
+        names[userId] =
+            username.isNotEmpty ? username : 'Участник $userId';
+        final rawAvatar = (map['avatar_url'] ?? map['avatarUrl'] ?? '')
+            .toString()
+            .trim();
+        avatars[userId] = UrlHelper.absoluteMediaUrl(
+          rawAvatar.isNotEmpty ? rawAvatar : null,
+        );
+      }
+    }
+    return (names: names, avatars: avatars);
+  }
+
   Future<void> removeGroupMember({
     required int chatId,
     required int memberUserId,

@@ -7,6 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
@@ -1361,6 +1362,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       _handleGroupCallInvite(incoming);
       return;
     }
+    if (incoming['type'] == 'call_e2e_hangup') {
+      _handleIncomingCallHangup(incoming);
+      return;
+    }
     if (incoming['type'] == 'call_e2e_init') {
       _handleIncomingCallSignal(incoming);
       return;
@@ -1543,6 +1548,17 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     }
   }
 
+  void _handleIncomingCallHangup(Map<String, dynamic> incoming) {
+    if (_isGroupChat) return;
+    final uid = _intFromDynamic(incoming['user_id']);
+    if (uid == null || uid == _currentUserId) return;
+    final peer = _privatePeerUserId();
+    if (peer != null && peer != uid) return;
+    final callId = incoming['call_id']?.toString() ?? '';
+    if (callId.isEmpty) return;
+    VoiceCallRing.dismissIncomingDialog(callId);
+  }
+
   void _handleIncomingCallSignal(Map<String, dynamic> incoming) {
     if (_isGroupChat) return;
     final uid = _intFromDynamic(incoming['user_id']);
@@ -1569,7 +1585,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       await showDialog<void>(
         context: context,
         barrierDismissible: false,
-        builder: (ctx) => AlertDialog(
+        builder: (ctx) {
+          VoiceCallRing.registerIncomingDismiss(callId, () {
+            if (Navigator.of(ctx).canPop()) Navigator.of(ctx).pop();
+          });
+          return AlertDialog(
           backgroundColor: AppColors.surface,
           title: const Text(
             'Входящий звонок',
@@ -1620,9 +1640,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               child: const Text('Принять'),
             ),
           ],
-        ),
+        );
+        },
       );
     } finally {
+      VoiceCallRing.unregisterIncomingDismiss(callId);
       await IncomingCallRingtone.instance.stop();
     }
   }
@@ -3070,13 +3092,30 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       );
     }
 
-    return Text(
-  (message['text'] ?? '').toString(),
-  style: TextStyle(
-        color: isMine ? AppColors.textPrimary : AppColors.textPrimary,
-        fontSize: 15,
-        fontWeight: FontWeight.w600,
-        height: 1.35,
+    final plain = (message['text'] ?? '').toString();
+    final baseStyle = TextStyle(
+      color: isMine ? AppColors.textPrimary : AppColors.textPrimary,
+      fontSize: 15,
+      fontWeight: FontWeight.w600,
+      height: 1.35,
+    );
+    return SelectionArea(
+      child: SelectableLinkify(
+        onOpen: (link) async {
+          final uri = Uri.tryParse(link.url);
+          if (uri == null) return;
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          }
+        },
+        text: plain,
+        style: baseStyle,
+        linkStyle: baseStyle.copyWith(
+          color: AppColors.accentBright,
+          fontWeight: FontWeight.w700,
+          decoration: TextDecoration.underline,
+          decorationColor: AppColors.accentBright.withAlpha(200),
+        ),
       ),
     );
   }

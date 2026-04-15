@@ -64,6 +64,33 @@ def _avatar_url_for_token(
     return ctx.default_url
 
 
+def build_inbox_new_message_event(
+    db: Session,
+    *,
+    chat_id: int,
+    recipient_user_id: int,
+    sender_name: str,
+    preview: str,
+) -> dict[str, str]:
+    """Событие для /ws/inbox: десктоп и локальные уведомления без FCM."""
+    avatar_ctx = _build_push_avatar_context(db, chat_id)
+    avatar_url = ""
+    if avatar_ctx is not None:
+        raw = _avatar_url_for_token(avatar_ctx, recipient_user_id)
+        if raw and str(raw).strip():
+            avatar_url = str(raw).strip()
+    body = (preview or "").strip()
+    if len(body) > 240:
+        body = body[:240]
+    return {
+        "type": "inbox_new_message",
+        "chat_id": str(chat_id),
+        "sender_name": sender_name,
+        "preview": body or "Новое сообщение",
+        "chat_avatar_url": avatar_url,
+    }
+
+
 def send_chat_message_push(
     db: Session,
     *,
@@ -115,7 +142,11 @@ def send_chat_message_push(
             if avatar_url:
                 android_cfg = messaging.AndroidConfig(
                     priority="high",
-                    notification=messaging.AndroidNotification(image=avatar_url),
+                    notification=messaging.AndroidNotification(
+                        title=sender_name,
+                        body=body,
+                        image=avatar_url,
+                    ),
                 )
 
             if avatar_url:

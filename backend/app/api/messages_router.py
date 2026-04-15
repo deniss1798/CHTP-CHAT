@@ -7,8 +7,8 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_user
-from app.core.push_service import send_chat_message_push
-from app.core.ws_manager import manager
+from app.core.push_service import build_inbox_new_message_event, send_chat_message_push
+from app.core.ws_manager import inbox_manager, manager
 from app.db.database import get_db
 from app.models.chat_member import ChatMember
 from app.models.message import Message
@@ -65,6 +65,48 @@ ALLOWED_DOCUMENT_EXTENSIONS: dict[str, str] = {
 }
 
 PRIVATE_MEDIA_MESSAGE_TYPES = frozenset({"image", "video", "video_note", "document"})
+
+
+async def _notify_inbox_new_message(
+    db: Session,
+    *,
+    chat_id: int,
+    sender_name: str,
+    preview: str,
+    recipient_user_ids: list[int],
+) -> None:
+    if not recipient_user_ids:
+        return
+    for uid in recipient_user_ids:
+        payload = build_inbox_new_message_event(
+            db,
+            chat_id=chat_id,
+            recipient_user_id=uid,
+            sender_name=sender_name,
+            preview=preview,
+        )
+        await inbox_manager.send_json(uid, payload)
+
+
+def _repoint_last_read_before_message_delete(
+    db: Session, chat_id: int, deleted_message_id: int
+) -> None:
+    """Иначе при SET NULL на FK счётчик непрочитанных считает все сообщения заново."""
+    prev = (
+        db.query(Message.id)
+        .filter(Message.chat_id == chat_id, Message.id < deleted_message_id)
+        .order_by(Message.id.desc())
+        .first()
+    )
+    new_lr = prev[0] if prev else None
+    (
+        db.query(ChatMember)
+        .filter(
+            ChatMember.chat_id == chat_id,
+            ChatMember.last_read_message_id == deleted_message_id,
+        )
+        .update({ChatMember.last_read_message_id: new_lr}, synchronize_session=False)
+    )
 
 
 def _make_s3_getter(
@@ -392,6 +434,17 @@ async def send_message(
     except Exception as e:
         print(f"Push sending skipped: {e}")
 
+    try:
+        await _notify_inbox_new_message(
+            db,
+            chat_id=new_message.chat_id,
+            sender_name=sender_name,
+            preview=new_message.text or "",
+            recipient_user_ids=recipient_user_ids,
+        )
+    except Exception as e:
+        print(f"Inbox notify skipped: {e}")
+
     return _message_to_response(new_message, db, viewer_user_id=current_user.id)
 
 
@@ -496,16 +549,28 @@ async def forward_message_endpoint(
         if row.user_id != current_user.id
     ]
 
+    preview = _push_preview_for_message(new_message)
     try:
         send_chat_message_push(
             db=db,
             chat_id=new_message.chat_id,
             sender_name=current_user.username,
             recipient_user_ids=recipient_user_ids,
-            message_text=_push_preview_for_message(new_message),
+            message_text=preview,
         )
     except Exception as e:
         print(f"Push sending skipped: {e}")
+
+    try:
+        await _notify_inbox_new_message(
+            db,
+            chat_id=new_message.chat_id,
+            sender_name=current_user.username,
+            preview=preview,
+            recipient_user_ids=recipient_user_ids,
+        )
+    except Exception as e:
+        print(f"Inbox notify skipped: {e}")
 
     return _message_to_response(new_message, db, viewer_user_id=current_user.id)
 
@@ -611,6 +676,17 @@ async def send_photo_message(
         )
     except Exception as e:
         print(f"Push sending skipped: {e}")
+
+    try:
+        await _notify_inbox_new_message(
+            db,
+            chat_id=new_message.chat_id,
+            sender_name=sender_name,
+            preview="📷 Фото",
+            recipient_user_ids=recipient_user_ids,
+        )
+    except Exception as e:
+        print(f"Inbox notify skipped: {e}")
 
     return _message_to_response(new_message, db, viewer_user_id=current_user.id)
 
@@ -739,6 +815,17 @@ async def send_video_message(
         )
     except Exception as e:
         print(f"Push sending skipped: {e}")
+
+    try:
+        await _notify_inbox_new_message(
+            db,
+            chat_id=new_message.chat_id,
+            sender_name=sender_name,
+            preview="🎥 Видео",
+            recipient_user_ids=recipient_user_ids,
+        )
+    except Exception as e:
+        print(f"Inbox notify skipped: {e}")
 
     return _message_to_response(new_message, db, viewer_user_id=current_user.id)
 
@@ -869,6 +956,17 @@ async def send_video_note_message(
     except Exception as e:
         print(f"Push sending skipped: {e}")
 
+    try:
+        await _notify_inbox_new_message(
+            db,
+            chat_id=new_message.chat_id,
+            sender_name=sender_name,
+            preview="🎬 Видеосообщение",
+            recipient_user_ids=recipient_user_ids,
+        )
+    except Exception as e:
+        print(f"Inbox notify skipped: {e}")
+
     return _message_to_response(new_message, db, viewer_user_id=current_user.id)
 
 
@@ -970,6 +1068,17 @@ async def send_document_message(
     except Exception as e:
         print(f"Push sending skipped: {e}")
 
+    try:
+        await _notify_inbox_new_message(
+            db,
+            chat_id=new_message.chat_id,
+            sender_name=sender_name,
+            preview=preview,
+            recipient_user_ids=recipient_user_ids,
+        )
+    except Exception as e:
+        print(f"Inbox notify skipped: {e}")
+
     return _message_to_response(new_message, db, viewer_user_id=current_user.id)
 
 
@@ -1043,6 +1152,7 @@ async def delete_message(
         message.media_key if message.message_type in PRIVATE_MEDIA_MESSAGE_TYPES else None
     )
 
+    _repoint_last_read_before_message_delete(db, chat_id, message.id)
     db.delete(message)
     db.commit()
 

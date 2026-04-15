@@ -1,13 +1,15 @@
+import 'dart:async';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform, kIsWeb;
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 
 import 'app/app.dart';
-import 'app/desktop_chat_session.dart';
 import 'core/notifiers/chats_list_refresh_notifier.dart';
-import 'core/platform/desktop_layout.dart';
-import 'features/chats/presentation/screens/chat_detail_screen.dart';
+import 'core/push/local_notifications_service.dart';
+import 'core/push/open_chat_from_push.dart';
 import 'firebase_options.dart';
 
 bool get _firebasePushSupported {
@@ -35,6 +37,10 @@ Future<void> main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  if (LocalNotificationsService.supported) {
+    await LocalNotificationsService.instance.init();
+  }
 
   if (_firebasePushSupported) {
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
@@ -78,13 +84,38 @@ Future<void> _initPush() async {
     print('Foreground message body: ${message.notification?.body}');
     print('Foreground message data: ${message.data}');
     requestChatsListRefresh();
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      final data = message.data;
+      final chatId = _extractChatId(data);
+      if (chatId != null) {
+        final n = message.notification;
+        final titleRaw = (n?.title ?? '').trim();
+        final bodyRaw = (n?.body ?? '').trim();
+        final title = titleRaw.isNotEmpty
+            ? n!.title!
+            : (data['sender_name']?.toString() ?? 'Чат');
+        final body =
+            bodyRaw.isNotEmpty ? n!.body! : 'Новое сообщение';
+        final av = _extractChatAvatarUrl(data);
+        unawaited(
+          LocalNotificationsService.instance.showChatMessage(
+            notificationId: chatId,
+            title: title,
+            body: body,
+            avatarUrl: av,
+            chatId: chatId,
+            avatarUrlForOpen: av,
+          ),
+        );
+      }
+    }
   });
 
   FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
     print('Opened from push: ${message.data}');
     final payload = _pendingPushFromMessageData(message.data);
     if (payload != null) {
-      _openChat(payload);
+      openChatFromPushPayload(payload);
     }
   });
 }
@@ -108,31 +139,5 @@ PendingPushPayload? _pendingPushFromMessageData(Map<String, dynamic> data) {
   return PendingPushPayload(
     chatId: chatId,
     avatarUrl: _extractChatAvatarUrl(data),
-  );
-}
-
-void _openChat(PendingPushPayload payload) {
-  final navigator = appNavigatorKey.currentState;
-  if (navigator == null) return;
-
-  if (isDesktopMessengerLayout) {
-    desktopChatOpenRequest.value = DesktopChatOpenRequest(
-      chatId: payload.chatId,
-      title: 'Чат',
-      chatType: 'private',
-      avatarUrl: payload.avatarUrl,
-    );
-    return;
-  }
-
-  navigator.push(
-    MaterialPageRoute(
-      builder: (_) => ChatDetailScreen(
-        chatId: payload.chatId,
-        title: 'Чат',
-        chatType: 'private',
-        avatarUrl: payload.avatarUrl,
-      ),
-    ),
   );
 }

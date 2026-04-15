@@ -45,7 +45,33 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
   String _status = '…';
   bool _micOn = true;
   bool _camOn = false;
+
+  /// После завершения звонка нужно временно разрешить pop — иначе [PopScope](canPop: false) блокирует [Navigator.pop].
+  bool _allowRoutePop = false;
+  DateTime? _lastTrackUiBump;
+  Timer? _remoteVideoUiPoll;
+  bool? _lastRemoteVideoLive;
   final MessagesService _messagesService = MessagesService();
+
+  void _startRemoteVideoUiPoll() {
+    _remoteVideoUiPoll?.cancel();
+    _lastRemoteVideoLive = null;
+    _remoteVideoUiPoll = Timer.periodic(const Duration(milliseconds: 400), (_) {
+      if (!mounted) return;
+      final s = _session;
+      if (s == null) return;
+      final live =
+          CallParticipantTile.rendererHasLiveVideo(s.remoteRenderer);
+      if (_lastRemoteVideoLive == live) return;
+      _lastRemoteVideoLive = live;
+      setState(() {});
+    });
+  }
+
+  void _stopRemoteVideoUiPoll() {
+    _remoteVideoUiPoll?.cancel();
+    _remoteVideoUiPoll = null;
+  }
 
   @override
   void initState() {
@@ -111,7 +137,12 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
         if (mounted) setState(() => _status = s);
       },
       onEnded: () {
-        if (mounted) Navigator.of(context).maybePop();
+        if (!mounted) return;
+        setState(() => _allowRoutePop = true);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          Navigator.of(context).pop();
+        });
       },
       isCaller: !isCallee,
       remoteCallerPubB64: incoming?['ephem_pub_b64']?.toString(),
@@ -124,7 +155,15 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
         );
       },
       onTracksChanged: () {
-        if (mounted) setState(() {});
+        if (!mounted) return;
+        final now = DateTime.now();
+        if (_lastTrackUiBump != null &&
+            now.difference(_lastTrackUiBump!) <
+                const Duration(milliseconds: 300)) {
+          return;
+        }
+        _lastTrackUiBump = now;
+        setState(() {});
       },
     );
 
@@ -142,6 +181,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
     });
 
     await session.run();
+    if (mounted) _startRemoteVideoUiPoll();
   }
 
   String _newCallId() {
@@ -150,6 +190,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
 
   @override
   void dispose() {
+    _stopRemoteVideoUiPoll();
     final s = _session;
     unawaited(s?.dispose() ?? Future<void>.value());
     VoiceCallSession.release();
@@ -164,7 +205,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
     final session = _session;
 
     return PopScope(
-      canPop: false,
+      canPop: _allowRoutePop,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
         _session?.hangUp();

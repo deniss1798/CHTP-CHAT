@@ -43,6 +43,20 @@ class LocalChatStateService {
     return int.tryParse(value.toString());
   }
 
+  /// Одно чтение хранилища для слияния с ответом API (список чатов).
+  Future<Map<int, int>> getAllLastReadMessageIds() async {
+    final map = await _readMap();
+    final out = <int, int>{};
+    for (final e in map.entries) {
+      final id = int.tryParse(e.key);
+      if (id == null) continue;
+      final v = e.value;
+      final mid = v is int ? v : int.tryParse(v.toString());
+      if (mid != null) out[id] = mid;
+    }
+    return out;
+  }
+
   Future<void> markChatAsRead({
     required int chatId,
     required int? lastMessageId,

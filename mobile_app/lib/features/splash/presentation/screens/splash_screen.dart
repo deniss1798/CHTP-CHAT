@@ -2,15 +2,13 @@ import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart';
 import '../../../../app/app.dart';
-import '../../../../app/desktop_chat_session.dart';
 import '../../../../app/home_chats_route.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/widgets/app_screen_background.dart';
+import '../../../../core/push/open_chat_from_push.dart';
 import '../../../../core/storage/secure_storage_service.dart';
 import '../../../auth/data/services/auth_service.dart';
 import '../../../auth/presentation/screens/auth_screen.dart';
-import '../../../../core/platform/desktop_layout.dart';
-import '../../../chats/presentation/screens/chat_detail_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -48,35 +46,13 @@ class _SplashScreenState extends State<SplashScreen> {
         MaterialPageRoute(builder: (_) => buildHomeChatsScreen()),
       );
 
-      if (pendingPush != null) {
-        void openChatFromPush() {
-          if (isDesktopMessengerLayout) {
-            desktopChatOpenRequest.value = DesktopChatOpenRequest(
-              chatId: pendingPush.chatId,
-              title: 'Чат',
-              chatType: 'private',
-              avatarUrl: pendingPush.avatarUrl,
-            );
-            return;
-          }
-
-          final navigator = appNavigatorKey.currentState;
-          if (navigator == null) return;
-
-          navigator.push(
-            MaterialPageRoute(
-              builder: (_) => ChatDetailScreen(
-                chatId: pendingPush.chatId,
-                title: 'Чат',
-                chatType: 'private',
-                avatarUrl: pendingPush.avatarUrl,
-              ),
-            ),
-          );
-        }
-
+      final push = pendingPush;
+      if (push != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          Future<void>.delayed(const Duration(milliseconds: 120), openChatFromPush);
+          Future<void>.delayed(
+            const Duration(milliseconds: 120),
+            () => openChatFromPushPayload(push),
+          );
         });
       }
     } else {

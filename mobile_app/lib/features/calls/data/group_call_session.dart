@@ -1,6 +1,7 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show VoidCallback, ValueNotifier, kIsWeb;
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, VoidCallback, ValueNotifier, defaultTargetPlatform, kIsWeb;
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -27,6 +28,9 @@ class _MeshPeer {
   final List<RTCIceCandidate> pendingIce = [];
   RTCVideoRenderer? renderer;
   bool iStartedNegotiation = false;
+
+  /// Один поток на участника: при отдельных onTrack не затираем аудио видео.
+  MediaStream? remoteMediaStream;
 }
 
 /// Групповой звонок (mesh): отдельный P2P с каждым участником. Сигналинг — по тому же WebSocket (без E2E SDP).
@@ -94,6 +98,7 @@ class GroupCallSession {
 
   bool _ended = false;
   bool _cameraOn = false;
+  bool _speakerphoneSet = false;
 
   bool get cameraOn => _cameraOn;
 
@@ -155,6 +160,9 @@ class GroupCallSession {
     }
 
     _emitParticipantCount();
+    if (!_ended) {
+      onStatus('В эфире');
+    }
   }
 
   Future<void> _openLocal() async {
@@ -257,6 +265,7 @@ class GroupCallSession {
       pc.onTrack = (RTCTrackEvent e) {
         unawaited(_onRemoteTrack(peerId, e));
       };
+      _wireMeshPeerConnection(peerId, pc);
 
       await _addLocalToPc(pc);
 
@@ -276,16 +285,49 @@ class GroupCallSession {
 
   Future<void> _onRemoteTrack(int userId, RTCTrackEvent e) async {
     final r = await _rendererFor(userId);
+    final rec = _ensurePeerRecord(userId);
+
     if (e.streams.isNotEmpty) {
-      r.srcObject = e.streams.first;
+      final s = e.streams.first;
+      for (final t in s.getTracks()) {
+        if (t.kind == 'audio') {
+          t.enabled = true;
+        }
+      }
+      r.srcObject = s;
+      rec.remoteMediaStream = s;
+      _attachRemoteVideoListenersForMeshPeer(s);
     } else if (e.track.kind == 'video' || e.track.kind == 'audio') {
+      e.track.enabled = true;
       try {
-        final ms = await createLocalMediaStream('remote-$userId');
-        await ms.addTrack(e.track);
-        r.srcObject = ms;
+        MediaStream? ms = rec.remoteMediaStream ?? r.srcObject;
+        if (ms == null) {
+          ms = await createLocalMediaStream('remote-$userId');
+          rec.remoteMediaStream = ms;
+          r.srcObject = ms;
+        }
+        var already = false;
+        for (final t in ms.getTracks()) {
+          if (t.id == e.track.id) {
+            already = true;
+            break;
+          }
+        }
+        if (!already) {
+          await ms.addTrack(e.track);
+        }
+        _attachRemoteVideoListenersForMeshPeer(ms);
       } catch (_) {}
     }
     _bumpUi();
+  }
+
+  /// Включение камеры у участника не даёт новый onTrack — обновляем сетку.
+  void _attachRemoteVideoListenersForMeshPeer(MediaStream s) {
+    for (final t in s.getVideoTracks()) {
+      t.onUnMute = () => _bumpUi();
+      t.onMute = () => _bumpUi();
+    }
   }
 
   void _sendSdp(int toUserId, String sdp, String sdpType) {
@@ -444,9 +486,34 @@ class GroupCallSession {
       await rec.pc?.close();
     } catch (_) {}
     rec.pc = null;
+    rec.remoteMediaStream = null;
     rec.iStartedNegotiation = false;
     rec.remoteDescriptionSet = false;
     rec.pendingIce.clear();
+  }
+
+  void _ensureSpeakerphoneOnce() {
+    if (_speakerphoneSet || _ended) return;
+    if (kIsWeb) return;
+    if (defaultTargetPlatform != TargetPlatform.android &&
+        defaultTargetPlatform != TargetPlatform.iOS) {
+      return;
+    }
+    _speakerphoneSet = true;
+    unawaited(() async {
+      try {
+        await Helper.setSpeakerphoneOn(true);
+      } catch (_) {}
+    }());
+  }
+
+  void _wireMeshPeerConnection(int peerId, RTCPeerConnection pc) {
+    pc.onConnectionState = (RTCPeerConnectionState s) {
+      if (_ended) return;
+      if (s == RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
+        _ensureSpeakerphoneOnce();
+      }
+    };
   }
 
   Future<void> _applyRemoteOffer(
@@ -500,6 +567,7 @@ class GroupCallSession {
       newPc.onTrack = (RTCTrackEvent e) {
         unawaited(_onRemoteTrack(from, e));
       };
+      _wireMeshPeerConnection(from, newPc);
 
       await _addLocalToPc(newPc);
       await newPc.setRemoteDescription(RTCSessionDescription(sdp, typ));
@@ -579,6 +647,9 @@ class GroupCallSession {
   Future<void> _removePeer(int userId) async {
     final rec = _peers.remove(userId);
     _remoteUserIds.remove(userId);
+    if (rec != null) {
+      rec.remoteMediaStream = null;
+    }
     try {
       await rec?.pc?.close();
     } catch (_) {}

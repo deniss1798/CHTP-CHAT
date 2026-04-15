@@ -43,6 +43,11 @@ class CallParticipantTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasFrame = showVideo && rendererHasLiveVideo(renderer);
 
+    /// Один [RTCVideoView] на [renderer], иначе при переключении «аудио+аватар» ↔ «видео»
+    /// Flutter снимает один виджет и создаёт другой — аудио обрывается (особенно desktop).
+    final showRenderer =
+        attachHiddenVideoSurface || hasFrame || showVideo;
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
       child: Stack(
@@ -53,24 +58,24 @@ class CallParticipantTile extends StatelessWidget {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                if (!hasFrame && attachHiddenVideoSurface)
-                  Opacity(
-                    opacity: 0,
-                    child: RTCVideoView(
-                      renderer,
-                      mirror: mirror,
-                      objectFit:
-                          RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                if (showRenderer)
+                  Positioned.fill(
+                    child: Opacity(
+                      opacity: hasFrame ? 1.0 : 0.02,
+                      child: RTCVideoView(
+                        renderer,
+                        mirror: mirror,
+                        objectFit:
+                            RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                      ),
                     ),
                   ),
-                if (hasFrame)
-                  RTCVideoView(
-                    renderer,
-                    mirror: mirror,
-                    objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
-                  )
-                else
-                  _buildAvatarPlace(context),
+                if (!hasFrame)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: Center(child: _buildAvatarPlace(context)),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -104,21 +109,94 @@ class CallParticipantTile extends StatelessWidget {
 
   Widget _buildAvatarPlace(BuildContext context) {
     final u = avatarUrl?.trim();
+    const size = 88.0;
+    if (u == null || u.isEmpty) {
+      return Center(child: _avatarInitialFallback(size));
+    }
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    final cachePx = (size * dpr).round();
     return Center(
-      child: CircleAvatar(
-        radius: 44,
-        backgroundColor: AppColors.accent.withValues(alpha: 0.35),
-        backgroundImage: (u != null && u.isNotEmpty) ? NetworkImage(u) : null,
-        child: (u == null || u.isEmpty)
-            ? Text(
-                _initial,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 32,
-                  fontWeight: FontWeight.w700,
+      child: RepaintBoundary(
+        child: ClipOval(
+          child: Image.network(
+            u,
+            key: ValueKey<String>(u),
+            width: size,
+            height: size,
+            fit: BoxFit.cover,
+            gaplessPlayback: true,
+            filterQuality: FilterQuality.medium,
+            cacheWidth: cachePx,
+            cacheHeight: cachePx,
+            headers: const {
+              'User-Agent': 'CHTP-Chat/1.0 (Flutter; avatar)',
+              'Accept': 'image/*,*/*;q=0.8',
+            },
+            errorBuilder: (context, error, stackTrace) =>
+                _avatarInitialFallback(size),
+            loadingBuilder: (context, child, progress) {
+              if (progress == null) return child;
+              return Container(
+                width: size,
+                height: size,
+                color: AppColors.surfaceSoft.withValues(alpha: 0.55),
+                alignment: Alignment.center,
+                child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.accent,
+                    value: progress.expectedTotalBytes != null &&
+                            progress.expectedTotalBytes! > 0
+                        ? progress.cumulativeBytesLoaded /
+                            progress.expectedTotalBytes!
+                        : null,
+                  ),
                 ),
-              )
-            : null,
+              );
+            },
+            frameBuilder: (context, child, frame, wasSync) {
+              if (wasSync || frame != null) {
+                return child;
+              }
+              return Container(
+                width: size,
+                height: size,
+                color: AppColors.surfaceSoft.withValues(alpha: 0.35),
+                alignment: Alignment.center,
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.accent.withValues(alpha: 0.85),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _avatarInitialFallback(double size) {
+    return Container(
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: AppColors.accent.withValues(alpha: 0.35),
+      ),
+      child: Text(
+        _initial,
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: size * 0.36,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
