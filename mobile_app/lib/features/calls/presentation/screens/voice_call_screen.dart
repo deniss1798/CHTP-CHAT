@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_icons.dart';
@@ -10,6 +9,7 @@ import '../../../../core/network/api_client.dart';
 import '../../../chats/data/services/chat_socket_service.dart';
 import '../../../chats/data/services/messages_service.dart';
 import '../../data/voice_call_session.dart';
+import '../widgets/call_participant_tile.dart';
 
 /// Голосовой звонок 1:1: WebRTC (DTLS-SRTP) + зашифрованный сигналинг (X25519 + AES-GCM).
 class VoiceCallScreen extends StatefulWidget {
@@ -21,6 +21,8 @@ class VoiceCallScreen extends StatefulWidget {
     required this.myUserId,
     this.existingSocket,
     this.incomingInit,
+    this.peerAvatarUrl,
+    this.myAvatarUrl,
   });
 
   final int chatId;
@@ -29,6 +31,8 @@ class VoiceCallScreen extends StatefulWidget {
   final int myUserId;
   final ChatSocketService? existingSocket;
   final Map<String, dynamic>? incomingInit;
+  final String? peerAvatarUrl;
+  final String? myAvatarUrl;
 
   @override
   State<VoiceCallScreen> createState() => _VoiceCallScreenState();
@@ -119,6 +123,9 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
               ),
         );
       },
+      onTracksChanged: () {
+        if (mounted) setState(() {});
+      },
     );
 
     if (!VoiceCallSession.tryAcquire(session)) {
@@ -156,181 +163,158 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
   Widget build(BuildContext context) {
     final session = _session;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            if (session != null)
-              RTCVideoView(
-                session.remoteRenderer,
-                mirror: false,
-                objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
-              )
-            else
-              const ColoredBox(color: AppColors.background),
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.black.withValues(alpha: 0.55),
-                      Colors.transparent,
-                      Colors.black.withValues(alpha: 0.65),
-                    ],
-                    stops: const [0, 0.35, 1],
-                  ),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                children: [
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: IconButton(
-                      onPressed: () {
-                        session?.hangUp();
-                      },
-                      icon:
-                          const Icon(AppIcons.close, color: AppColors.textMuted),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        _session?.hangUp();
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 4, 16, 0),
+                child: Row(
+                  children: [
+                    IconButton(
+                      onPressed: () => session?.hangUp(),
+                      icon: const Icon(
+                        AppIcons.close,
+                        color: AppColors.textMuted,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    widget.peerTitle,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    _status,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Аудио: DTLS-SRTP. Сигналинг: X25519 + AES-GCM.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: AppColors.textMuted,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const Spacer(),
-                  if (session != null && _camOn)
-                    Align(
-                      alignment: Alignment.bottomRight,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(14),
-                        child: Container(
-                          width: 110,
-                          height: 160,
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.35),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.18),
+                    Expanded(
+                      child: Column(
+                        children: [
+                          Text(
+                            widget.peerTitle,
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
-                          child: RTCVideoView(
-                            session.localRenderer,
-                            mirror: true,
-                            objectFit: RTCVideoViewObjectFit
-                                .RTCVideoViewObjectFitCover,
+                          const SizedBox(height: 4),
+                          Text(
+                            _status,
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
-                        ),
+                        ],
                       ),
                     ),
-                  const SizedBox(height: 18),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      IconButton.filled(
-                        style: IconButton.styleFrom(
-                          backgroundColor: AppColors.surfaceSoft,
-                          foregroundColor: AppColors.textPrimary,
-                        ),
-                        onPressed: session == null
-                            ? null
-                            : () {
-                                setState(() {
-                                  _micOn = !_micOn;
-                                  session.setMicEnabled(_micOn);
-                                });
-                              },
-                        icon: Icon(_micOn ? AppIcons.mic : AppIcons.micOff),
-                      ),
-                      const SizedBox(width: 16),
-                      IconButton.filled(
-                        style: IconButton.styleFrom(
-                          backgroundColor: AppColors.surfaceSoft,
-                          foregroundColor: AppColors.textPrimary,
-                        ),
-                        onPressed: session == null
-                            ? null
-                            : () async {
-                                final next = !_camOn;
-                                setState(() => _camOn = next);
-                                await session.setCameraEnabled(next);
-                                if (mounted) {
-                                  setState(() => _camOn = session.isCameraOn);
-                                }
-                              },
-                        icon: Icon(_camOn ? Icons.videocam : Icons.videocam_off),
-                      ),
-                      const SizedBox(width: 16),
-                      IconButton.filled(
-                        style: IconButton.styleFrom(
-                          backgroundColor: AppColors.surfaceSoft,
-                          foregroundColor: AppColors.textPrimary,
-                        ),
-                        onPressed: (session == null || !_camOn)
-                            ? null
-                            : () => session.switchCamera(),
-                        icon: const Icon(Icons.cameraswitch),
-                      ),
-                      const SizedBox(width: 16),
-                      IconButton.filled(
-                        style: IconButton.styleFrom(
-                          backgroundColor: Colors.red.shade700,
-                          foregroundColor: Colors.white,
-                        ),
-                        onPressed: session == null ? null : () => session.hangUp(),
-                        icon: const Icon(AppIcons.callEnd),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  // На десктопе слишком малый виджет иногда глушит воспроизведение удалённого аудио.
-                  if (session != null)
-                    Opacity(
-                      opacity: 0,
-                      child: SizedBox(
-                        width: 64,
-                        height: 64,
-                        child: RTCVideoView(
-                          session.remoteRenderer,
-                          mirror: false,
-                        ),
-                      ),
-                    ),
-                ],
+                    const SizedBox(width: 48),
+                  ],
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 8),
+              Expanded(
+                child: session == null
+                    ? const ColoredBox(color: AppColors.background)
+                    : Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(
+                              child: CallParticipantTile(
+                                label: 'Вы',
+                                renderer: session.localRenderer,
+                                avatarUrl: widget.myAvatarUrl,
+                                showVideo: _camOn,
+                                mirror: true,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: CallParticipantTile(
+                                label: widget.peerTitle,
+                                renderer: session.remoteRenderer,
+                                avatarUrl: widget.peerAvatarUrl,
+                                showVideo: true,
+                                mirror: false,
+                                attachHiddenVideoSurface: true,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconButton.filled(
+                      style: IconButton.styleFrom(
+                        backgroundColor: AppColors.surfaceSoft,
+                        foregroundColor: AppColors.textPrimary,
+                      ),
+                      onPressed: session == null
+                          ? null
+                          : () {
+                              setState(() {
+                                _micOn = !_micOn;
+                                session.setMicEnabled(_micOn);
+                              });
+                            },
+                      icon: Icon(_micOn ? AppIcons.mic : AppIcons.micOff),
+                    ),
+                    const SizedBox(width: 16),
+                    IconButton.filled(
+                      style: IconButton.styleFrom(
+                        backgroundColor: AppColors.surfaceSoft,
+                        foregroundColor: AppColors.textPrimary,
+                      ),
+                      onPressed: session == null
+                          ? null
+                          : () async {
+                              final next = !_camOn;
+                              setState(() => _camOn = next);
+                              await session.setCameraEnabled(next);
+                              if (mounted) {
+                                setState(() => _camOn = session.isCameraOn);
+                              }
+                            },
+                      icon: Icon(_camOn ? Icons.videocam : Icons.videocam_off),
+                    ),
+                    const SizedBox(width: 16),
+                    IconButton.filled(
+                      style: IconButton.styleFrom(
+                        backgroundColor: AppColors.surfaceSoft,
+                        foregroundColor: AppColors.textPrimary,
+                      ),
+                      onPressed: (session == null || !_camOn)
+                          ? null
+                          : () => session.switchCamera(),
+                      icon: const Icon(Icons.cameraswitch),
+                    ),
+                    const SizedBox(width: 16),
+                    IconButton.filled(
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.red.shade700,
+                        foregroundColor: Colors.white,
+                      ),
+                      onPressed:
+                          session == null ? null : () => session.hangUp(),
+                      icon: const Icon(AppIcons.callEnd),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

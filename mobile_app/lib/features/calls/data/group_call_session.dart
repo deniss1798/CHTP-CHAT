@@ -48,6 +48,10 @@ class GroupCallSession {
   static GroupCallSession? _active;
 
   static bool tryAcquire(GroupCallSession s) {
+    final cur = _active;
+    if (cur != null && cur._ended) {
+      releaseStatic();
+    }
     if (_active != null || !CallCoordinator.tryEnterGroup()) return false;
     _active = s;
     return true;
@@ -158,11 +162,9 @@ class GroupCallSession {
     if (!mic.isGranted) {
       throw Exception('mic');
     }
-    if (startWithVideo) {
-      final cam = await Permission.camera.request();
-      if (!cam.isGranted) {
-        onStatus('Камера недоступна — только аудио');
-      }
+    final camOk = await Permission.camera.request();
+    if (startWithVideo && !camOk.isGranted) {
+      onStatus('Камера недоступна — только аудио');
     }
 
     _localStream = await navigator.mediaDevices.getUserMedia({
@@ -170,7 +172,7 @@ class GroupCallSession {
         'echoCancellation': true,
         'noiseSuppression': true,
       },
-      'video': startWithVideo
+      'video': camOk.isGranted
           ? {
               'facingMode': 'user',
               'width': 640,
@@ -179,7 +181,14 @@ class GroupCallSession {
             }
           : false,
     });
-    localRenderer.srcObject = _localStream;
+    final ls = _localStream!;
+    for (final vt in ls.getVideoTracks()) {
+      vt.enabled = startWithVideo && camOk.isGranted;
+    }
+    _localVideoTrack =
+        ls.getVideoTracks().isNotEmpty ? ls.getVideoTracks().first : null;
+    _cameraOn = _localVideoTrack != null && _localVideoTrack!.enabled;
+    localRenderer.srcObject = ls;
   }
 
   Map<String, dynamic> _iceConfig() {
@@ -213,9 +222,6 @@ class GroupCallSession {
     final s = _localStream;
     if (s == null) return;
     for (final t in s.getTracks()) {
-      if (t.kind == 'video' && !_cameraOn) {
-        continue;
-      }
       await pc.addTrack(t, s);
     }
   }
@@ -370,8 +376,12 @@ class GroupCallSession {
       unawaited(_ensureOfferTo(uid));
     }
 
-    _sendJoin();
     _bumpUi();
+  }
+
+  bool _sdpIsOffer(String typ) {
+    final t = typ.trim().toLowerCase();
+    return t == 'offer';
   }
 
   Future<void> _onRemoteSdp(Map<String, dynamic> msg) async {
@@ -382,8 +392,11 @@ class GroupCallSession {
     }
 
     final sdp = msg['sdp']?.toString();
-    final typ = msg['sdp_type']?.toString();
-    if (sdp == null || sdp.isEmpty || typ == null) return;
+    final typRaw = msg['sdp_type']?.toString();
+    if (sdp == null || sdp.isEmpty || typRaw == null || typRaw.isEmpty) {
+      return;
+    }
+    final typ = typRaw.trim();
 
     if (!_remoteUserIds.contains(from)) {
       _remoteUserIds.add(from);
@@ -393,55 +406,115 @@ class GroupCallSession {
     final rec = _ensurePeerRecord(from);
 
     try {
-      if (typ == 'offer') {
-        if (rec.iStartedNegotiation && rec.pc != null) {
-          try {
-            await rec.pc!.close();
-          } catch (_) {}
-          rec.pc = null;
-          rec.iStartedNegotiation = false;
-          rec.remoteDescriptionSet = false;
-          rec.pendingIce.clear();
-        }
-
-        final pc = await createPeerConnection(_iceConfig());
-        rec.pc = pc;
-        rec.iStartedNegotiation = false;
-        rec.remoteDescriptionSet = false;
-        await _rendererFor(from);
-
-        pc.onIceCandidate = (RTCIceCandidate? c) {
-          if (_ended || c == null) return;
-          unawaited(_sendIceToPeer(from, c));
-        };
-        pc.onTrack = (RTCTrackEvent e) {
-          unawaited(_onRemoteTrack(from, e));
-        };
-
-        await _addLocalToPc(pc);
-        await pc.setRemoteDescription(RTCSessionDescription(sdp, typ));
-        rec.remoteDescriptionSet = true;
-        await _flushIce(rec);
-
-        final ans = await pc.createAnswer({
-          'offerToReceiveAudio': true,
-          'offerToReceiveVideo': true,
-        });
-        await pc.setLocalDescription(ans);
-        final ld = await pc.getLocalDescription();
-        if (ld?.sdp == null) return;
-        _sendSdp(from, ld!.sdp!, ld.type ?? 'answer');
-        _bumpUi();
+      if (_sdpIsOffer(typ)) {
+        await _applyRemoteOffer(from, rec, sdp, typ);
       } else {
-        final pc = rec.pc;
-        if (pc == null) return;
-        await pc.setRemoteDescription(RTCSessionDescription(sdp, typ));
-        rec.remoteDescriptionSet = true;
-        await _flushIce(rec);
-        _bumpUi();
+        await _applyRemoteAnswer(from, rec, sdp, typ);
       }
     } catch (e) {
       onStatus('Ошибка SDP: $e');
+    }
+  }
+
+  /// Второй answer после stable — игнорируем (дубликат по сети / повторная доставка).
+  Future<void> _applyRemoteAnswer(
+    int from,
+    _MeshPeer rec,
+    String sdp,
+    String typ,
+  ) async {
+    final pc = rec.pc;
+    if (pc == null) return;
+    final st = pc.signalingState;
+    if (st == RTCSignalingState.RTCSignalingStateStable) {
+      return;
+    }
+    if (st != RTCSignalingState.RTCSignalingStateHaveLocalOffer) {
+      return;
+    }
+    await pc.setRemoteDescription(RTCSessionDescription(sdp, typ));
+    rec.remoteDescriptionSet = true;
+    rec.iStartedNegotiation = false;
+    await _flushIce(rec);
+    _bumpUi();
+  }
+
+  Future<void> _rollbackPeerPc(_MeshPeer rec) async {
+    try {
+      await rec.pc?.close();
+    } catch (_) {}
+    rec.pc = null;
+    rec.iStartedNegotiation = false;
+    rec.remoteDescriptionSet = false;
+    rec.pendingIce.clear();
+  }
+
+  Future<void> _applyRemoteOffer(
+    int from,
+    _MeshPeer rec,
+    String sdp,
+    String typ,
+  ) async {
+    var pc = rec.pc;
+
+    // Renegotiation: уже stable (например после включения камеры).
+    if (pc != null &&
+        pc.signalingState == RTCSignalingState.RTCSignalingStateStable) {
+      await pc.setRemoteDescription(RTCSessionDescription(sdp, typ));
+      rec.remoteDescriptionSet = true;
+      await _flushIce(rec);
+      final ans = await pc.createAnswer({
+        'offerToReceiveAudio': true,
+        'offerToReceiveVideo': true,
+      });
+      await pc.setLocalDescription(ans);
+      final ld = await pc.getLocalDescription();
+      if (ld?.sdp == null) return;
+      _sendSdp(from, ld!.sdp!, ld.type ?? 'answer');
+      _bumpUi();
+      return;
+    }
+
+    // Glare: оба отправили offer. Оставляем offer с меньшим user id.
+    if (pc != null &&
+        pc.signalingState ==
+            RTCSignalingState.RTCSignalingStateHaveLocalOffer) {
+      if (from > myUserId) {
+        return;
+      }
+      await _rollbackPeerPc(rec);
+      pc = null;
+    }
+
+    if (pc == null) {
+      final newPc = await createPeerConnection(_iceConfig());
+      rec.pc = newPc;
+      rec.iStartedNegotiation = false;
+      rec.remoteDescriptionSet = false;
+      await _rendererFor(from);
+
+      newPc.onIceCandidate = (RTCIceCandidate? c) {
+        if (_ended || c == null) return;
+        unawaited(_sendIceToPeer(from, c));
+      };
+      newPc.onTrack = (RTCTrackEvent e) {
+        unawaited(_onRemoteTrack(from, e));
+      };
+
+      await _addLocalToPc(newPc);
+      await newPc.setRemoteDescription(RTCSessionDescription(sdp, typ));
+      rec.remoteDescriptionSet = true;
+      await _flushIce(rec);
+
+      final ans = await newPc.createAnswer({
+        'offerToReceiveAudio': true,
+        'offerToReceiveVideo': true,
+      });
+      await newPc.setLocalDescription(ans);
+      final ld = await newPc.getLocalDescription();
+      if (ld?.sdp == null) return;
+      _sendSdp(from, ld!.sdp!, ld.type ?? 'answer');
+      _bumpUi();
     }
   }
 
@@ -534,69 +607,57 @@ class GroupCallSession {
 
   Future<void> setCameraEnabled(bool on) async {
     if (_ended) return;
+    if (on == _cameraOn) return;
+
+    final local = _localStream;
+    if (local == null) return;
+
     final pcList = _peers.values.map((e) => e.pc).whereType<RTCPeerConnection>().toList();
-    if (on) {
-      final cam = await Permission.camera.request();
-      if (!cam.isGranted) {
-        onStatus('Нет доступа к камере');
-        return;
+
+    final vts = List<MediaStreamTrack>.from(local.getVideoTracks());
+    if (vts.isNotEmpty) {
+      for (final t in vts) {
+        t.enabled = on;
       }
-      try {
-        final camStream = await navigator.mediaDevices.getUserMedia({
-          'audio': false,
-          'video': {
-            'facingMode': 'user',
-            'width': 640,
-            'height': 480,
-            'frameRate': 24,
-          },
-        });
-        _cameraOnlyStream = camStream;
-        final vt = camStream.getVideoTracks().isNotEmpty
-            ? camStream.getVideoTracks().first
-            : null;
-        if (vt == null) return;
-        _localVideoTrack = vt;
-        final local = _localStream;
-        if (local != null) {
-          await local.addTrack(vt);
-        }
-        for (final pc in pcList) {
-          await pc.addTrack(vt, local!);
-        }
-        localRenderer.srcObject = local;
-        _cameraOn = true;
-        await _renegotiateAll();
-      } catch (e) {
-        onStatus('Камера: $e');
+      _cameraOn = on;
+      _localVideoTrack = vts.first;
+      localRenderer.srcObject = local;
+      _bumpUi();
+      return;
+    }
+
+    if (!on) return;
+
+    final cam = await Permission.camera.request();
+    if (!cam.isGranted) {
+      onStatus('Нет доступа к камере');
+      return;
+    }
+    try {
+      final camStream = await navigator.mediaDevices.getUserMedia({
+        'audio': false,
+        'video': {
+          'facingMode': 'user',
+          'width': 640,
+          'height': 480,
+          'frameRate': 24,
+        },
+      });
+      _cameraOnlyStream = camStream;
+      final vt = camStream.getVideoTracks().isNotEmpty
+          ? camStream.getVideoTracks().first
+          : null;
+      if (vt == null) return;
+      _localVideoTrack = vt;
+      await local.addTrack(vt);
+      for (final pc in pcList) {
+        await pc.addTrack(vt, local);
       }
-    } else {
-      _cameraOn = false;
-      try {
-        _localVideoTrack?.stop();
-      } catch (_) {}
-      _localVideoTrack = null;
-      try {
-        _cameraOnlyStream?.getTracks().forEach((t) => t.stop());
-      } catch (_) {}
-      _cameraOnlyStream = null;
-      final local = _localStream;
-      if (local != null) {
-        for (final t in List<MediaStreamTrack>.from(local.getVideoTracks())) {
-          await local.removeTrack(t);
-          t.stop();
-        }
-        localRenderer.srcObject = local;
-        for (final pc in pcList) {
-          final senders = await pc.getSenders();
-          for (final se in senders) {
-            if (se.track?.kind == 'video') {
-              await pc.removeTrack(se);
-            }
-          }
-        }
-      }
+      localRenderer.srcObject = local;
+      _cameraOn = true;
       await _renegotiateAll();
+    } catch (e) {
+      onStatus('Камера: $e');
     }
   }
 
@@ -611,7 +672,8 @@ class GroupCallSession {
   Future<void> _renegotiateAll() async {
     for (final e in _peers.entries) {
       final peerId = e.key;
-      final pc = e.value.pc;
+      final rec = e.value;
+      final pc = rec.pc;
       if (pc == null) continue;
       try {
         final offer = await pc.createOffer({
@@ -619,6 +681,7 @@ class GroupCallSession {
           'offerToReceiveVideo': true,
         });
         await pc.setLocalDescription(offer);
+        rec.iStartedNegotiation = true;
         final ld = await pc.getLocalDescription();
         if (ld?.sdp == null) continue;
         _sendSdp(peerId, ld!.sdp!, ld.type ?? 'offer');
@@ -646,6 +709,10 @@ class GroupCallSession {
     _socketSub = null;
 
     for (final p in _peers.values) {
+      try {
+        final ro = p.renderer?.srcObject;
+        ro?.getTracks().forEach((t) => t.stop());
+      } catch (_) {}
       try {
         p.pc?.close();
       } catch (_) {}

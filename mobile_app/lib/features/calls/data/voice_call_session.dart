@@ -34,11 +34,16 @@ class VoiceCallSession {
     required this.isCaller,
     this.remoteCallerPubB64,
     this.onChatMessage,
+    this.onTracksChanged,
   });
 
   static VoiceCallSession? _active;
 
   static bool tryAcquire(VoiceCallSession s) {
+    final cur = _active;
+    if (cur != null && cur._ended) {
+      release();
+    }
     if (_active != null || !CallCoordinator.tryEnterVoice()) return false;
     _active = s;
     return true;
@@ -66,6 +71,9 @@ class VoiceCallSession {
 
   /// Строка в чат после завершения звонка (длительность / отклонён / отменён).
   final void Function(String text)? onChatMessage;
+
+  /// Вызывается при смене удалённых/локальных дорожек (обновить превью video/avatar).
+  final VoidCallback? onTracksChanged;
 
   CallSignalingCrypto? _crypto;
   SecretKey? _signalingKey;
@@ -196,14 +204,28 @@ class VoiceCallSession {
   }
 
   Future<void> _openMicAndPeer() async {
+    final camOk = await Permission.camera.request();
     final stream = await navigator.mediaDevices.getUserMedia({
       'audio': {
         'echoCancellation': true,
         'noiseSuppression': true,
       },
-      'video': false,
+      'video': camOk.isGranted
+          ? {
+              'facingMode': 'user',
+              'width': 640,
+              'height': 480,
+              'frameRate': 24,
+            }
+          : false,
     });
     _localStream = stream;
+    for (final vt in stream.getVideoTracks()) {
+      vt.enabled = false;
+    }
+    _cameraOn = false;
+    _localVideoTrack =
+        stream.getVideoTracks().isNotEmpty ? stream.getVideoTracks().first : null;
 
     final config = <String, dynamic>{
       'iceServers': buildIceServerConfig(),
@@ -233,6 +255,9 @@ class VoiceCallSession {
       } else if (e.track.kind == 'audio') {
         unawaited(_attachRemoteAudioOnlyTrack(e.track));
       }
+      try {
+        onTracksChanged?.call();
+      } catch (_) {}
     };
 
     pc.onConnectionState = (RTCPeerConnectionState s) {
@@ -257,9 +282,12 @@ class VoiceCallSession {
       }
     };
 
-    for (final t in stream.getAudioTracks()) {
+    for (final t in stream.getTracks()) {
       await pc.addTrack(t, stream);
     }
+    try {
+      localRenderer.srcObject = stream;
+    } catch (_) {}
   }
 
   bool get isCameraOn => _cameraOn;
@@ -267,52 +295,68 @@ class VoiceCallSession {
   Future<void> setCameraEnabled(bool on) async {
     if (_ended) return;
     if (on == _cameraOn) return;
-    if (on) {
-      final cam = await Permission.camera.request();
-      if (!cam.isGranted) {
-        onStatus('Нет доступа к камере');
+
+    final pc = _pc;
+    final local = _localStream;
+    if (pc == null || local == null) return;
+
+    final vts = List<MediaStreamTrack>.from(local.getVideoTracks());
+    if (vts.isNotEmpty) {
+      for (final t in vts) {
+        t.enabled = on;
+      }
+      _cameraOn = on;
+      _localVideoTrack = vts.first;
+      try {
+        localRenderer.srcObject = local;
+      } catch (_) {}
+      try {
+        onTracksChanged?.call();
+      } catch (_) {}
+      return;
+    }
+
+    if (!on) return;
+
+    final cam = await Permission.camera.request();
+    if (!cam.isGranted) {
+      onStatus('Нет доступа к камере');
+      return;
+    }
+    try {
+      final camStream = await navigator.mediaDevices.getUserMedia({
+        'audio': false,
+        'video': {
+          'facingMode': 'user',
+          'width': 640,
+          'height': 480,
+          'frameRate': 30,
+        },
+      });
+      _cameraStream = camStream;
+      final vt = camStream.getVideoTracks().isNotEmpty
+          ? camStream.getVideoTracks().first
+          : null;
+      if (vt == null) {
+        onStatus('Камера недоступна');
+        try {
+          camStream.getTracks().forEach((t) => t.stop());
+        } catch (_) {}
+        _cameraStream = null;
         return;
       }
-      final pc = _pc;
-      final local = _localStream;
-      if (pc == null || local == null) return;
-
-      try {
-        final camStream = await navigator.mediaDevices.getUserMedia({
-          'audio': false,
-          'video': {
-            'facingMode': 'user',
-            'width': 640,
-            'height': 480,
-            'frameRate': 30,
-          },
-        });
-        _cameraStream = camStream;
-        final vt = camStream.getVideoTracks().isNotEmpty
-            ? camStream.getVideoTracks().first
-            : null;
-        if (vt == null) {
-          onStatus('Камера недоступна');
-          try {
-            camStream.getTracks().forEach((t) => t.stop());
-          } catch (_) {}
-          _cameraStream = null;
-          return;
-        }
-        _localVideoTrack = vt;
-        await local.addTrack(vt);
-        await pc.addTrack(vt, local);
-        localRenderer.srcObject = local;
-        _cameraOn = true;
-        await _renegotiateAndSendOffer();
-      } catch (e) {
-        onStatus('Ошибка камеры: $e');
-        await _stopLocalCameraTracks();
-      }
-    } else {
-      await _stopLocalCameraTracks();
-      _cameraOn = false;
+      _localVideoTrack = vt;
+      await local.addTrack(vt);
+      await pc.addTrack(vt, local);
+      localRenderer.srcObject = local;
+      _cameraOn = true;
       await _renegotiateAndSendOffer();
+      try {
+        onTracksChanged?.call();
+      } catch (_) {}
+    } catch (e) {
+      onStatus('Ошибка камеры: $e');
+      await _stopLocalCameraTracks();
     }
   }
 
@@ -388,6 +432,9 @@ class VoiceCallSession {
       final ms = await createLocalMediaStream('remote-audio');
       await ms.addTrack(track);
       remoteRenderer.srcObject = ms;
+      try {
+        onTracksChanged?.call();
+      } catch (_) {}
     } catch (_) {}
   }
 

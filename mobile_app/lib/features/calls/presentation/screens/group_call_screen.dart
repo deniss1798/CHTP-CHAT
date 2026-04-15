@@ -1,14 +1,15 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_icons.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../chats/data/services/chat_socket_service.dart';
 import '../../data/group_call_session.dart';
+import '../widgets/call_participant_tile.dart';
 
 /// Групповой аудио/видеозвонок (mesh WebRTC) в групповом чате.
 class GroupCallScreen extends StatefulWidget {
@@ -20,6 +21,7 @@ class GroupCallScreen extends StatefulWidget {
     required this.callId,
     required this.startedByUserId,
     required this.memberNames,
+    this.memberAvatarUrls,
     this.existingSocket,
     this.isHost = false,
     this.startWithVideo = true,
@@ -32,6 +34,7 @@ class GroupCallScreen extends StatefulWidget {
   final String callId;
   final int startedByUserId;
   final Map<int, String> memberNames;
+  final Map<int, String?>? memberAvatarUrls;
   final ChatSocketService? existingSocket;
   final bool isHost;
   final bool startWithVideo;
@@ -147,271 +150,192 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
     return 'Участник $userId';
   }
 
+  String? _avatarForUser(int userId) {
+    final m = widget.memberAvatarUrls;
+    if (m == null) return null;
+    return m[userId];
+  }
+
   @override
   Widget build(BuildContext context) {
     final session = _session;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        onPressed: () => session?.leave(),
-                        icon: const Icon(
-                          AppIcons.close,
-                          color: AppColors.textMuted,
-                        ),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        _session?.leave();
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+                child: Row(
+                  children: [
+                    IconButton(
+                      onPressed: () => session?.leave(),
+                      icon: const Icon(
+                        AppIcons.close,
+                        color: AppColors.textMuted,
                       ),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              widget.chatTitle,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: AppColors.textPrimary,
-                                fontSize: 17,
-                                fontWeight: FontWeight.w700,
-                              ),
+                    ),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.chatTitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
                             ),
-                            Text(
-                              '$_participantCount ${_participantCount == 1 ? 'участник' : 'участников'} · $_status',
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Expanded(
-                  child: session == null
-                      ? const Center(
-                          child: CircularProgressIndicator(
-                            color: AppColors.accent,
                           ),
-                        )
-                      : ValueListenableBuilder<int>(
-                          valueListenable: session.meshVersion,
-                          builder: (context, _, __) {
-                            final remotes = session.remoteVideoRenderers;
-                            final keys = remotes.keys.toList()..sort();
-                            if (keys.isEmpty && !session.cameraOn) {
-                              return const Center(
-                                child: Text(
-                                  'Ожидаем участников…',
-                                  style: TextStyle(
-                                    color: AppColors.textMuted,
-                                    fontSize: 15,
-                                  ),
-                                ),
-                              );
-                            }
-                            return GridView.builder(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 4,
-                              ),
-                              gridDelegate:
-                                  const SliverGridDelegateWithMaxCrossAxisExtent(
-                                maxCrossAxisExtent: 220,
-                                mainAxisSpacing: 10,
-                                crossAxisSpacing: 10,
-                                childAspectRatio: 0.72,
-                              ),
-                              itemCount: keys.length + (session.cameraOn ? 1 : 0),
-                              itemBuilder: (context, i) {
-                                if (session.cameraOn && i == 0) {
-                                  return _VideoTile(
-                                    label: 'Вы',
-                                    renderer: session.localRenderer,
-                                    mirror: true,
-                                  );
-                                }
-                                final idx =
-                                    session.cameraOn ? i - 1 : i;
-                                final uid = keys[idx];
-                                final r = remotes[uid]!;
-                                return _VideoTile(
-                                  label: _nameFor(uid),
-                                  renderer: r,
-                                  mirror: false,
+                          Text(
+                            '$_participantCount ${_participantCount == 1 ? 'участник' : 'участников'} · $_status',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: session == null
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          color: AppColors.accent,
+                        ),
+                      )
+                    : ValueListenableBuilder<int>(
+                        valueListenable: session.meshVersion,
+                        builder: (context, meshTick, _) {
+                          final remotes = session.remoteVideoRenderers;
+                          final keys = remotes.keys.toList()..sort();
+                          final n = keys.length + 1;
+                          final cols = n <= 1
+                              ? 1
+                              : math.min(4, math.max(2, math.sqrt(n).ceil()));
+
+                          return GridView.builder(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 4,
+                            ),
+                            gridDelegate:
+                                SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: cols,
+                              mainAxisSpacing: 10,
+                              crossAxisSpacing: 10,
+                              childAspectRatio: 0.92,
+                            ),
+                            itemCount: n,
+                            itemBuilder: (context, i) {
+                              if (i == 0) {
+                                return CallParticipantTile(
+                                  label: 'Вы',
+                                  renderer: session.localRenderer,
+                                  avatarUrl: _avatarForUser(widget.myUserId),
+                                  showVideo: _camOn,
+                                  mirror: true,
                                 );
-                              },
-                            );
-                          },
-                        ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      IconButton.filled(
-                        style: IconButton.styleFrom(
-                          backgroundColor: AppColors.surfaceSoft,
-                          foregroundColor: AppColors.textPrimary,
-                        ),
-                        onPressed: session == null
-                            ? null
-                            : () {
-                                setState(() {
-                                  _micOn = !_micOn;
-                                  session.setMicEnabled(_micOn);
-                                });
-                              },
-                        icon: Icon(_micOn ? AppIcons.mic : AppIcons.micOff),
+                              }
+                              final uid = keys[i - 1];
+                              final r = remotes[uid]!;
+                              return CallParticipantTile(
+                                label: _nameFor(uid),
+                                renderer: r,
+                                avatarUrl: _avatarForUser(uid),
+                                showVideo: true,
+                                mirror: false,
+                                attachHiddenVideoSurface: true,
+                              );
+                            },
+                          );
+                        },
                       ),
-                      const SizedBox(width: 16),
-                      IconButton.filled(
-                        style: IconButton.styleFrom(
-                          backgroundColor: AppColors.surfaceSoft,
-                          foregroundColor: AppColors.textPrimary,
-                        ),
-                        onPressed: session == null
-                            ? null
-                            : () async {
-                                final next = !_camOn;
-                                setState(() => _camOn = next);
-                                await session.setCameraEnabled(next);
-                                if (mounted) {
-                                  setState(() => _camOn = session.cameraOn);
-                                }
-                              },
-                        icon: Icon(
-                          _camOn ? Icons.videocam : Icons.videocam_off,
-                        ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconButton.filled(
+                      style: IconButton.styleFrom(
+                        backgroundColor: AppColors.surfaceSoft,
+                        foregroundColor: AppColors.textPrimary,
                       ),
-                      const SizedBox(width: 16),
-                      IconButton.filled(
-                        style: IconButton.styleFrom(
-                          backgroundColor: AppColors.surfaceSoft,
-                          foregroundColor: AppColors.textPrimary,
-                        ),
-                        onPressed: (session == null || !_camOn)
-                            ? null
-                            : () => session.switchCamera(),
-                        icon: const Icon(Icons.cameraswitch),
+                      onPressed: session == null
+                          ? null
+                          : () {
+                              setState(() {
+                                _micOn = !_micOn;
+                                session.setMicEnabled(_micOn);
+                              });
+                            },
+                      icon: Icon(_micOn ? AppIcons.mic : AppIcons.micOff),
+                    ),
+                    const SizedBox(width: 16),
+                    IconButton.filled(
+                      style: IconButton.styleFrom(
+                        backgroundColor: AppColors.surfaceSoft,
+                        foregroundColor: AppColors.textPrimary,
                       ),
-                      const SizedBox(width: 16),
-                      IconButton.filled(
-                        style: IconButton.styleFrom(
-                          backgroundColor: Colors.red.shade700,
-                          foregroundColor: Colors.white,
-                        ),
-                        onPressed:
-                            session == null ? null : () => session.leave(),
-                        icon: const Icon(AppIcons.callEnd),
+                      onPressed: session == null
+                          ? null
+                          : () async {
+                              final next = !_camOn;
+                              setState(() => _camOn = next);
+                              await session.setCameraEnabled(next);
+                              if (mounted) {
+                                setState(() => _camOn = session.cameraOn);
+                              }
+                            },
+                      icon: Icon(
+                        _camOn ? Icons.videocam : Icons.videocam_off,
                       ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            if (session != null && !session.cameraOn)
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 88,
-                height: 64,
-                child: ValueListenableBuilder<int>(
-                  valueListenable: session.meshVersion,
-                  builder: (context, _, __) {
-                    final remotes = session.remoteVideoRenderers;
-                    if (remotes.isEmpty) return const SizedBox.shrink();
-                    return Opacity(
-                      opacity: 0,
-                      child: Row(
-                        children: remotes.entries
-                            .map(
-                              (e) => SizedBox(
-                                width: 64,
-                                height: 64,
-                                child: RTCVideoView(
-                                  e.value,
-                                  mirror: false,
-                                ),
-                              ),
-                            )
-                            .toList(),
+                    ),
+                    const SizedBox(width: 16),
+                    IconButton.filled(
+                      style: IconButton.styleFrom(
+                        backgroundColor: AppColors.surfaceSoft,
+                        foregroundColor: AppColors.textPrimary,
                       ),
-                    );
-                  },
+                      onPressed: (session == null || !_camOn)
+                          ? null
+                          : () => session.switchCamera(),
+                      icon: const Icon(Icons.cameraswitch),
+                    ),
+                    const SizedBox(width: 16),
+                    IconButton.filled(
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.red.shade700,
+                        foregroundColor: Colors.white,
+                      ),
+                      onPressed:
+                          session == null ? null : () => session.leave(),
+                      icon: const Icon(AppIcons.callEnd),
+                    ),
+                  ],
                 ),
               ),
-          ],
+            ],
+          ),
         ),
-      ),
-    );
-  }
-}
-
-class _VideoTile extends StatelessWidget {
-  const _VideoTile({
-    required this.label,
-    required this.renderer,
-    required this.mirror,
-  });
-
-  final String label;
-  final RTCVideoRenderer renderer;
-  final bool mirror;
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          ColoredBox(
-            color: Colors.black.withValues(alpha: 0.35),
-            child: RTCVideoView(
-              renderer,
-              mirror: mirror,
-              objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
-            ),
-          ),
-          Positioned(
-            left: 8,
-            bottom: 8,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: Colors.black54,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                child: Text(
-                  label,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

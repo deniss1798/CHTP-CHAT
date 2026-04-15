@@ -1520,6 +1520,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                         callId: callId,
                         startedByUserId: startedBy,
                         memberNames: Map<int, String>.from(_memberNames),
+                        memberAvatarUrls: {
+                          for (final e in _memberAvatarUrls.entries)
+                            e.key: _normalizedAvatarUrl(e.value),
+                        },
                         existingSocket: _chatSocketService,
                         isHost: false,
                         startWithVideo: withVideo,
@@ -1604,6 +1608,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                         myUserId: me,
                         existingSocket: _chatSocketService,
                         incomingInit: init,
+                        peerAvatarUrl:
+                            _normalizedAvatarUrl(_memberAvatarUrls[peer]),
+                        myAvatarUrl:
+                            _normalizedAvatarUrl(_memberAvatarUrls[me]),
                       ),
                     ),
                   ),
@@ -1646,6 +1654,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           callId: callId,
           startedByUserId: me,
           memberNames: Map<int, String>.from(_memberNames),
+          memberAvatarUrls: {
+            for (final e in _memberAvatarUrls.entries)
+              e.key: _normalizedAvatarUrl(e.value),
+          },
           existingSocket: _chatSocketService,
           isHost: true,
           startWithVideo: true,
@@ -1679,6 +1691,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           peerUserId: peer,
           myUserId: me,
           existingSocket: _chatSocketService,
+          peerAvatarUrl: _normalizedAvatarUrl(_memberAvatarUrls[peer]),
+          myAvatarUrl: _normalizedAvatarUrl(_memberAvatarUrls[me]),
         ),
       ),
     );
