@@ -668,7 +668,9 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
       chatId = int.tryParse(cidRaw?.toString() ?? '');
     }
     if (chatId == null) return;
-    if (_chatTypeById(chatId) != 'group') return;
+    // Если список чатов ещё не подгрузился, _chatTypeById может быть null — не отбрасываем инвайт.
+    // Инвайт group_call_invite всё равно приходит только из group-чата.
+    if (_chatTypeById(chatId) == 'private') return;
 
     final uRaw = msg['user_id'];
     int? callerId;

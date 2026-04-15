@@ -1,7 +1,9 @@
-import json
+import logging
 from collections import defaultdict
 
 from fastapi import WebSocket
+
+logger = logging.getLogger(__name__)
 
 
 class InboxConnectionManager:
@@ -21,6 +23,15 @@ class InboxConnectionManager:
     async def send_json(self, user_id: int, message: dict) -> None:
         ws = self._user_id_to_ws.get(user_id)
         if not ws:
+            t = message.get("type")
+            if isinstance(t, str) and (
+                t.startswith("call_e2e_") or t.startswith("group_call_")
+            ):
+                logger.info(
+                    "inbox_skip user_id=%s type=%s (нет активного /ws/inbox)",
+                    user_id,
+                    t,
+                )
             return
         try:
             await ws.send_json(message)

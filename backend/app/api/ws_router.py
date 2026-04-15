@@ -1,4 +1,5 @@
 import json
+import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
@@ -13,6 +14,7 @@ from app.models.user import User
 
 router = APIRouter(tags=["WebSocket"])
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 _CALL_SIGNAL_TYPES = frozenset(
     {
@@ -110,6 +112,13 @@ async def websocket_chat(
                 call_payload["type"] = msg_type
                 call_payload["chat_id"] = chat_id
                 call_payload["user_id"] = user_id
+                logger.info(
+                    "ws_call_signal chat_id=%s type=%s from_user=%s call_id=%s",
+                    chat_id,
+                    msg_type,
+                    user_id,
+                    data.get("call_id"),
+                )
                 await manager.broadcast_to_others(
                     chat_id,
                     call_payload,
