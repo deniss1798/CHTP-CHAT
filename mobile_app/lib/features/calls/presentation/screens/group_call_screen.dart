@@ -273,6 +273,7 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
                             itemBuilder: (context, i) {
                               if (i == 0) {
                                 return CallParticipantTile(
+                                  key: const ValueKey<String>('group_tile_local'),
                                   label: 'Вы',
                                   renderer: session.localRenderer,
                                   avatarUrl: _avatarForUser(widget.myUserId),
@@ -283,6 +284,7 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
                               final uid = keys[i - 1];
                               final r = remotes[uid]!;
                               return CallParticipantTile(
+                                key: ValueKey<int>(uid),
                                 label: _nameFor(uid),
                                 renderer: r,
                                 avatarUrl: _avatarForUser(uid),

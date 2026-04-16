@@ -1,12 +1,21 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart'
-    show TargetPlatform, VoidCallback, ValueNotifier, defaultTargetPlatform, kIsWeb;
+    show
+        TargetPlatform,
+        VoidCallback,
+        ValueNotifier,
+        debugPrint,
+        defaultTargetPlatform,
+        kDebugMode,
+        kIsWeb;
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../call_coordinator.dart';
 import 'ice_config_service.dart';
+import 'webrtc_render_bind.dart';
+import 'webrtc_video_constraints.dart';
 
 const _groupCallSignalTypes = {
   'group_call_invite',
@@ -96,9 +105,12 @@ class GroupCallSession {
   StreamSubscription<Map<String, dynamic>>? _socketSub;
   Timer? _joinBurstTimer;
 
+  /// Строгая очередь SDP на пару участников: параллельные [setRemoteDescription]
+  /// ломают состояние PC и дают «Unable to setRemoteDescription» / обрыв через ~1 с.
+  final Map<int, Future<void>> _sdpQueue = {};
+
   bool _ended = false;
   bool _cameraOn = false;
-  bool _speakerphoneSet = false;
 
   bool get cameraOn => _cameraOn;
 
@@ -180,14 +192,7 @@ class GroupCallSession {
         'echoCancellation': true,
         'noiseSuppression': true,
       },
-      'video': camOk.isGranted
-          ? {
-              'facingMode': 'user',
-              'width': 640,
-              'height': 480,
-              'frameRate': 24,
-            }
-          : false,
+      'video': camOk.isGranted ? webrtcVideoCaptureConstraints() : false,
     });
     final ls = _localStream!;
     for (final vt in ls.getVideoTracks()) {
@@ -196,7 +201,7 @@ class GroupCallSession {
     _localVideoTrack =
         ls.getVideoTracks().isNotEmpty ? ls.getVideoTracks().first : null;
     _cameraOn = _localVideoTrack != null && _localVideoTrack!.enabled;
-    localRenderer.srcObject = ls;
+    bindRtcVideoRenderer(localRenderer, ls);
   }
 
   Future<Map<String, dynamic>> _iceConfig() async {
@@ -234,7 +239,11 @@ class GroupCallSession {
     }
   }
 
-  Future<void> _ensureOfferTo(int peerId) async {
+  Future<void> _ensureOfferTo(int peerId) {
+    return _runPeerLocked(peerId, () => _ensureOfferToLocked(peerId));
+  }
+
+  Future<void> _ensureOfferToLocked(int peerId) async {
     if (_ended || peerId == myUserId) return;
     if (_remoteUserIds.length >= _maxGroupPeers) {
       onStatus('Лимит участников');
@@ -290,21 +299,29 @@ class GroupCallSession {
     if (e.streams.isNotEmpty) {
       final s = e.streams.first;
       for (final t in s.getTracks()) {
-        if (t.kind == 'audio') {
-          t.enabled = true;
+        t.enabled = true;
+        // Только видео: mute/unmute на аудио дергает _bumpUi → пересборка GridView + RTCVideoView
+        // и на части устройств обрывает воспроизведение через ~1 с.
+        if (t.kind == 'video') {
+          t.onUnMute = () => _bumpUi();
+          t.onMute = () => _bumpUi();
         }
       }
-      r.srcObject = s;
+      bindRtcVideoRenderer(r, s);
       rec.remoteMediaStream = s;
       _attachRemoteVideoListenersForMeshPeer(s);
     } else if (e.track.kind == 'video' || e.track.kind == 'audio') {
       e.track.enabled = true;
+      if (e.track.kind == 'video') {
+        e.track.onUnMute = () => _bumpUi();
+        e.track.onMute = () => _bumpUi();
+      }
       try {
         MediaStream? ms = rec.remoteMediaStream ?? r.srcObject;
         if (ms == null) {
           ms = await createLocalMediaStream('remote-$userId');
           rec.remoteMediaStream = ms;
-          r.srcObject = ms;
+          bindRtcVideoRenderer(r, ms);
         }
         var already = false;
         for (final t in ms.getTracks()) {
@@ -389,7 +406,10 @@ class GroupCallSession {
         _onRemoteJoin(msg);
         break;
       case 'group_call_sdp':
-        unawaited(_onRemoteSdp(msg));
+        final sdpFrom = _int(msg['user_id']);
+        if (sdpFrom != null) {
+          unawaited(_runPeerLocked(sdpFrom, () => _processRemoteSdp(msg)));
+        }
         break;
       case 'group_call_ice':
         unawaited(_onRemoteIce(msg));
@@ -426,7 +446,24 @@ class GroupCallSession {
     return t == 'offer';
   }
 
-  Future<void> _onRemoteSdp(Map<String, dynamic> msg) async {
+  /// Все операции SDP + создание локального offer для пары участников — строго по очереди.
+  Future<void> _runPeerLocked(int peerId, Future<void> Function() work) {
+    final fut = (_sdpQueue[peerId] ?? Future<void>.value()).then((_) async {
+      if (_ended) return;
+      try {
+        await work();
+      } catch (e, st) {
+        if (kDebugMode) {
+          debugPrint('group_call peer=$peerId: $e\n$st');
+        }
+        onStatus('Ошибка SDP: $e');
+      }
+    });
+    _sdpQueue[peerId] = fut.catchError((_) {});
+    return fut;
+  }
+
+  Future<void> _processRemoteSdp(Map<String, dynamic> msg) async {
     final from = _int(msg['user_id']);
     final to = _int(msg['to_user_id']);
     if (from == null || to == null || to != myUserId || from == myUserId) {
@@ -447,14 +484,10 @@ class GroupCallSession {
 
     final rec = _ensurePeerRecord(from);
 
-    try {
-      if (_sdpIsOffer(typ)) {
-        await _applyRemoteOffer(from, rec, sdp, typ);
-      } else {
-        await _applyRemoteAnswer(from, rec, sdp, typ);
-      }
-    } catch (e) {
-      onStatus('Ошибка SDP: $e');
+    if (_sdpIsOffer(typ)) {
+      await _applyRemoteOffer(from, rec, sdp, typ);
+    } else {
+      await _applyRemoteAnswer(from, rec, sdp, typ);
     }
   }
 
@@ -492,14 +525,14 @@ class GroupCallSession {
     rec.pendingIce.clear();
   }
 
-  void _ensureSpeakerphoneOnce() {
-    if (_speakerphoneSet || _ended) return;
+  /// В mesh несколько PC; на части устройств динамик нужно выставлять при каждом успешном P2P.
+  void _ensureSpeakerphoneForMesh() {
+    if (_ended) return;
     if (kIsWeb) return;
     if (defaultTargetPlatform != TargetPlatform.android &&
         defaultTargetPlatform != TargetPlatform.iOS) {
       return;
     }
-    _speakerphoneSet = true;
     unawaited(() async {
       try {
         await Helper.setSpeakerphoneOn(true);
@@ -510,8 +543,11 @@ class GroupCallSession {
   void _wireMeshPeerConnection(int peerId, RTCPeerConnection pc) {
     pc.onConnectionState = (RTCPeerConnectionState s) {
       if (_ended) return;
+      if (kDebugMode) {
+        debugPrint('group_call peer=$peerId pcState=$s');
+      }
       if (s == RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
-        _ensureSpeakerphoneOnce();
+        _ensureSpeakerphoneForMesh();
       }
     };
   }
@@ -524,9 +560,11 @@ class GroupCallSession {
   ) async {
     var pc = rec.pc;
 
-    // Renegotiation: уже stable (например после включения камеры).
+    // Renegotiation: stable после завершённого первого offer/answer.
+    // Без [remoteDescriptionSet] это ещё первый handshake — иначе гонка даёт неверный SDP.
     if (pc != null &&
-        pc.signalingState == RTCSignalingState.RTCSignalingStateStable) {
+        pc.signalingState == RTCSignalingState.RTCSignalingStateStable &&
+        rec.remoteDescriptionSet) {
       await pc.setRemoteDescription(RTCSessionDescription(sdp, typ));
       rec.remoteDescriptionSet = true;
       await _flushIce(rec);
@@ -692,7 +730,7 @@ class GroupCallSession {
       }
       _cameraOn = on;
       _localVideoTrack = vts.first;
-      localRenderer.srcObject = local;
+      bindRtcVideoRenderer(localRenderer, local);
       _bumpUi();
       return;
     }
@@ -707,12 +745,7 @@ class GroupCallSession {
     try {
       final camStream = await navigator.mediaDevices.getUserMedia({
         'audio': false,
-        'video': {
-          'facingMode': 'user',
-          'width': 640,
-          'height': 480,
-          'frameRate': 24,
-        },
+        'video': webrtcVideoCaptureConstraints(),
       });
       _cameraOnlyStream = camStream;
       final vt = camStream.getVideoTracks().isNotEmpty
@@ -724,7 +757,7 @@ class GroupCallSession {
       for (final pc in pcList) {
         await pc.addTrack(vt, local);
       }
-      localRenderer.srcObject = local;
+      bindRtcVideoRenderer(localRenderer, local);
       _cameraOn = true;
       await _renegotiateAll();
     } catch (e) {
@@ -743,20 +776,23 @@ class GroupCallSession {
   Future<void> _renegotiateAll() async {
     for (final e in _peers.entries) {
       final peerId = e.key;
-      final rec = e.value;
-      final pc = rec.pc;
-      if (pc == null) continue;
-      try {
-        final offer = await pc.createOffer({
-          'offerToReceiveAudio': true,
-          'offerToReceiveVideo': true,
-        });
-        await pc.setLocalDescription(offer);
-        rec.iStartedNegotiation = true;
-        final ld = await pc.getLocalDescription();
-        if (ld?.sdp == null) continue;
-        _sendSdp(peerId, ld!.sdp!, ld.type ?? 'offer');
-      } catch (_) {}
+      await _runPeerLocked(peerId, () async {
+        final rec = _peers[peerId];
+        if (rec == null) return;
+        final pc = rec.pc;
+        if (pc == null) return;
+        try {
+          final offer = await pc.createOffer({
+            'offerToReceiveAudio': true,
+            'offerToReceiveVideo': true,
+          });
+          await pc.setLocalDescription(offer);
+          rec.iStartedNegotiation = true;
+          final ld = await pc.getLocalDescription();
+          if (ld?.sdp == null) return;
+          _sendSdp(peerId, ld!.sdp!, ld.type ?? 'offer');
+        } catch (_) {}
+      });
     }
   }
 
@@ -774,6 +810,7 @@ class GroupCallSession {
     _ended = true;
     _joinBurstTimer?.cancel();
     _joinBurstTimer = null;
+    _sdpQueue.clear();
     try {
       _socketSub?.cancel();
     } catch (_) {}

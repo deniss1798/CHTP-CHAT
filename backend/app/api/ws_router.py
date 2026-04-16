@@ -124,14 +124,17 @@ async def websocket_chat(
                     call_payload,
                     exclude_user_id=user_id,
                 )
-                member_ids = (
-                    db.query(ChatMember.user_id)
-                    .filter(ChatMember.chat_id == chat_id)
-                    .all()
-                )
-                for (member_uid,) in member_ids:
-                    if member_uid != user_id:
-                        await inbox_manager.send_json(member_uid, call_payload)
+                # SDP/ICE не дублируем в inbox: при открытом чате + inbox — двойная доставка
+                # ломает WebRTC (setRemoteDescription, обрыв медиа).
+                if msg_type not in ("group_call_sdp", "group_call_ice"):
+                    member_ids = (
+                        db.query(ChatMember.user_id)
+                        .filter(ChatMember.chat_id == chat_id)
+                        .all()
+                    )
+                    for (member_uid,) in member_ids:
+                        if member_uid != user_id:
+                            await inbox_manager.send_json(member_uid, call_payload)
     except WebSocketDisconnect:
         manager.disconnect(chat_id, websocket)
     finally:

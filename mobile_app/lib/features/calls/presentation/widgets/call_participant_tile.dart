@@ -48,6 +48,12 @@ class CallParticipantTile extends StatelessWidget {
     final showRenderer =
         attachHiddenVideoSurface || hasFrame || showVideo;
 
+    /// Один и тот же [RTCVideoView] на весь тайл: нельзя менять layout (2×2 → fullscreen) при
+    /// появлении кадра — иначе Flutter пересоздаёт виджет и WebRTC зависает/рвёт звук.
+    /// Без кадра: чуть выше прозрачность, если нужен скрытый вывод аудио (attachHiddenVideoSurface).
+    final hiddenOpacity =
+        attachHiddenVideoSurface && !hasFrame ? 0.08 : 0.02;
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
       child: Stack(
@@ -61,7 +67,7 @@ class CallParticipantTile extends StatelessWidget {
                 if (showRenderer)
                   Positioned.fill(
                     child: Opacity(
-                      opacity: hasFrame ? 1.0 : 0.02,
+                      opacity: hasFrame ? 1.0 : hiddenOpacity,
                       child: RTCVideoView(
                         renderer,
                         mirror: mirror,

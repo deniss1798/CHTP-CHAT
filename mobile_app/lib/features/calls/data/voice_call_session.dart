@@ -11,6 +11,8 @@ import '../call_chat_message.dart';
 import '../call_coordinator.dart';
 import 'call_signaling_crypto.dart';
 import 'ice_config_service.dart';
+import 'webrtc_render_bind.dart';
+import 'webrtc_video_constraints.dart';
 
 const _callSignalTypes = {
   'call_e2e_init',
@@ -216,14 +218,7 @@ class VoiceCallSession {
         'echoCancellation': true,
         'noiseSuppression': true,
       },
-      'video': camOk.isGranted
-          ? {
-              'facingMode': 'user',
-              'width': 640,
-              'height': 480,
-              'frameRate': 24,
-            }
-          : false,
+      'video': camOk.isGranted ? webrtcVideoCaptureConstraints() : false,
     });
     _localStream = stream;
     for (final vt in stream.getVideoTracks()) {
@@ -262,7 +257,7 @@ class VoiceCallSession {
           t.enabled = true;
         }
         _remoteCombinedStream = s;
-        remoteRenderer.srcObject = s;
+        bindRtcVideoRenderer(remoteRenderer, s);
         _attachRemoteVideoUiListeners(s);
         try {
           onTracksChanged?.call();
@@ -308,13 +303,25 @@ class VoiceCallSession {
       await pc.addTrack(t, stream);
     }
     try {
-      localRenderer.srcObject = stream;
+      bindRtcVideoRenderer(localRenderer, stream);
     } catch (_) {}
   }
 
   /// Когда собеседник включает/выключает камеру, снова [onTrack] не приходит — дергаем UI.
   void _attachRemoteVideoUiListeners(MediaStream s) {
     for (final t in s.getVideoTracks()) {
+      t.onUnMute = () {
+        try {
+          onTracksChanged?.call();
+        } catch (_) {}
+      };
+      t.onMute = () {
+        try {
+          onTracksChanged?.call();
+        } catch (_) {}
+      };
+    }
+    for (final t in s.getAudioTracks()) {
       t.onUnMute = () {
         try {
           onTracksChanged?.call();
@@ -346,7 +353,7 @@ class VoiceCallSession {
       _cameraOn = on;
       _localVideoTrack = vts.first;
       try {
-        localRenderer.srcObject = local;
+        bindRtcVideoRenderer(localRenderer, local);
       } catch (_) {}
       try {
         onTracksChanged?.call();
@@ -364,12 +371,7 @@ class VoiceCallSession {
     try {
       final camStream = await navigator.mediaDevices.getUserMedia({
         'audio': false,
-        'video': {
-          'facingMode': 'user',
-          'width': 640,
-          'height': 480,
-          'frameRate': 30,
-        },
+        'video': webrtcVideoCaptureConstraints(),
       });
       _cameraStream = camStream;
       final vt = camStream.getVideoTracks().isNotEmpty
@@ -386,7 +388,7 @@ class VoiceCallSession {
       _localVideoTrack = vt;
       await local.addTrack(vt);
       await pc.addTrack(vt, local);
-      localRenderer.srcObject = local;
+      bindRtcVideoRenderer(localRenderer, local);
       _cameraOn = true;
       await _renegotiateAndSendOffer();
       try {
@@ -473,7 +475,7 @@ class VoiceCallSession {
       if (ms == null) {
         ms = await createLocalMediaStream('remote-$peerUserId');
         _remoteCombinedStream = ms;
-        remoteRenderer.srcObject = ms;
+        bindRtcVideoRenderer(remoteRenderer, ms);
       } else {
         _remoteCombinedStream = ms;
       }
@@ -487,9 +489,8 @@ class VoiceCallSession {
       if (!already) {
         await ms.addTrack(track);
       }
-      if (track.kind == 'video') {
-        _attachRemoteVideoUiListeners(ms);
-      }
+      bindRtcVideoRenderer(remoteRenderer, ms);
+      _attachRemoteVideoUiListeners(ms);
       try {
         onTracksChanged?.call();
       } catch (_) {}
