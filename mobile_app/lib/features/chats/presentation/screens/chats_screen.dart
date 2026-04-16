@@ -22,6 +22,7 @@ import '../../data/services/chats_service.dart';
 import '../../data/services/chat_socket_service.dart';
 import '../../data/services/inbox_socket_service.dart';
 import '../../data/services/local_chat_state_service.dart';
+import '../../../calls/data/ice_config_service.dart';
 import '../../../calls/incoming_call_ringtone.dart';
 import '../../../calls/presentation/screens/group_call_screen.dart';
 import '../../../calls/presentation/screens/voice_call_screen.dart';
@@ -393,7 +394,7 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _logout(BuildContext context) async {
-    
+    IceConfigService.instance.clearCache();
     await SecureStorageService.deleteAccessToken();
 
     if (!context.mounted) return;

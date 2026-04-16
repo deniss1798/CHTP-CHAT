@@ -9,7 +9,8 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../../app/app.dart';
 import 'open_chat_from_push.dart';
 
-/// Локальные уведомления: foreground FCM на Android, inbox на Windows/macOS/Linux.
+/// Локальные уведомления (foreground FCM). Только Android: плагин для Windows
+/// (flutter_local_notifications ≥19) ломает AOT-сборку (`NativeLaunchDetails` / gen_snapshot).
 class LocalNotificationsService {
   LocalNotificationsService._();
   static final LocalNotificationsService instance = LocalNotificationsService._();
@@ -19,35 +20,14 @@ class LocalNotificationsService {
 
   static bool get supported {
     if (kIsWeb) return false;
-    switch (defaultTargetPlatform) {
-      case TargetPlatform.android:
-      case TargetPlatform.windows:
-      case TargetPlatform.linux:
-      case TargetPlatform.macOS:
-        return true;
-      default:
-        return false;
-    }
+    return defaultTargetPlatform == TargetPlatform.android;
   }
 
   Future<void> init() async {
     if (!supported || _initialized) return;
 
-    const android = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const darwin = DarwinInitializationSettings();
-    const linux = LinuxInitializationSettings(defaultActionName: 'Открыть');
-    final initSettings = InitializationSettings(
-      android: android,
-      iOS: darwin,
-      macOS: darwin,
-      linux: linux,
-      windows: defaultTargetPlatform == TargetPlatform.windows
-          ? const WindowsInitializationSettings(
-              appName: 'ЧТП ЧАТ',
-              appUserModelId: 'com.chnetp.mobile_app',
-              guid: '{a7f3c8d1-4e2b-5c9d-8a1f-0b2c3d4e5f6a}',
-            )
-          : null,
+    const initSettings = InitializationSettings(
+      android: AndroidInitializationSettings('@mipmap/ic_launcher'),
     );
 
     await _plugin.initialize(
@@ -55,17 +35,15 @@ class LocalNotificationsService {
       onDidReceiveNotificationResponse: _onNotificationResponse,
     );
 
-    if (defaultTargetPlatform == TargetPlatform.android) {
-      const channel = AndroidNotificationChannel(
-        'chat_messages',
-        'Сообщения',
-        description: 'Входящие сообщения',
-        importance: Importance.high,
-      );
-      final androidImpl = _plugin.resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>();
-      await androidImpl?.createNotificationChannel(channel);
-    }
+    const channel = AndroidNotificationChannel(
+      'chat_messages',
+      'Сообщения',
+      description: 'Входящие сообщения',
+      importance: Importance.high,
+    );
+    final androidImpl = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    await androidImpl?.createNotificationChannel(channel);
 
     _initialized = true;
   }
@@ -114,46 +92,30 @@ class LocalNotificationsService {
     required int chatId,
     String? avatarUrlForOpen,
   }) async {
-    if (!_initialized) return;
+    if (!supported || !_initialized) return;
 
     final payload = jsonEncode({
       'c': chatId,
       if (avatarUrlForOpen != null && avatarUrlForOpen.isNotEmpty) 'a': avatarUrlForOpen,
     });
 
-    late final NotificationDetails details;
-    if (defaultTargetPlatform == TargetPlatform.android) {
-      Uint8List? iconBytes;
-      final u = avatarUrl?.trim();
-      if (u != null && u.isNotEmpty && (u.startsWith('http://') || u.startsWith('https://'))) {
-        iconBytes = await _downloadImageBytes(u);
-      }
-      details = NotificationDetails(
-        android: AndroidNotificationDetails(
-          'chat_messages',
-          'Сообщения',
-          channelDescription: 'Входящие сообщения',
-          importance: Importance.high,
-          priority: Priority.high,
-          largeIcon: iconBytes != null ? ByteArrayAndroidBitmap(iconBytes) : null,
-          styleInformation: BigTextStyleInformation(body),
-        ),
-      );
-    } else if (defaultTargetPlatform == TargetPlatform.windows) {
-      details = const NotificationDetails(
-        windows: WindowsNotificationDetails(),
-      );
-    } else if (defaultTargetPlatform == TargetPlatform.linux) {
-      details = const NotificationDetails(
-        linux: LinuxNotificationDetails(),
-      );
-    } else if (defaultTargetPlatform == TargetPlatform.macOS) {
-      details = const NotificationDetails(
-        macOS: DarwinNotificationDetails(),
-      );
-    } else {
-      return;
+    Uint8List? iconBytes;
+    final u = avatarUrl?.trim();
+    if (u != null && u.isNotEmpty && (u.startsWith('http://') || u.startsWith('https://'))) {
+      iconBytes = await _downloadImageBytes(u);
     }
+
+    final details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        'chat_messages',
+        'Сообщения',
+        channelDescription: 'Входящие сообщения',
+        importance: Importance.high,
+        priority: Priority.high,
+        largeIcon: iconBytes != null ? ByteArrayAndroidBitmap(iconBytes) : null,
+        styleInformation: BigTextStyleInformation(body),
+      ),
+    );
 
     await _plugin.show(
       notificationId,

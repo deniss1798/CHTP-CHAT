@@ -7,6 +7,7 @@ import '../../../../app/theme/app_shadows.dart';
 import '../../../../app/theme/design_tokens.dart';
 import '../../../../app/widgets/app_screen_background.dart';
 import '../../../../core/storage/secure_storage_service.dart';
+import '../../../calls/data/ice_config_service.dart';
 import '../../../auth/presentation/screens/auth_screen.dart';
 import '../../../profile/data/services/profile_service.dart';
 import '../../../profile/presentation/screens/profile_screen.dart';
@@ -201,6 +202,7 @@ class SettingsScreen extends StatelessWidget {
 
     try {
       await service.deleteMyAccount();
+      IceConfigService.instance.clearCache();
       await SecureStorageService.deleteAccessToken();
       if (!context.mounted) return;
       nav.pushAndRemoveUntil(

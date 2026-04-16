@@ -1,15 +1,10 @@
 import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
 
-/// ICE: STUN по умолчанию + опциональный TURN через dart-define.
+/// ICE: по умолчанию [resolveIceServerConfig] → `GET /webrtc/ice` (временный TURN с бэкенда).
 ///
-/// Без TURN многие пары за NAT не получают рабочий медиапоток (звук не идёт).
-/// Поднимите coturn и соберите, например:
-/// `--dart-define=WEBRTC_TURN_URLS=turn:turn.example.com:3478`
-/// `--dart-define=WEBRTC_TURN_USERNAME=user`
-/// `--dart-define=WEBRTC_TURN_CREDENTIAL=pass`
-///
-/// Если задан TURN, первым добавляется STUN с того же хоста/порта (coturn),
-/// чтобы не зависеть от DNS к публичным STUN (stun.l.google.com).
+/// Аварийный путь — [buildIceServerConfigFromDartDefine]: STUN (Google) + опциональный TURN
+/// через `--dart-define` (локальная отладка без API или при ошибке сети).
+/// `--dart-define=WEBRTC_USE_API_ICE=false` — только dart-define, без запроса к API.
 String? _stunUrlFromTurnUrl(String raw) {
   final u = raw.split('?').first.trim();
   if (u.startsWith('turn:')) {
@@ -21,7 +16,9 @@ String? _stunUrlFromTurnUrl(String raw) {
   return null;
 }
 
-List<Map<String, dynamic>> buildIceServerConfig() {
+/// Только STUN по умолчанию + опциональный TURN из `--dart-define` (без API).
+/// Для продакшена предпочтительнее [resolveIceServerConfig].
+List<Map<String, dynamic>> buildIceServerConfigFromDartDefine() {
   final defaultStun = <Map<String, dynamic>>[
     {'urls': 'stun:stun.l.google.com:19302'},
     {'urls': 'stun:stun1.l.google.com:19302'},

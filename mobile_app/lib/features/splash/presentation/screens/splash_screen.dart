@@ -8,6 +8,7 @@ import '../../../../app/widgets/app_screen_background.dart';
 import '../../../../core/push/open_chat_from_push.dart';
 import '../../../../core/storage/secure_storage_service.dart';
 import '../../../auth/data/services/auth_service.dart';
+import '../../../calls/data/ice_config_service.dart';
 import '../../../auth/presentation/screens/auth_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -37,6 +38,12 @@ class _SplashScreenState extends State<SplashScreen> {
         AuthService().registerPushTokenIfLoggedIn().catchError(
           (Object e, StackTrace st) =>
               debugPrint('registerPushTokenIfLoggedIn: $e\n$st'),
+        ),
+      );
+      unawaited(
+        IceConfigService.instance.prefetch().catchError(
+          (Object e, StackTrace st) =>
+              debugPrint('IceConfigService.prefetch: $e\n$st'),
         ),
       );
 

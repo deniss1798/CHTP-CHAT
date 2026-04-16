@@ -69,6 +69,30 @@ class Settings(BaseSettings):
 
     cors_origins: str = Field("", alias="CORS_ORIGINS")
 
+    # --- WebRTC / TURN (coturn REST + static-auth-secret) ---
+    # Если заданы secret и host — API выдаёт временные username/credential для TURN.
+    turn_static_auth_secret: str | None = Field(
+        None,
+        alias="TURN_STATIC_AUTH_SECRET",
+    )
+    turn_server_host: str | None = Field(
+        None,
+        alias="TURN_SERVER_HOST",
+        description="Публичный hostname или IP coturn для клиентов",
+    )
+    turn_udp_port: int = Field(3478, alias="TURN_UDP_PORT")
+    turn_tls_port: int | None = Field(None, alias="TURN_TLS_PORT")
+    turn_credential_ttl_seconds: int = Field(
+        3600,
+        ge=300,
+        le=86400,
+        alias="TURN_CREDENTIAL_TTL_SECONDS",
+    )
+    webrtc_fallback_stun_urls: str = Field(
+        "stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302",
+        alias="WEBRTC_FALLBACK_STUN_URLS",
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

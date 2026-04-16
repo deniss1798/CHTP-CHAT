@@ -10,7 +10,7 @@ import 'package:permission_handler/permission_handler.dart';
 import '../call_chat_message.dart';
 import '../call_coordinator.dart';
 import 'call_signaling_crypto.dart';
-import 'webrtc_ice_config.dart';
+import 'ice_config_service.dart';
 
 const _callSignalTypes = {
   'call_e2e_init',
@@ -234,7 +234,7 @@ class VoiceCallSession {
         stream.getVideoTracks().isNotEmpty ? stream.getVideoTracks().first : null;
 
     final config = <String, dynamic>{
-      'iceServers': buildIceServerConfig(),
+      'iceServers': await resolveIceServerConfig(),
       'sdpSemantics': 'unified-plan',
     };
     // Debug: --dart-define=WEBRTC_FORCE_RELAY=true forces TURN-only (no direct P2P).

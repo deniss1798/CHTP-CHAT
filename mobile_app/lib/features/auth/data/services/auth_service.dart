@@ -1,4 +1,4 @@
-import 'dart:async' show TimeoutException;
+import 'dart:async' show TimeoutException, unawaited;
 
 import 'package:dio/dio.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatf
 import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/secure_storage_service.dart';
 import '../../../../core/session/current_user_store.dart';
+import '../../../calls/data/ice_config_service.dart';
 
 class AuthService {
   final Dio _dio = ApiClient.dio;
@@ -66,6 +67,7 @@ Future<void> requestEmailCode({
     await SecureStorageService.saveAccessToken(token);
     await _registerDeviceToken(token);
     await getMe(forceRefresh: true);
+    unawaited(IceConfigService.instance.prefetch());
   }
 
   /// Повторная регистрация FCM после cold start (токен мог обновиться, сессия уже есть).
@@ -105,6 +107,7 @@ Future<void> requestEmailCode({
     await SecureStorageService.saveAccessToken(token);
     await _registerDeviceToken(token);
     await getMe(forceRefresh: true);
+    unawaited(IceConfigService.instance.prefetch());
   }
 
   Future<void> _registerDeviceToken(String accessToken) async {

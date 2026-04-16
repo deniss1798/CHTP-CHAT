@@ -6,7 +6,7 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../call_coordinator.dart';
-import 'webrtc_ice_config.dart';
+import 'ice_config_service.dart';
 
 const _groupCallSignalTypes = {
   'group_call_invite',
@@ -199,9 +199,9 @@ class GroupCallSession {
     localRenderer.srcObject = ls;
   }
 
-  Map<String, dynamic> _iceConfig() {
+  Future<Map<String, dynamic>> _iceConfig() async {
     final config = <String, dynamic>{
-      'iceServers': buildIceServerConfig(),
+      'iceServers': await resolveIceServerConfig(),
       'sdpSemantics': 'unified-plan',
     };
     const forceRelay =
@@ -251,7 +251,7 @@ class GroupCallSession {
     }
 
     try {
-      final pc = await createPeerConnection(_iceConfig());
+      final pc = await createPeerConnection(await _iceConfig());
       rec.pc = pc;
       rec.iStartedNegotiation = true;
       rec.remoteDescriptionSet = false;
@@ -554,7 +554,7 @@ class GroupCallSession {
     }
 
     if (pc == null) {
-      final newPc = await createPeerConnection(_iceConfig());
+      final newPc = await createPeerConnection(await _iceConfig());
       rec.pc = newPc;
       rec.iStartedNegotiation = false;
       rec.remoteDescriptionSet = false;
