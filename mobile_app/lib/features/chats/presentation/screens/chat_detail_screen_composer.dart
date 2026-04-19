@@ -564,17 +564,17 @@ mixin _ChatDetailComposerAndActionsLogic
     }
   }
 
-  String _titleForForwardChat(Map<String, dynamic> chat) {
-    final title = (chat['title'] ?? '').toString().trim();
+  String _titleForForwardChat(ChatSummary chat) {
+    final title = chat.title.trim();
     if (title.isNotEmpty) return title;
-    return 'Chat ${chat['id'] ?? ''}';
+    return 'Chat ${chat.id}';
   }
 
   Future<void> _pickForwardTarget(Map<String, dynamic> message) async {
     final sourceId = ChatDetailMessageMaps.intFromDynamic(message['id']);
     if (sourceId == null || _currentUserId == null) return;
 
-    List<Map<String, dynamic>> chats;
+    List<ChatSummary> chats;
     try {
       chats = await ChatsService().getChats(currentUserId: _currentUserId!);
     } catch (e) {
@@ -626,12 +626,9 @@ mixin _ChatDetailComposerAndActionsLogic
                   itemCount: chats.length,
                   itemBuilder: (context, index) {
                     final chat = chats[index];
-                    final targetId = ChatDetailMessageMaps.intFromDynamic(
-                      chat['id'] ?? chat['chat_id'],
-                    );
-                    if (targetId == null) return const SizedBox.shrink();
+                    final targetId = chat.id;
                     final title = _titleForForwardChat(chat);
-                    final chatType = (chat['type'] ?? 'private').toString();
+                    final chatType = chat.type;
 
                     return ListTile(
                       title: Text(

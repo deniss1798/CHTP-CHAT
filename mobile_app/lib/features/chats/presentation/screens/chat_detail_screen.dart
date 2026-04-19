@@ -29,6 +29,7 @@ import '../../data/services/presence_service.dart';
 import 'chat_member_add_screen.dart';
 import 'video_note_record_screen.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../data/models/chat_models.dart';
 import '../../data/services/chat_avatar_service.dart';
 import '../../data/services/chats_service.dart';
 import 'group_members_manage_screen.dart';

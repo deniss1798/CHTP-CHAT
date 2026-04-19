@@ -542,82 +542,23 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
   }
 
   String _chatTitle(ChatSummary chat) {
-    final type = (chat['type'] ?? '').toString();
-
-    if (type == 'private') {
-      final displayName = (chat['display_name'] ?? '').toString().trim();
-      if (displayName.isNotEmpty) {
-        return displayName;
-      }
-    }
-
-    final possible = [
-      chat['title'],
-      chat['name'],
-      chat['chat_name'],
-      chat['username'],
-      chat['other_user_name'],
-      chat['other_username'],
-    ];
-
-    for (final value in possible) {
-      if (value != null && value.toString().trim().isNotEmpty) {
-        return value.toString().trim();
-      }
-    }
-
-    final id = chat['id'] ?? chat['chat_id'];
-    return 'Чат ${id ?? ''}'.trim();
+    final title = chat.title.trim();
+    return title.isNotEmpty ? title : 'Чат ${chat.id}';
   }
 
-  String? _chatAvatarUrl(Map<String, dynamic> chat) {
-    final possible = [
-      chat['avatar_url'],
-      chat['avatarUrl'],
-    ];
-
-    for (final value in possible) {
-      if (value != null && value.toString().trim().isNotEmpty) {
-        final raw = value.toString().trim();
-
-        if (raw.startsWith('http://') || raw.startsWith('https://')) {
-          return raw;
-        }
-
-        return '${ApiClient.baseUrl}$raw';
-      }
-    }
-
-    return null;
-  }
+  String? _chatAvatarUrl(ChatSummary chat) => chat.avatarUrl;
 
   String? _chatTypeById(int chatId) {
     for (final c in _allChats) {
-      final rawId = c['id'] ?? c['chat_id'];
-      int? id;
-      if (rawId is int) {
-        id = rawId;
-      } else {
-        id = int.tryParse(rawId?.toString() ?? '');
-      }
-      if (id == chatId) {
-        return (c['type'] ?? '').toString();
-      }
+      if (c.id == chatId) return c.type;
     }
     return null;
   }
 
   String? _titleForChatId(int chatId) {
     for (final c in _allChats) {
-      final rawId = c['id'] ?? c['chat_id'];
-      int? id;
-      if (rawId is int) {
-        id = rawId;
-      } else {
-        id = int.tryParse(rawId?.toString() ?? '');
-      }
-      if (id == chatId) {
-        final t = (c['title'] ?? '').toString().trim();
+      if (c.id == chatId) {
+        final t = c.title.trim();
         return t.isNotEmpty ? t : null;
       }
     }
@@ -850,24 +791,11 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
     }
   }
 
-  String _lastMessage(Map<String, dynamic> chat) {
-    final possible = [
-      chat['last_message'],
-      chat['lastMessage'],
-      chat['message'],
-      chat['last_message_text'],
-      chat['content'],
-    ];
+  String _lastMessage(ChatSummary chat) {
+    final text = chat.lastMessage?.trim();
+    if (text != null && text.isNotEmpty) return text;
 
-    for (final value in possible) {
-      if (value != null && value.toString().trim().isNotEmpty) {
-        return value.toString().trim();
-      }
-    }
-
-    final mt = (chat['last_message_type'] ?? chat['lastMessageType'])
-        ?.toString()
-        .trim();
+    final mt = chat.lastMessageType?.trim();
     if (mt != null && mt.isNotEmpty) {
       final preview = _previewForLastMessageType(mt);
       if (preview != null) {
@@ -875,22 +803,14 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
       }
     }
 
-    return chat['type'] == 'private' ? 'Личный чат' : 'Групповой чат';
+    return chat.type == 'private' ? 'Личный чат' : 'Групповой чат';
   }
 
-  String _timeText(Map<String, dynamic> chat) {
-    final possible = [
-      chat['last_message_at'],
-      chat['updated_at'],
-      chat['created_at'],
-    ];
-
-    for (final value in possible) {
-      if (value != null && value.toString().trim().isNotEmpty) {
-        return _formatShortTime(value.toString());
-      }
+  String _timeText(ChatSummary chat) {
+    final raw = chat.lastMessageAtRaw?.trim();
+    if (raw != null && raw.isNotEmpty) {
+      return _formatShortTime(raw);
     }
-
     return '';
   }
 
@@ -915,36 +835,15 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
     return '$day.$month';
   }
 
-  int? _intFromChatField(dynamic v) {
-    if (v == null) return null;
-    if (v is int) return v;
-    return int.tryParse(v.toString());
-  }
-
-  int _parseUnreadRaw(dynamic value) {
-    if (value == null) return 0;
-    if (value is int) return value;
-    if (value is double) return value.round();
-    return int.tryParse(value.toString()) ?? 0;
-  }
-
   /// Счётчик с сервера; если 0 — эвристика по last_message_id vs my_last_read (последнее от собеседника).
-  int _unreadCount(Map<String, dynamic> chat) {
-    final api = _parseUnreadRaw(chat['unread_count'] ?? chat['unreadCount']);
-    if (api > 0) return api;
+  int _unreadCount(ChatSummary chat) {
+    if (chat.unreadCount > 0) return chat.unreadCount;
 
     if (_currentUserId == null) return 0;
 
-    final lastId = _intFromChatField(
-      chat['last_message_id'] ?? chat['lastMessageId'],
-    );
-    final lastSender = _intFromChatField(
-      chat['last_message_sender_id'] ?? chat['lastMessageSenderId'],
-    );
-    final myRead = _intFromChatField(
-          chat['my_last_read_message_id'] ?? chat['myLastReadMessageId'],
-        ) ??
-        0;
+    final lastId = chat.lastMessageId;
+    final lastSender = chat.lastMessageSenderId;
+    final myRead = chat.myLastReadMessageId;
 
     if (lastId == null || lastSender == null) return 0;
     if (lastSender == _currentUserId) return 0;
@@ -961,9 +860,9 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
     return DateTime.now().toUtc().difference(t) <= _peerOnlineThreshold;
   }
 
-  bool _peerOnlineInList(Map<String, dynamic> chat) {
-    if ((chat['type'] ?? '').toString() != 'private') return false;
-    return _peerOnlineFromLastSeenRaw(chat['peer_last_seen_at']);
+  bool _peerOnlineInList(ChatSummary chat) {
+    if (chat.type != 'private') return false;
+    return _peerOnlineFromLastSeenRaw(chat.peerLastSeenAtRaw);
   }
 
   String _initials(String title) {
@@ -1137,31 +1036,21 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
           final lastMessage = _lastMessage(chat);
           final timeText = _timeText(chat);
 
-          final rawId = chat['id'] ?? chat['chat_id'];
-          int? chatId;
+          final chatId = chat.id;
 
-          if (rawId is int) {
-            chatId = rawId;
-          } else {
-            chatId = int.tryParse(rawId.toString());
-          }
-
-          final typingLabel =
-              chatId != null ? _typingLabelByChatId[chatId] : null;
+          final typingLabel = _typingLabelByChatId[chatId];
 
           final isUnread = unreadCount > 0;
           final isSelected =
               widget.selectedChatId != null && chatId == widget.selectedChatId;
 
           return GestureDetector(
-            onTap: chatId == null
-                ? null
-                : () => _openChat(
-                      chatId: chatId!,
-                      title: title,
-                      chatType: (chat['type'] ?? '').toString(),
-                      avatarUrl: avatarUrl,
-                    ),
+            onTap: () => _openChat(
+              chatId: chatId,
+              title: title,
+              chatType: chat.type,
+              avatarUrl: avatarUrl,
+            ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(AppRadius.md),
               child: Container(
@@ -1561,3 +1450,5 @@ class _CreateChatOption extends StatelessWidget {
     );
   }
 }
+
+
