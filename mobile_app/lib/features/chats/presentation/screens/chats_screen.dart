@@ -18,6 +18,7 @@ import '../../../auth/data/services/auth_service.dart';
 import '../../../auth/presentation/screens/auth_screen.dart';
 import '../../../settings/presentation/screens/settings_screen.dart';
 import '../../../../core/push/local_notifications_service.dart';
+import '../../data/models/chat_models.dart';
 import '../../data/services/chats_service.dart';
 import '../../data/services/chat_socket_service.dart';
 import '../../data/services/inbox_socket_service.dart';
@@ -64,8 +65,8 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
   String? _error;
   int? _currentUserId;
 
-  List<Map<String, dynamic>> _allChats = [];
-  List<Map<String, dynamic>> _filteredChats = [];
+  List<ChatSummary> _allChats = [];
+  List<ChatSummary> _filteredChats = [];
 
   static const Duration _chatsListPollInterval = Duration(seconds: 5);
 
@@ -293,45 +294,34 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
     }
 
     try {
-      final chats = await _chatsService.getChats(
+      var chats = await _chatsService.getChats(
         currentUserId: _currentUserId!,
       );
 
       if (!mounted) return;
 
       final localReads = await _localChatStateService.getAllLastReadMessageIds();
-      for (final c in chats) {
-        final cid = _intFromChatField(c['id']);
-        if (cid == null) continue;
-        final lrLocal = localReads[cid];
-        if (lrLocal != null) {
-          final sr = _intFromChatField(
-                c['my_last_read_message_id'] ?? c['myLastReadMessageId'],
-              ) ??
-              0;
-          if (lrLocal > sr) {
-            c['my_last_read_message_id'] = lrLocal;
-          }
+      chats = chats.map((chat) {
+        final lrLocal = localReads[chat.id];
+        var updated = chat;
+        if (lrLocal != null && lrLocal > chat.myLastReadMessageId) {
+          updated = updated.copyWith(myLastReadMessageId: lrLocal);
         }
-        final serverUnread = _parseUnreadRaw(c['unread_count'] ?? c['unreadCount']);
-        final lastId = _intFromChatField(
-          c['last_message_id'] ?? c['lastMessageId'],
-        );
-        final lastSender = _intFromChatField(
-          c['last_message_sender_id'] ?? c['lastMessageSenderId'],
-        );
-        final myRead = _intFromChatField(
-              c['my_last_read_message_id'] ?? c['myLastReadMessageId'],
-            ) ??
-            0;
+
+        final serverUnread = updated.unreadCount;
+        final lastId = updated.lastMessageId;
+        final lastSender = updated.lastMessageSenderId;
+        final myRead = updated.myLastReadMessageId;
         if (serverUnread > 0 &&
             lastId != null &&
             lastSender != null &&
             lastSender != _currentUserId &&
             myRead >= lastId) {
-          c['unread_count'] = 0;
+          updated = updated.copyWith(unreadCount: 0);
         }
-      }
+
+        return updated;
+      }).toList();
 
       setState(() {
         _allChats = chats;
@@ -370,8 +360,8 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
     }
   }
 
-  List<Map<String, dynamic>> _applySearchToList(
-    List<Map<String, dynamic>> chats,
+  List<ChatSummary> _applySearchToList(
+    List<ChatSummary> chats,
     String query,
   ) {
     if (query.isEmpty) {
@@ -551,7 +541,7 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
     }
   }
 
-  String _chatTitle(Map<String, dynamic> chat) {
+  String _chatTitle(ChatSummary chat) {
     final type = (chat['type'] ?? '').toString();
 
     if (type == 'private') {

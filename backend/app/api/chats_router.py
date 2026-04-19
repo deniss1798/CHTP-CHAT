@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFil
 from sqlalchemy.orm import Session
 
 from app.application.media.constants import ALLOWED_IMAGE_TYPES, MAX_AVATAR_SIZE
-from app.application.chats.chat_commands import create_chat as execute_create_chat
+from app.application.chats.chat_commands import create_chat
 from app.application.chats.chat_listing import list_my_chats
 from app.application.chats.chat_queries import build_chat_detail_response
 from app.core.dependencies import get_current_user
@@ -37,12 +37,12 @@ def get_my_chats(
 
 
 @router.post("/", response_model=ChatResponse)
-def create_chat(
+def create_chat_endpoint(
     payload: ChatCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return execute_create_chat(db, current_user, payload)
+    return create_chat(db, current_user, payload)
 
 
 @router.get("/{chat_id}", response_model=ChatDetailResponse)

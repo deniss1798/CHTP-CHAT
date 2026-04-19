@@ -4,8 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_icons.dart';
 import '../../../../app/widgets/app_screen_background.dart';
-import '../../../../core/network/api_client.dart';
-import '../../../../core/storage/secure_storage_service.dart';
+import '../../data/models/chat_models.dart';
 import '../../data/services/chats_service.dart';
 
 class GroupMembersManageScreen extends StatefulWidget {
@@ -27,9 +26,8 @@ class GroupMembersManageScreen extends StatefulWidget {
 
 class _GroupMembersManageScreenState extends State<GroupMembersManageScreen> {
   final ChatsService _chatsService = ChatsService();
-  final Dio _dio = ApiClient.dio;
 
-  List<Map<String, dynamic>> _members = [];
+  List<ChatMember> _members = [];
   bool _loading = true;
   bool _busy = false;
   String? _error;
@@ -46,23 +44,7 @@ class _GroupMembersManageScreenState extends State<GroupMembersManageScreen> {
       _error = null;
     });
     try {
-      final token = await SecureStorageService.getAccessToken();
-      if (token == null || token.isEmpty) {
-        throw Exception('Токен не найден');
-      }
-      final response = await _dio.get(
-        '/chats/${widget.chatId}/members',
-        options: Options(headers: {'Authorization': 'Bearer $token'}),
-      );
-      final data = response.data;
-      final list = <Map<String, dynamic>>[];
-      if (data is List) {
-        for (final item in data) {
-          if (item is Map) {
-            list.add(Map<String, dynamic>.from(item));
-          }
-        }
-      }
+      final list = await _chatsService.fetchChatMembers(widget.chatId);
       if (!mounted) return;
       setState(() {
         _members = list;
@@ -115,10 +97,7 @@ class _GroupMembersManageScreenState extends State<GroupMembersManageScreen> {
       );
       if (!mounted) return;
       setState(() {
-        _members.removeWhere((m) {
-          final id = _parseId(m['id']);
-          return id == userId;
-        });
+        _members.removeWhere((member) => member.id == userId);
         _busy = false;
       });
       if (mounted) {
@@ -129,30 +108,15 @@ class _GroupMembersManageScreenState extends State<GroupMembersManageScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _busy = false);
-      String msg = 'Не удалось удалить';
+      var msg = 'Не удалось удалить';
       if (e is DioException) {
-        final d = e.response?.data;
-        if (d is Map) {
-          msg = d['detail']?.toString() ?? msg;
+        final data = e.response?.data;
+        if (data is Map) {
+          msg = data['detail']?.toString() ?? msg;
         }
       }
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     }
-  }
-
-  int? _parseId(dynamic v) {
-    if (v == null) return null;
-    if (v is int) return v;
-    return int.tryParse(v.toString());
-  }
-
-  String _avatarUrl(Map<String, dynamic> m) {
-    final raw = (m['avatar_url'] ?? '').toString().trim();
-    if (raw.isEmpty) return '';
-    if (raw.startsWith('http://') || raw.startsWith('https://')) {
-      return raw;
-    }
-    return '${ApiClient.baseUrl}$raw';
   }
 
   @override
@@ -227,15 +191,12 @@ class _GroupMembersManageScreenState extends State<GroupMembersManageScreen> {
                             separatorBuilder: (_, __) =>
                                 const SizedBox(height: 8),
                             itemBuilder: (context, index) {
-                              final m = _members[index];
-                              final uid = _parseId(m['id']);
-                              final username =
-                                  (m['username'] ?? 'Пользователь').toString();
-                              final email = (m['email'] ?? '').toString();
-                              final avatar = _avatarUrl(m);
+                              final member = _members[index];
+                              final username = member.username;
+                              final email = member.email ?? '';
+                              final avatar = member.avatarUrl ?? '';
                               final canRemove = _isCreator &&
-                                  uid != null &&
-                                  uid != widget.currentUserId &&
+                                  member.id != widget.currentUserId &&
                                   !_busy;
 
                               return Container(
@@ -278,8 +239,10 @@ class _GroupMembersManageScreenState extends State<GroupMembersManageScreen> {
                                     ),
                                     if (canRemove)
                                       IconButton(
-                                        onPressed: () =>
-                                            _remove(uid, username),
+                                        onPressed: () => _remove(
+                                          member.id,
+                                          username,
+                                        ),
                                         icon: const Icon(
                                           AppIcons.personRemove,
                                           color: Colors.redAccent,
