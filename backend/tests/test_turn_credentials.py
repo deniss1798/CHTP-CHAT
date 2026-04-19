@@ -2,7 +2,7 @@ import base64
 import hashlib
 import hmac
 
-from app.services.turn_credentials import build_turn_rest_username_and_credential
+from app.infrastructure.turn.turn_credentials import build_turn_rest_username_and_credential
 
 
 def test_turn_rest_hmac_matches_manual() -> None:

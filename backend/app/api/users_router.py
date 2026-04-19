@@ -11,7 +11,7 @@ from app.models.device_token import DeviceToken
 from app.models.message import Message
 from app.models.user import User
 from app.schemas.user_schema import UserPublicProfile, UserResponse
-from app.services.s3_storage import S3StorageService, is_s3_configured
+from app.infrastructure.storage.s3_storage import S3StorageService, is_s3_configured
 
 router = APIRouter(prefix="/users", tags=["Users"])
 

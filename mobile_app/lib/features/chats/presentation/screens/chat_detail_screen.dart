@@ -9,7 +9,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:video_player/video_player.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_icons.dart';
@@ -21,6 +20,7 @@ import '../../../../core/formatting/last_seen_label.dart';
 import '../../../../core/formatting/server_time.dart';
 import '../../../../core/platform/desktop_layout.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/realtime/chat_ws_contract.dart';
 import '../../../../core/network/url_helper.dart';
 import '../../../../core/notifiers/chats_list_refresh_notifier.dart';
 import '../../../../core/storage/secure_storage_service.dart';
@@ -43,6 +43,10 @@ import 'group_members_manage_screen.dart';
 import '../../../profile/presentation/screens/user_profile_screen.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 
+import '../widgets/chat_detail_fullscreen_image_viewer.dart';
+import '../widgets/chat_detail_fullscreen_video_page.dart';
+import '../widgets/chat_detail_video_message_widget.dart';
+
 class ChatDetailScreen extends StatefulWidget {
   final int chatId;
   final String title;
@@ -63,490 +67,6 @@ class ChatDetailScreen extends StatefulWidget {
 
   @override
   State<ChatDetailScreen> createState() => _ChatDetailScreenState();
-}
-
-class _VideoMessageWidget extends StatefulWidget {
-  final String url;
-  final bool isMine;
-  final bool isVideoNote;
-
-  /// Для обычного видео: открыть на весь экран. Для кружков ([isVideoNote]) не используется.
-  final VoidCallback? onOpenFullscreen;
-
-  const _VideoMessageWidget({
-    required this.url,
-    required this.isMine,
-    this.isVideoNote = false,
-    this.onOpenFullscreen,
-  });
-
-  @override
-  State<_VideoMessageWidget> createState() => _VideoMessageWidgetState();
-}
-
-class _VideoMessageWidgetState extends State<_VideoMessageWidget> {
-  VideoPlayerController? _controller;
-  bool _initialized = false;
-  bool _showOverlay = true;
-  String? _initError;
-  int _loadGeneration = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _attachController();
-  }
-
-  void _attachController() {
-    final gen = ++_loadGeneration;
-    _controller?.dispose();
-    _controller = null;
-    _initialized = false;
-    _initError = null;
-
-    final uri = Uri.tryParse(widget.url);
-    if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
-      _initError = 'Некорректный адрес видео';
-      return;
-    }
-
-    final c = VideoPlayerController.networkUrl(
-      uri,
-      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
-    );
-    _controller = c;
-
-    c.initialize().then((_) {
-      if (!mounted || gen != _loadGeneration) return;
-      setState(() {
-        _initialized = true;
-        _initError = null;
-      });
-    }).catchError((Object e, _) {
-      if (!mounted || gen != _loadGeneration) return;
-      setState(() {
-        _initialized = false;
-        _initError = e.toString().replaceFirst('Exception: ', '');
-      });
-    });
-
-    if (widget.isVideoNote) {
-      c.addListener(() {
-        if (!mounted || gen != _loadGeneration) return;
-        final playing = c.value.isPlaying;
-        if (playing) {
-          if (_showOverlay) setState(() => _showOverlay = false);
-        } else {
-          if (!_showOverlay) setState(() => _showOverlay = true);
-        }
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    _loadGeneration++;
-    _controller?.dispose();
-    super.dispose();
-  }
-
-  void _togglePlayback() {
-    final c = _controller;
-    if (c == null || !_initialized) return;
-    if (c.value.isPlaying) {
-      c.pause();
-    } else {
-      c.play();
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    const loadingBg = Color(0x00000000);
-
-    if (_initError != null) {
-      return Container(
-        color: loadingBg,
-        alignment: Alignment.center,
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              AppIcons.videocamOff,
-              color: AppColors.textMuted,
-              size: 32,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Не удалось загрузить видео',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'На ПК иногда не поддерживается кодек с телефона. Повторите попытку.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: AppColors.textMuted,
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            TextButton.icon(
-              onPressed: () => setState(_attachController),
-              icon: const Icon(AppIcons.refresh, size: 18),
-              label: const Text('Повторить'),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (!_initialized || _controller == null) {
-      return Container(
-        color: loadingBg,
-        alignment: Alignment.center,
-        child: SizedBox(
-          width: 28,
-          height: 28,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            color: AppColors.accent.withAlpha(220),
-          ),
-        ),
-      );
-    }
-
-    final c = _controller!;
-
-    final videoChild = widget.isVideoNote
-        ? SizedBox(
-            width: 220,
-            height: 220,
-            child: ClipOval(
-              child: FittedBox(
-                fit: BoxFit.cover,
-                child: SizedBox(
-                  width: c.value.size.width,
-                  height: c.value.size.height,
-                  child: VideoPlayer(c),
-                ),
-              ),
-            ),
-          )
-        : AspectRatio(
-            aspectRatio: c.value.aspectRatio,
-            child: VideoPlayer(c),
-          );
-
-    if (widget.isVideoNote) {
-      return GestureDetector(
-        onTap: _togglePlayback,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Center(child: videoChild),
-            AnimatedOpacity(
-              opacity: _showOverlay ? 1 : 0,
-              duration: const Duration(milliseconds: 150),
-              child: Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: Colors.black.withAlpha(55),
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                alignment: Alignment.center,
-                child: Icon(
-                  c.value.isPlaying
-                      ? AppIcons.pause
-                      : AppIcons.play,
-                  color: Colors.white,
-                  size: 24,
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return GestureDetector(
-      onTap: widget.onOpenFullscreen,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Center(child: videoChild),
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: Colors.black.withAlpha(55),
-              borderRadius: BorderRadius.circular(24),
-            ),
-            alignment: Alignment.center,
-            child: const Icon(
-              AppIcons.play,
-              color: Colors.white,
-              size: 24,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FullscreenImageViewer extends StatelessWidget {
-  final String url;
-
-  const _FullscreenImageViewer({required this.url});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(AppIcons.close, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ),
-      body: SafeArea(
-        child: Center(
-          child: InteractiveViewer(
-            minScale: 0.5,
-            maxScale: 4,
-            child: Image.network(
-              url,
-              fit: BoxFit.contain,
-              loadingBuilder: (context, child, progress) {
-                if (progress == null) return child;
-                return const SizedBox(
-                  height: 200,
-                  width: double.infinity,
-                  child: Center(
-                    child: CircularProgressIndicator(color: AppColors.accent),
-                  ),
-                );
-              },
-              errorBuilder: (_, __, ___) => const Padding(
-                padding: EdgeInsets.all(24),
-                child: Text(
-                  'Не удалось загрузить фото',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white70),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _FullscreenVideoPage extends StatefulWidget {
-  final String url;
-  final bool isVideoNote;
-
-  const _FullscreenVideoPage({
-    required this.url,
-    this.isVideoNote = false,
-  });
-
-  @override
-  State<_FullscreenVideoPage> createState() => _FullscreenVideoPageState();
-}
-
-class _FullscreenVideoPageState extends State<_FullscreenVideoPage> {
-  VideoPlayerController? _controller;
-  bool _initialized = false;
-  bool _showOverlay = true;
-  String? _initError;
-  int _loadGeneration = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _attach();
-  }
-
-  void _attach() {
-    final gen = ++_loadGeneration;
-    _controller?.dispose();
-    _controller = null;
-    _initialized = false;
-    _initError = null;
-
-    final uri = Uri.tryParse(widget.url);
-    if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
-      setState(() => _initError = 'Некорректный адрес видео');
-      return;
-    }
-
-    final c = VideoPlayerController.networkUrl(
-      uri,
-      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
-    );
-    _controller = c;
-
-    c.initialize().then((_) {
-      if (!mounted || gen != _loadGeneration) return;
-      setState(() {
-        _initialized = true;
-        _initError = null;
-      });
-    }).catchError((Object e, _) {
-      if (!mounted || gen != _loadGeneration) return;
-      setState(() {
-        _initialized = false;
-        _initError = e.toString().replaceFirst('Exception: ', '');
-      });
-    });
-
-    c.addListener(() {
-      if (!mounted || gen != _loadGeneration) return;
-      final playing = c.value.isPlaying;
-      if (playing) {
-        if (_showOverlay) setState(() => _showOverlay = false);
-      } else {
-        if (!_showOverlay) setState(() => _showOverlay = true);
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _loadGeneration++;
-    _controller?.dispose();
-    super.dispose();
-  }
-
-  void _togglePlayback() {
-    final c = _controller;
-    if (c == null || !_initialized) return;
-    if (c.value.isPlaying) {
-      c.pause();
-    } else {
-      c.play();
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(AppIcons.close, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ),
-      body: SafeArea(
-        child: _buildBody(),
-      ),
-    );
-  }
-
-  Widget _buildBody() {
-    if (_initError != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                _initError!,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white70),
-              ),
-              const SizedBox(height: 16),
-              TextButton.icon(
-                onPressed: () => setState(_attach),
-                icon: const Icon(AppIcons.refresh, color: AppColors.accent),
-                label: const Text(
-                  'Повторить',
-                  style: TextStyle(color: AppColors.accent),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    if (!_initialized || _controller == null) {
-      return const Center(
-        child: CircularProgressIndicator(color: AppColors.accent),
-      );
-    }
-
-    final c = _controller!;
-
-    final videoChild = widget.isVideoNote
-        ? LayoutBuilder(
-            builder: (context, constraints) {
-              final side = constraints.biggest.shortestSide * 0.92;
-              return SizedBox(
-                width: side,
-                height: side,
-                child: ClipOval(
-                  child: FittedBox(
-                    fit: BoxFit.cover,
-                    child: SizedBox(
-                      width: c.value.size.width,
-                      height: c.value.size.height,
-                      child: VideoPlayer(c),
-                    ),
-                  ),
-                ),
-              );
-            },
-          )
-        : AspectRatio(
-            aspectRatio: c.value.aspectRatio,
-            child: VideoPlayer(c),
-          );
-
-    return GestureDetector(
-      onTap: _togglePlayback,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Center(child: videoChild),
-          AnimatedOpacity(
-            opacity: _showOverlay ? 1 : 0,
-            duration: const Duration(milliseconds: 150),
-            child: Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: Colors.black.withAlpha(55),
-                borderRadius: BorderRadius.circular(28),
-              ),
-              alignment: Alignment.center,
-              child: Icon(
-                c.value.isPlaying ? AppIcons.pause : AppIcons.play,
-                color: Colors.white,
-                size: 28,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _ChatDetailScreenState extends State<ChatDetailScreen> {
@@ -1405,7 +925,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       return;
     }
 
-    if (incoming['event'] == 'message_deleted') {
+    if (incoming['event'] == ChatWsContract.eventMessageDeleted) {
       final rawId = incoming['id'];
       int? id;
       if (rawId is int) {
@@ -1429,7 +949,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       return;
     }
 
-    if (incoming['event'] == 'message_updated') {
+    if (incoming['event'] == ChatWsContract.eventMessageUpdated) {
       final msg = incoming['message'];
       if (msg is! Map) return;
 
@@ -1456,7 +976,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       return;
     }
 
-    if (incoming['type'] == 'new_message' || incoming.containsKey('message')) {
+    if (incoming['type'] == ChatWsContract.payloadTypeNewMessage ||
+        incoming.containsKey('message')) {
       _handleNewMessage(incoming);
     }
   }
@@ -2916,7 +2437,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         fullscreenDialog: true,
-        builder: (ctx) => _FullscreenImageViewer(url: url),
+        builder: (ctx) => ChatDetailFullscreenImageViewer(url: url),
       ),
     );
   }
@@ -2925,7 +2446,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         fullscreenDialog: true,
-        builder: (ctx) => _FullscreenVideoPage(url: url, isVideoNote: isVideoNote),
+        builder: (ctx) =>
+            ChatDetailFullscreenVideoPage(url: url, isVideoNote: isVideoNote),
       ),
     );
   }
@@ -3009,7 +2531,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       return SizedBox(
         width: 220,
         height: 220,
-        child: _VideoMessageWidget(
+        child: ChatDetailVideoMessageWidget(
           url: mediaUrl,
           isMine: isMine,
           isVideoNote: true,
@@ -3082,7 +2604,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(12),
-          child: _VideoMessageWidget(
+          child: ChatDetailVideoMessageWidget(
             url: mediaUrl,
             isMine: isMine,
             isVideoNote: false,

@@ -5,7 +5,7 @@ from sqlalchemy import text
 from app.api.auth_router import router as auth_router
 from app.api.chats_router import router as chats_router
 from app.api.devices_router import router as devices_router
-from app.api.messages_router import router as messages_router
+from app.api.routers.messages.router import router as messages_router
 from app.api.users_router import router as users_router
 from app.api.ws_inbox_router import router as ws_inbox_router
 from app.api.webrtc_router import router as webrtc_router
