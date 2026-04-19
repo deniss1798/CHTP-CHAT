@@ -24,6 +24,7 @@ import '../../../calls/presentation/screens/voice_call_screen.dart';
 import '../../../calls/voice_call_ring.dart';
 import '../../data/services/chat_socket_service.dart';
 import '../../data/services/local_chat_state_service.dart';
+import '../../data/models/chat_models.dart';
 import '../../data/services/messages_service.dart';
 import '../../data/services/presence_service.dart';
 import 'chat_member_add_screen.dart';
