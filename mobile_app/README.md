@@ -1,17 +1,64 @@
 # mobile_app
 
-A new Flutter project.
+Flutter-клиент Messanger.
 
-## Getting Started
+## Поддерживаемые платформы
 
-This project is a starting point for a Flutter application.
+- Android
+- Windows
+- другие платформы Flutter по мере готовности
 
-A few resources to get you started if this is your first Flutter project:
+## Основные зависимости
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+- `dio`
+- `firebase_core`
+- `firebase_messaging`
+- `flutter_webrtc`
+- `image_picker`
+- `file_picker`
+- `desktop_drop`
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Запуск
+
+```powershell
+cd mobile_app
+flutter pub get
+flutter run
+```
+
+## Release build
+
+Из корня репозитория:
+
+```powershell
+build_flutter_release.bat
+```
+
+Или вручную с `--dart-define` для TURN/WebRTC.
+
+## Архитектура
+
+- `features/*/presentation` — UI
+- `features/*/data` — API, sockets, storage
+- `features/*/domain` — правила и модели уровня предметной области
+- `core/` — общие межмодульные инструменты
+
+Цель архитектуры:
+
+- не держать orchestration внутри экранов
+- выносить state и controller отдельно от UI
+- не смешивать websocket/polling/reconnect с виджетами
+- держать reusable widgets независимыми от service layer
+
+Контракты событий и API:
+
+- [../docs/contracts.md](C:/Users/User/Desktop/Messanger/docs/contracts.md)
+- `lib/core/realtime/chat_ws_contract.dart`
+
+## Качество
+
+```powershell
+cd mobile_app
+flutter analyze
+flutter test
+```

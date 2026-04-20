@@ -1,10 +1,13 @@
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
 from app.api.auth_router import router as auth_router
-from app.api.chats_router import router as chats_router
 from app.api.devices_router import router as devices_router
+from app.api.routers.chats.router import router as chats_router
 from app.api.routers.messages.router import router as messages_router
 from app.api.users_router import router as users_router
 from app.api.ws_inbox_router import router as ws_inbox_router
@@ -12,8 +15,6 @@ from app.api.webrtc_router import router as webrtc_router
 from app.api.ws_router import router as ws_router
 from app.core.config import get_settings
 from app.db.database import engine
-from pathlib import Path
-from fastapi.staticfiles import StaticFiles
 
 settings = get_settings()
 

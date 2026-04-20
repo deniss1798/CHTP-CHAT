@@ -86,7 +86,7 @@ class ChatsService {
         .toList();
   }
 
-  Future<Map<String, dynamic>> addMemberToChat({
+  Future<ChatMember> addMemberToChat({
     required int chatId,
     required int userId,
   }) async {
@@ -111,11 +111,11 @@ class ChatsService {
     final data = response.data;
 
     if (data is Map<String, dynamic>) {
-      return data;
+      return ChatMember.fromApi(data);
     }
 
     if (data is Map) {
-      return Map<String, dynamic>.from(data);
+      return ChatMember.fromApi(Map<String, dynamic>.from(data));
     }
 
     throw Exception('Неожиданный формат ответа при добавлении участника');

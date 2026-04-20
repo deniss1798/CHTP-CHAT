@@ -2,6 +2,7 @@
 
 # Тип в payload для нового сообщения в чате
 WS_TYPE_NEW_MESSAGE = "new_message"
+WS_TYPE_READ_RECEIPT = "read_receipt"
 
 # События в теле broadcast (часть путей использует event вместо type)
 WS_EVENT_MESSAGE_UPDATED = "message_updated"

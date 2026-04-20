@@ -13,7 +13,13 @@ from app.application.messages.message_projection import (
     safe_message_text,
     safe_message_type,
 )
+from app.application.messages.notifications import deliver_new_message_notifications
 from app.application.messages.reply_validation import validate_reply_target
+from app.application.realtime.chat_events import (
+    publish_message_deleted,
+    publish_message_updated,
+    publish_new_message,
+)
 from app.domain.policies.chat_access import require_chat_member
 from app.domain.policies.message_access import (
     require_message_sender,
@@ -29,8 +35,6 @@ from app.schemas.message_schema import (
     MessageUpdate,
 )
 from app.services import media_service as media_svc
-from app.services import push_service as push_svc
-from app.services import ws_service
 
 
 async def _notify_new_message(
@@ -40,7 +44,7 @@ async def _notify_new_message(
     current_user: User,
     preview: str,
 ) -> None:
-    await ws_service.broadcast_new_message(
+    await publish_new_message(
         new_message.chat_id,
         build_message_payload(new_message, db),
     )
@@ -50,14 +54,7 @@ async def _notify_new_message(
         current_user.id,
     )
     sender_name = current_user.username
-    push_svc.try_send_chat_message_push(
-        db=db,
-        chat_id=new_message.chat_id,
-        sender_name=sender_name,
-        recipient_user_ids=recipient_user_ids,
-        message_text=preview,
-    )
-    await push_svc.try_notify_inbox_new_message(
+    await deliver_new_message_notifications(
         db=db,
         chat_id=new_message.chat_id,
         sender_name=sender_name,
@@ -174,7 +171,7 @@ async def update_text_message(
 
     repo.commit_refresh(message)
 
-    await ws_service.broadcast_message_updated(
+    await publish_message_updated(
         message.chat_id,
         build_message_payload(message, db),
     )
@@ -211,7 +208,7 @@ async def delete_message(
 
     media_svc.delete_private_media_key(media_key)
 
-    await ws_service.broadcast_message_deleted(chat_id, message_id=message_id)
+    await publish_message_deleted(chat_id, message_id=message_id)
 
     return {"detail": "Message deleted"}
 

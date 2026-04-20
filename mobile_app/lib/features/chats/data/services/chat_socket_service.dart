@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert' show jsonDecode, jsonEncode, utf8;
 import 'package:web_socket_channel/web_socket_channel.dart';
+
+import '../../../../core/realtime/chat_ws_contract.dart';
 import '../../../../core/storage/secure_storage_service.dart';
 
 class ChatSocketService {
@@ -107,7 +109,12 @@ class ChatSocketService {
     final ch = _channel;
     if (ch == null) return;
     try {
-      ch.sink.add(jsonEncode({'type': 'typing', 'typing': typing}));
+      ch.sink.add(
+        jsonEncode({
+          'type': ChatWsContract.payloadTypeTyping,
+          'typing': typing,
+        }),
+      );
     } catch (_) {}
   }
 

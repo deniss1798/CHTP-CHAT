@@ -10,8 +10,12 @@
 Константы для согласования с клиентами: `app/application/realtime/ws_event_names.py`.
 
 - Новое сообщение в чате: payload с `"type": "new_message"` и полем `message` (см. `build_message_payload` в `application/messages/message_projection.py`).
+- Typing: payload с `"type": "typing"`.
+- Read receipt: payload с `"type": "read_receipt"`, `user_id` и `last_read_message_id`.
 - Обновление / удаление: `application/realtime/chat_events.py` (`publish_message_updated`, `publish_message_deleted`); новые сообщения — `publish_new_message`.
 
 ## Inbox
 
 После отправки сообщения вызывается `notify_inbox_new_message` (`application/messages/inbox_delivery.py`) для пользователей, не являющихся отправителем.
+
+Подробный канонический контракт см. в [contracts.md](C:/Users/User/Desktop/Messanger/docs/contracts.md).

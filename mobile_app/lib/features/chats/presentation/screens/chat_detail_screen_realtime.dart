@@ -1,6 +1,7 @@
 part of 'chat_detail_screen.dart';
 
 mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetailStateHelpers {
+  @override
   Future<void> _connectSocket() async {
     await _socketSubscription?.cancel();
 
@@ -36,7 +37,7 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
       _handleIncomingCallSignal(incoming);
       return;
     }
-    if (incoming['type'] == 'typing') {
+    if (incoming['type'] == ChatWsContract.payloadTypeTyping) {
       final uid = ChatDetailMessageMaps.intFromDynamic(incoming['user_id']);
       if (uid == null || uid == _currentUserId) return;
       final typing = incoming['typing'] != false;
@@ -63,7 +64,7 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
       return;
     }
 
-    if (incoming['type'] == 'read_receipt') {
+    if (incoming['type'] == ChatWsContract.payloadTypeReadReceipt) {
       final uid = ChatDetailMessageMaps.intFromDynamic(incoming['user_id']);
       final lr = ChatDetailMessageMaps.intFromDynamic(incoming['last_read_message_id']);
       if (uid == null || lr == null) return;

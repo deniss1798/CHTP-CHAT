@@ -1,10 +1,59 @@
+## Secrets and environment
+.env
+.env.*
+!.env.example
+!backend/.env.example
+firebase-service-account.json
+backend/app/core/firebase-service-account.json
+
+## Python
+**/__pycache__/
+**/*.py[cod]
+**/*.pyo
+**/*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage/
+htmlcov/
+backend/venv/
+backend/.venv/
 venv/
 .venv/
-__pycache__/
-*.pyc
-.env
+
+## Flutter / Dart
+mobile_app/.dart_tool/
+mobile_app/build/
+mobile_app/.flutter-plugins
+mobile_app/.flutter-plugins-dependencies
+mobile_app/.packages
+mobile_app/.metadata
+mobile_app/android/.gradle/
+mobile_app/android/app/debug/
+mobile_app/android/app/profile/
+mobile_app/android/app/release/
+mobile_app/ios/Pods/
+mobile_app/ios/.symlinks/
+mobile_app/macos/Pods/
+mobile_app/macos/Flutter/ephemeral/
+mobile_app/linux/flutter/ephemeral/
+mobile_app/windows/flutter/ephemeral/
+*.iml
+
+## Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.bak
+*.orig
+mobile_app/build_win_verbose.txt
+
+## IDE
 .idea/
 .vscode/
-alembic/versions/__pycache__/
-firebase-service-account.json
-app/core/firebase-service-account.json
+
+## OS artifacts
+**/.DS_Store
+**/Thumbs.db

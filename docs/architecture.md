@@ -4,7 +4,7 @@
 
 | Слой | Назначение | Каталоги |
 |------|------------|----------|
-| API | HTTP-вход, привязка зависимостей, тонкие роутеры | `api/*_router.py`, `api/routers/messages/` (текст / медиа / выборки) |
+| API | HTTP-вход, привязка зависимостей, тонкие роутеры | `api/*_router.py`, `api/routers/messages/`, `api/routers/chats/` |
 | Application | Сценарии (orchestration), use cases | `application/chats/`, `application/messages/`, `application/auth/`, `application/media/`, `application/realtime/` |
 | Domain | Политики доступа, правила без ORM-логики | `domain/policies/` |
 | Repositories | Чтение/списки идентификаторов из БД (тонкий слой) | `repositories/` |
@@ -23,6 +23,7 @@
 
 - [data-model.md](data-model.md)
 - [realtime.md](realtime.md)
+- [contracts.md](contracts.md)
 - [media.md](media.md)
 - [calls.md](calls.md)
 - [testing.md](testing.md)
