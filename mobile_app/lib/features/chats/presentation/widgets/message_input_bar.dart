@@ -4,6 +4,7 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_icons.dart';
 import '../../../../app/theme/design_tokens.dart';
 import '../../../../app/theme/app_shadows.dart';
+import '../../../../app/widgets/app_surface.dart';
 import 'attachment_preview.dart';
 import 'reply_preview.dart';
 
@@ -48,12 +49,12 @@ class ChatDetailMessageInputBar extends StatelessWidget {
     return SafeArea(
       top: false,
       child: Container(
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
         decoration: BoxDecoration(
-          color: AppColors.background,
+          color: AppColors.background.withAlpha(235),
           border: Border(
             top: BorderSide(
-              color: Colors.white.withAlpha(10),
+              color: AppColors.strokeSoft,
             ),
           ),
           boxShadow: AppShadows.topBar,
@@ -77,57 +78,71 @@ class ChatDetailMessageInputBar extends StatelessWidget {
                   onVideoNote: onVideoNote,
                 ),
                 Expanded(
-                  child: TextField(
-                    controller: messageController,
-                    style: const TextStyle(color: AppColors.textPrimary),
-                    minLines: 1,
-                    maxLines: 5,
-                    textInputAction: TextInputAction.newline,
-                    decoration: InputDecoration(
-                      hintText: isEditing
-                          ? 'Новый текст сообщения...'
-                          : 'Введите сообщение...',
-                      hintStyle: const TextStyle(color: AppColors.textMuted),
-                      filled: true,
-                      fillColor: AppColors.surfaceSoft,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
+                  child: AppSurface(
+                    radius: AppRadius.xl,
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    shadow: AppShadows.lift,
+                    child: TextField(
+                      controller: messageController,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w600,
                       ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.md),
-                        borderSide: BorderSide.none,
+                      minLines: 1,
+                      maxLines: 5,
+                      textInputAction: TextInputAction.newline,
+                      decoration: InputDecoration(
+                        hintText: isEditing
+                            ? 'Новый текст сообщения...'
+                            : 'Введите сообщение...',
+                        hintStyle: const TextStyle(color: AppColors.textMuted),
+                        filled: true,
+                        fillColor: Colors.transparent,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.lg),
+                          borderSide: BorderSide.none,
+                        ),
                       ),
                     ),
                   ),
                 ),
                 const SizedBox(width: 10),
-                GestureDetector(
-                  onTap: isSending ? null : onSend,
-                  child: Container(
-                    width: AppSizes.fab - 8,
-                    height: AppSizes.fab - 8,
-                    decoration: BoxDecoration(
-                      color: AppColors.accent,
-                      shape: BoxShape.circle,
-                      boxShadow: AppShadows.primaryButton,
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: isSending ? null : onSend,
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
+                    child: Ink(
+                      width: AppSizes.fab - 6,
+                      height: AppSizes.fab - 6,
+                      decoration: BoxDecoration(
+                        gradient: AppGradients.accentPanel,
+                        shape: BoxShape.circle,
+                        boxShadow: AppShadows.accentFab(),
+                      ),
+                      child: Center(
+                        child: isSending
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    AppColors.textOnAccent,
+                                  ),
+                                ),
+                              )
+                            : Icon(
+                                isEditing ? AppIcons.check : AppIcons.send,
+                                color: AppColors.textOnAccent,
+                                size: AppSizes.iconLg,
+                              ),
+                      ),
                     ),
-                    alignment: Alignment.center,
-                    child: isSending
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor:
-                                  AlwaysStoppedAnimation<Color>(Colors.black),
-                            ),
-                          )
-                        : Icon(
-                            isEditing ? AppIcons.check : AppIcons.send,
-                            color: Colors.black,
-                            size: AppSizes.iconMd,
-                          ),
                   ),
                 ),
               ],

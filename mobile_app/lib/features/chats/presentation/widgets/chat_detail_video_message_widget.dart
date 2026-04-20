@@ -3,14 +3,16 @@ import 'package:video_player/video_player.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_icons.dart';
+import '../../../../app/theme/app_shadows.dart';
+import '../../../../app/theme/design_tokens.dart';
 
-/// Встроенное видео в пузыре сообщения (в т.ч. video note).
+/// Р’СЃС‚СЂРѕРµРЅРЅРѕРµ РІРёРґРµРѕ РІ РїСѓР·С‹СЂРµ СЃРѕРѕР±С‰РµРЅРёСЏ (РІ С‚.С‡. video note).
 class ChatDetailVideoMessageWidget extends StatefulWidget {
   final String url;
   final bool isMine;
   final bool isVideoNote;
 
-  /// Для обычного видео: открыть на весь экран. Для кружков ([isVideoNote]) не используется.
+  /// Р”Р»СЏ РѕР±С‹С‡РЅРѕРіРѕ РІРёРґРµРѕ: РѕС‚РєСЂС‹С‚СЊ РЅР° РІРµСЃСЊ СЌРєСЂР°РЅ. Р”Р»СЏ РєСЂСѓР¶РєРѕРІ ([isVideoNote]) РЅРµ РёСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ.
   final VoidCallback? onOpenFullscreen;
 
   const ChatDetailVideoMessageWidget({
@@ -49,17 +51,17 @@ class _ChatDetailVideoMessageWidgetState
 
     final uri = Uri.tryParse(widget.url);
     if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
-      _initError = 'Некорректный адрес видео';
+      _initError = 'РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ Р°РґСЂРµСЃ РІРёРґРµРѕ';
       return;
     }
 
-    final c = VideoPlayerController.networkUrl(
+    final controller = VideoPlayerController.networkUrl(
       uri,
       videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
     );
-    _controller = c;
+    _controller = controller;
 
-    c.initialize().then((_) {
+    controller.initialize().then((_) {
       if (!mounted || gen != _loadGeneration) return;
       setState(() {
         _initialized = true;
@@ -74,9 +76,9 @@ class _ChatDetailVideoMessageWidgetState
     });
 
     if (widget.isVideoNote) {
-      c.addListener(() {
+      controller.addListener(() {
         if (!mounted || gen != _loadGeneration) return;
-        final playing = c.value.isPlaying;
+        final playing = controller.value.isPlaying;
         if (playing) {
           if (_showOverlay) setState(() => _showOverlay = false);
         } else {
@@ -94,35 +96,31 @@ class _ChatDetailVideoMessageWidgetState
   }
 
   void _togglePlayback() {
-    final c = _controller;
-    if (c == null || !_initialized) return;
-    if (c.value.isPlaying) {
-      c.pause();
+    final controller = _controller;
+    if (controller == null || !_initialized) return;
+    if (controller.value.isPlaying) {
+      controller.pause();
     } else {
-      c.play();
+      controller.play();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    const loadingBg = Color(0x00000000);
-
     if (_initError != null) {
-      return Container(
-        color: loadingBg,
-        alignment: Alignment.center,
+      return _buildSurfaceState(
         padding: const EdgeInsets.all(12),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
+            const Icon(
               AppIcons.videocamOff,
               color: AppColors.textMuted,
               size: 32,
             ),
             const SizedBox(height: 8),
-            Text(
-              'Не удалось загрузить видео',
+            const Text(
+              'РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ РІРёРґРµРѕ',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: AppColors.textSecondary,
@@ -131,8 +129,8 @@ class _ChatDetailVideoMessageWidgetState
               ),
             ),
             const SizedBox(height: 6),
-            Text(
-              'На ПК иногда не поддерживается кодек с телефона. Повторите попытку.',
+            const Text(
+              'РќР° РџРљ РёРЅРѕРіРґР° РЅРµ РїРѕРґРґРµСЂР¶РёРІР°РµС‚СЃСЏ РєРѕРґРµРє СЃ С‚РµР»РµС„РѕРЅР°. РџРѕРІС‚РѕСЂРёС‚Рµ РїРѕРїС‹С‚РєСѓ.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: AppColors.textMuted,
@@ -140,10 +138,11 @@ class _ChatDetailVideoMessageWidgetState
                 fontWeight: FontWeight.w500,
               ),
             ),
+            const SizedBox(height: 8),
             TextButton.icon(
               onPressed: () => setState(_attachController),
               icon: const Icon(AppIcons.refresh, size: 18),
-              label: const Text('Повторить'),
+              label: const Text('РџРѕРІС‚РѕСЂРёС‚СЊ'),
             ),
           ],
         ),
@@ -151,9 +150,7 @@ class _ChatDetailVideoMessageWidgetState
     }
 
     if (!_initialized || _controller == null) {
-      return Container(
-        color: loadingBg,
-        alignment: Alignment.center,
+      return _buildSurfaceState(
         child: SizedBox(
           width: 28,
           height: 28,
@@ -165,7 +162,7 @@ class _ChatDetailVideoMessageWidgetState
       );
     }
 
-    final c = _controller!;
+    final controller = _controller!;
 
     final videoChild = widget.isVideoNote
         ? SizedBox(
@@ -175,16 +172,16 @@ class _ChatDetailVideoMessageWidgetState
               child: FittedBox(
                 fit: BoxFit.cover,
                 child: SizedBox(
-                  width: c.value.size.width,
-                  height: c.value.size.height,
-                  child: VideoPlayer(c),
+                  width: controller.value.size.width,
+                  height: controller.value.size.height,
+                  child: VideoPlayer(controller),
                 ),
               ),
             ),
           )
         : AspectRatio(
-            aspectRatio: c.value.aspectRatio,
-            child: VideoPlayer(c),
+            aspectRatio: controller.value.aspectRatio,
+            child: VideoPlayer(controller),
           );
 
     if (widget.isVideoNote) {
@@ -197,19 +194,9 @@ class _ChatDetailVideoMessageWidgetState
             AnimatedOpacity(
               opacity: _showOverlay ? 1 : 0,
               duration: const Duration(milliseconds: 150),
-              child: Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: Colors.black.withAlpha(55),
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                alignment: Alignment.center,
-                child: Icon(
-                  c.value.isPlaying ? AppIcons.pause : AppIcons.play,
-                  color: Colors.white,
-                  size: 24,
-                ),
+              child: _buildOverlayButton(
+                icon:
+                    controller.value.isPlaying ? AppIcons.pause : AppIcons.play,
               ),
             ),
           ],
@@ -223,21 +210,45 @@ class _ChatDetailVideoMessageWidgetState
         alignment: Alignment.center,
         children: [
           Center(child: videoChild),
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: Colors.black.withAlpha(55),
-              borderRadius: BorderRadius.circular(24),
-            ),
-            alignment: Alignment.center,
-            child: const Icon(
-              AppIcons.play,
-              color: Colors.white,
-              size: 24,
-            ),
-          ),
+          _buildOverlayButton(icon: AppIcons.play),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSurfaceState({
+    required Widget child,
+    EdgeInsetsGeometry padding = EdgeInsets.zero,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: AppGradients.surfacePanel,
+        borderRadius: BorderRadius.circular(
+          widget.isVideoNote ? 999 : AppRadius.lg,
+        ),
+        border: Border.all(color: AppColors.strokeSoft),
+      ),
+      alignment: Alignment.center,
+      padding: padding,
+      child: child,
+    );
+  }
+
+  Widget _buildOverlayButton({required IconData icon}) {
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        gradient: AppGradients.heroPanel,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.strokeSoft),
+        boxShadow: AppShadows.lift,
+      ),
+      alignment: Alignment.center,
+      child: Icon(
+        icon,
+        color: Colors.white,
+        size: 24,
       ),
     );
   }

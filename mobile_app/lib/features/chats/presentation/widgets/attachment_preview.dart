@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_icons.dart';
-import '../../../../app/theme/design_tokens.dart';
-import '../../../../app/theme/app_shadows.dart';
+import '../../../../app/widgets/app_surface.dart';
 
 /// Кнопки вложений (галерея / видеосообщение) над строкой ввода.
 class ChatDetailAttachmentPreview extends StatelessWidget {
@@ -26,59 +25,21 @@ class ChatDetailAttachmentPreview extends StatelessWidget {
       children: [
         Tooltip(
           message: 'Фото, видео или файл',
-          child: GestureDetector(
+          child: AppIconButtonSurface(
+            icon: AppIcons.permMedia,
+            tooltip: 'Медиа',
             onTap: (isEditing || isBusy) ? null : onPickAttachment,
-            child: Container(
-              width: AppSizes.inputAction,
-              height: AppSizes.inputAction,
-              decoration: BoxDecoration(
-                color: AppColors.surfaceSoft,
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-                border: Border.all(color: Colors.white.withAlpha(10)),
-                boxShadow: AppShadows.lift,
-              ),
-              alignment: Alignment.center,
-              child: isBusy
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Icon(
-                      AppIcons.permMedia,
-                      color: isEditing ? AppColors.textMuted : AppColors.accentBright,
-                      size: AppSizes.iconMd,
-                    ),
-            ),
+            iconColor: isEditing ? AppColors.textMuted : AppColors.accentBright,
           ),
         ),
         const SizedBox(width: 6),
         Tooltip(
           message: 'Видеосообщение (кружок) — удерживайте кнопку записи',
-          child: GestureDetector(
+          child: AppIconButtonSurface(
+            icon: AppIcons.videocam,
+            tooltip: 'Видеосообщение',
             onTap: (isEditing || isBusy) ? null : onVideoNote,
-            child: Container(
-              width: AppSizes.inputAction,
-              height: AppSizes.inputAction,
-              decoration: BoxDecoration(
-                color: AppColors.surfaceSoft,
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-                border: Border.all(color: Colors.white.withAlpha(10)),
-                boxShadow: AppShadows.lift,
-              ),
-              alignment: Alignment.center,
-              child: isBusy
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Icon(
-                      AppIcons.videocam,
-                      color: isEditing ? AppColors.textMuted : AppColors.accentBright,
-                      size: AppSizes.iconMd,
-                    ),
-            ),
+            iconColor: isEditing ? AppColors.textMuted : AppColors.accentBright,
           ),
         ),
         const SizedBox(width: 8),

@@ -6,6 +6,7 @@ import '../../../../app/theme/app_icons.dart';
 import '../../../../app/theme/app_shadows.dart';
 import '../../../../app/theme/design_tokens.dart';
 import '../../../../app/widgets/app_screen_background.dart';
+import '../../../../app/widgets/app_surface.dart';
 import '../../../../app/home_chats_route.dart';
 import '../../../../app/widgets/desktop_constrained_content.dart';
 import '../../data/services/auth_service.dart';
@@ -122,11 +123,11 @@ class _AuthScreenState extends State<AuthScreen> {
         ),
       );
     } finally {
-      if (!mounted) return;
-
-      setState(() {
-        isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
   }
 
@@ -196,14 +197,9 @@ class _AuthScreenState extends State<AuthScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: AppSpacing.lg),
-                      const Text(
-                        'CHTP',
-                        style: TextStyle(
-                          color: AppColors.accent,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 4,
-                        ),
+                      const AppPillBadge(
+                        label: 'CHTP PRIVATE ACCESS',
+                        accent: true,
                       ),
                       const SizedBox(height: AppSpacing.xxl),
                       Text(
@@ -222,25 +218,29 @@ class _AuthScreenState extends State<AuthScreen> {
                             : 'Создайте аккаунт и подтвердите email',
                         style: textTheme.bodyMedium,
                       ),
-                      const SizedBox(height: AppSpacing.xxxl),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(AppSpacing.lg),
-                        decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(AppRadius.xl),
-                          border: Border.all(color: Colors.white.withAlpha(14)),
-                          boxShadow: AppShadows.card,
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Тот же фирменный чёрно-янтарный характер, но с более чистым и статусным ритмом интерфейса.',
+                        style: TextStyle(
+                          color: AppColors.textMuted,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          height: 1.4,
                         ),
+                      ),
+                      const SizedBox(height: AppSpacing.xxxl),
+                      AppSurface(
+                        tone: AppSurfaceTone.elevated,
+                        radius: AppRadius.xxl,
+                        padding: const EdgeInsets.all(AppSpacing.xl),
                         child: Column(
                           children: [
                             Container(
-                              width: 96,
-                              height: 72,
+                              width: 108,
+                              height: 80,
                               decoration: BoxDecoration(
-                                color: AppColors.accent,
-                                borderRadius:
-                                    BorderRadius.circular(AppRadius.md),
+                                gradient: AppGradients.accentPanel,
+                                borderRadius: BorderRadius.circular(AppRadius.lg),
                                 boxShadow: AppShadows.primaryButton,
                               ),
                               alignment: Alignment.center,
@@ -254,7 +254,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                     style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w800,
-                                      color: Colors.black,
+                                      color: AppColors.textOnAccent,
                                       letterSpacing: 0.3,
                                     ),
                                   ),
@@ -416,13 +416,9 @@ class _AuthSegmentedSwitch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return AppSurface(
+      radius: AppRadius.lg,
       padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: AppColors.backgroundSecondary,
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        border: Border.all(color: Colors.white.withAlpha(10)),
-      ),
       child: Row(
         children: [
           Expanded(
@@ -462,17 +458,19 @@ class _SegmentButton extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 220),
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: selected ? AppColors.accent : Colors.transparent,
-          borderRadius: BorderRadius.circular(AppRadius.sm - 2),
+          gradient: selected ? AppGradients.accentPanel : null,
+          color: selected ? null : Colors.transparent,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          boxShadow: selected ? AppShadows.primaryButton : null,
         ),
         alignment: Alignment.center,
         child: Text(
           title,
           style: TextStyle(
-            color: selected ? Colors.black : AppColors.textSecondary,
-            fontWeight: FontWeight.w700,
+            color: selected ? AppColors.textOnAccent : AppColors.textSecondary,
+            fontWeight: FontWeight.w800,
             fontSize: 14,
           ),
         ),

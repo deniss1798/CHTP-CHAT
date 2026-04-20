@@ -7,6 +7,7 @@ import '../../../../app/theme/app_shadows.dart';
 import '../../../../app/theme/design_tokens.dart';
 import '../../../../app/home_chats_route.dart';
 import '../../../../app/widgets/app_screen_background.dart';
+import '../../../../app/widgets/app_surface.dart';
 import '../../../../app/widgets/desktop_constrained_content.dart';
 import '../../data/services/auth_service.dart';
 
@@ -104,11 +105,11 @@ class _EmailCodeScreenState extends State<EmailCodeScreen> {
         ),
       );
     } finally {
-      if (!mounted) return;
-
-      setState(() {
-        isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
   }
 
@@ -135,14 +136,9 @@ class _EmailCodeScreenState extends State<EmailCodeScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: AppSpacing.lg),
-                      const Text(
-                        'CHTP',
-                        style: TextStyle(
-                          color: AppColors.accent,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 4,
-                        ),
+                      const AppPillBadge(
+                        label: 'EMAIL VERIFICATION',
+                        accent: true,
                       ),
                       const SizedBox(height: AppSpacing.xxl),
                       Text(
@@ -162,26 +158,20 @@ class _EmailCodeScreenState extends State<EmailCodeScreen> {
                         style: textTheme.bodyMedium,
                       ),
                       const SizedBox(height: AppSpacing.xxxl),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(AppSpacing.lg),
-                        decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(AppRadius.xl),
-                          border: Border.all(color: Colors.white.withAlpha(14)),
-                          boxShadow: AppShadows.card,
-                        ),
+                      AppSurface(
+                        tone: AppSurfaceTone.elevated,
+                        radius: AppRadius.xxl,
+                        padding: const EdgeInsets.all(AppSpacing.xl),
                         child: Form(
                           key: _formKey,
                           child: Column(
                             children: [
                               Container(
-                                width: 96,
-                                height: 72,
+                                width: 108,
+                                height: 80,
                                 decoration: BoxDecoration(
-                                  color: AppColors.accent,
-                                  borderRadius:
-                                      BorderRadius.circular(AppRadius.md),
+                                  gradient: AppGradients.accentPanel,
+                                  borderRadius: BorderRadius.circular(AppRadius.lg),
                                   boxShadow: AppShadows.primaryButton,
                                 ),
                                 alignment: Alignment.center,
@@ -195,7 +185,7 @@ class _EmailCodeScreenState extends State<EmailCodeScreen> {
                                       style: TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.w800,
-                                        color: Colors.black,
+                                        color: AppColors.textOnAccent,
                                         letterSpacing: 0.3,
                                       ),
                                     ),
@@ -208,9 +198,9 @@ class _EmailCodeScreenState extends State<EmailCodeScreen> {
                                   width: double.infinity,
                                   padding: const EdgeInsets.all(14),
                                   decoration: BoxDecoration(
-                                    color: AppColors.backgroundSecondary,
-                                    borderRadius:
-                                        BorderRadius.circular(AppRadius.md),
+                                    gradient: AppGradients.surfacePanel,
+                                    borderRadius: BorderRadius.circular(AppRadius.lg),
+                                    border: Border.all(color: AppColors.strokeSoft),
                                   ),
                                   child: Column(
                                     crossAxisAlignment:
@@ -228,7 +218,7 @@ class _EmailCodeScreenState extends State<EmailCodeScreen> {
                                       Text(
                                         widget.debugCode!,
                                         style: const TextStyle(
-                                          color: AppColors.accentBright,
+                                          color: AppColors.accentGlow,
                                           fontSize: 22,
                                           fontWeight: FontWeight.w800,
                                           letterSpacing: 2,

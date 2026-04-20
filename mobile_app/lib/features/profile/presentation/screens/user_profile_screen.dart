@@ -6,6 +6,7 @@ import '../../../../app/theme/app_icons.dart';
 import '../../../../app/theme/app_shadows.dart';
 import '../../../../app/theme/design_tokens.dart';
 import '../../../../app/widgets/app_screen_background.dart';
+import '../../../../app/widgets/app_surface.dart';
 import '../../../../core/network/url_helper.dart';
 import '../../data/services/profile_service.dart';
 
@@ -82,19 +83,10 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             Positioned(
               top: MediaQuery.paddingOf(context).top + 4,
               left: 8,
-              child: Material(
-                color: Colors.transparent,
-                child: IconButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.white.withAlpha(10),
-                    foregroundColor: AppColors.textPrimary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadius.sm),
-                    ),
-                  ),
-                  icon: const Icon(AppIcons.back, size: 18),
-                ),
+              child: AppIconButtonSurface(
+                icon: AppIcons.back,
+                tooltip: 'Назад',
+                onTap: () => Navigator.of(context).pop(),
               ),
             ),
             SafeArea(
@@ -135,14 +127,10 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   }
 
   Widget _errorBlock(bool isWide) {
-    return Container(
+    return AppSurface(
+      tone: AppSurfaceTone.elevated,
+      radius: AppRadius.xxl,
       padding: const EdgeInsets.all(AppSpacing.xxl),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.xl),
-        border: Border.all(color: Colors.white.withAlpha(14)),
-        boxShadow: AppShadows.card,
-      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -173,33 +161,17 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     required double avatarSize,
     required bool isWide,
   }) {
-    return Container(
-      width: double.infinity,
+    return AppSurface(
+      tone: AppSurfaceTone.elevated,
+      radius: AppRadius.xxl,
       padding: EdgeInsets.symmetric(
         horizontal: isWide ? AppSpacing.xxxl : AppSpacing.xxl,
         vertical: isWide ? 40 : AppSpacing.xxxl,
       ),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.xl),
-        border: Border.all(
-          color: Colors.white.withAlpha(14),
-          width: 1,
-        ),
-        boxShadow: AppShadows.card,
-      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            'Профиль',
-            style: TextStyle(
-              color: AppColors.textMuted,
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.2,
-            ),
-          ),
+          const AppPillBadge(label: 'PUBLIC PROFILE', accent: true),
           SizedBox(height: isWide ? 28 : AppSpacing.xl),
           _buildAvatar(username, avatarSize),
           SizedBox(height: isWide ? 28 : AppSpacing.xl),
@@ -252,14 +224,15 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: AppColors.accent,
+        gradient: AppGradients.accentPanel,
         borderRadius: BorderRadius.circular(radius),
+        boxShadow: AppShadows.primaryButton,
       ),
       alignment: Alignment.center,
       child: Text(
         ch,
         style: TextStyle(
-          color: Colors.black,
+          color: AppColors.textOnAccent,
           fontSize: size * 0.36,
           fontWeight: FontWeight.w900,
         ),

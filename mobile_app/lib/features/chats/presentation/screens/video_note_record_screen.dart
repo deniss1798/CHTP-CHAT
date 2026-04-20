@@ -6,8 +6,12 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_icons.dart';
+import '../../../../app/theme/app_shadows.dart';
+import '../../../../app/theme/design_tokens.dart';
+import '../../../../app/widgets/app_screen_background.dart';
+import '../../../../app/widgets/app_surface.dart';
 
-/// Запись круглого видеосообщения в стиле Telegram: удерживайте кнопку записи.
+/// Р—Р°РїРёСЃСЊ РєСЂСѓРіР»РѕРіРѕ РІРёРґРµРѕСЃРѕРѕР±С‰РµРЅРёСЏ РІ СЃС‚РёР»Рµ Telegram: СѓРґРµСЂР¶РёРІР°Р№С‚Рµ РєРЅРѕРїРєСѓ Р·Р°РїРёСЃРё.
 class VideoNoteRecordScreen extends StatefulWidget {
   const VideoNoteRecordScreen({super.key});
 
@@ -20,6 +24,7 @@ class _VideoNoteRecordScreenState extends State<VideoNoteRecordScreen> {
   bool _ready = false;
   bool _recording = false;
   Timer? _maxDurationTimer;
+  Timer? _recordTicker;
   DateTime? _recordStartedAt;
 
   @override
@@ -36,7 +41,7 @@ class _VideoNoteRecordScreenState extends State<VideoNoteRecordScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Нужны разрешения камеры и микрофона'),
+          content: Text('РќСѓР¶РЅС‹ СЂР°Р·СЂРµС€РµРЅРёСЏ РєР°РјРµСЂС‹ Рё РјРёРєСЂРѕС„РѕРЅР°'),
         ),
       );
       Navigator.of(context).pop();
@@ -47,19 +52,19 @@ class _VideoNoteRecordScreenState extends State<VideoNoteRecordScreen> {
     if (cameras.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Камера не найдена')),
+        const SnackBar(content: Text('РљР°РјРµСЂР° РЅРµ РЅР°Р№РґРµРЅР°')),
       );
       Navigator.of(context).pop();
       return;
     }
 
-    final camDesc = cameras.firstWhere(
-      (c) => c.lensDirection == CameraLensDirection.front,
+    final description = cameras.firstWhere(
+      (camera) => camera.lensDirection == CameraLensDirection.front,
       orElse: () => cameras.first,
     );
 
     final controller = CameraController(
-      camDesc,
+      description,
       ResolutionPreset.medium,
       enableAudio: true,
     );
@@ -69,7 +74,7 @@ class _VideoNoteRecordScreenState extends State<VideoNoteRecordScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Камера: $e')),
+        SnackBar(content: Text('РљР°РјРµСЂР°: $e')),
       );
       Navigator.of(context).pop();
       return;
@@ -87,32 +92,42 @@ class _VideoNoteRecordScreenState extends State<VideoNoteRecordScreen> {
   }
 
   Future<void> _onPointerDown() async {
-    final c = _controller;
-    if (!_ready || c == null || !c.value.isInitialized || _recording) return;
+    final controller = _controller;
+    if (!_ready || controller == null || !controller.value.isInitialized) {
+      return;
+    }
+    if (_recording) return;
 
     try {
-      await c.startVideoRecording();
+      await controller.startVideoRecording();
       if (!mounted) return;
       setState(() {
         _recording = true;
         _recordStartedAt = DateTime.now();
       });
       _maxDurationTimer?.cancel();
+      _recordTicker?.cancel();
       _maxDurationTimer = Timer(const Duration(seconds: 60), _onPointerUp);
+      _recordTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (!mounted || !_recording) return;
+        setState(() {});
+      });
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Не удалось начать запись: $e')),
+        SnackBar(content: Text('РќРµ СѓРґР°Р»РѕСЃСЊ РЅР°С‡Р°С‚СЊ Р·Р°РїРёСЃСЊ: $e')),
       );
     }
   }
 
   Future<void> _onPointerUp() async {
-    final c = _controller;
-    if (c == null || !_recording) return;
+    final controller = _controller;
+    if (controller == null || !_recording) return;
 
     _maxDurationTimer?.cancel();
     _maxDurationTimer = null;
+    _recordTicker?.cancel();
+    _recordTicker = null;
 
     final started = _recordStartedAt;
     setState(() {
@@ -121,7 +136,7 @@ class _VideoNoteRecordScreenState extends State<VideoNoteRecordScreen> {
     });
 
     try {
-      final xfile = await c.stopVideoRecording();
+      final file = await controller.stopVideoRecording();
       if (!mounted) return;
 
       final duration = started != null
@@ -130,17 +145,19 @@ class _VideoNoteRecordScreenState extends State<VideoNoteRecordScreen> {
       if (duration < const Duration(milliseconds: 500)) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Слишком коротко — удерживайте кнопку дольше'),
+            content: Text(
+              'РЎР»РёС€РєРѕРј РєРѕСЂРѕС‚РєРѕ вЂ” СѓРґРµСЂР¶РёРІР°Р№С‚Рµ РєРЅРѕРїРєСѓ РґРѕР»СЊС€Рµ',
+            ),
           ),
         );
         return;
       }
 
-      Navigator.of(context).pop<String>(xfile.path);
+      Navigator.of(context).pop<String>(file.path);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка записи: $e')),
+        SnackBar(content: Text('РћС€РёР±РєР° Р·Р°РїРёСЃРё: $e')),
       );
     }
   }
@@ -148,87 +165,178 @@ class _VideoNoteRecordScreenState extends State<VideoNoteRecordScreen> {
   @override
   void dispose() {
     _maxDurationTimer?.cancel();
+    _recordTicker?.cancel();
     _controller?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final durationLabel = _recordStartedAt == null
+        ? '00:00'
+        : _formatDuration(DateTime.now().difference(_recordStartedAt!));
+
     return Scaffold(
-      backgroundColor: Colors.black,
-      body: SafeArea(
-        child: Column(
-          children: [
-            Align(
-              alignment: Alignment.centerLeft,
-              child: IconButton(
-                onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(AppIcons.close, color: Colors.white70),
-              ),
-            ),
-            const Text(
-              'Видеосообщение',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 24),
-              child: Text(
-                'Удерживайте кнопку внизу — идёт запись. Отпустите, чтобы отправить.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white54,
-                  fontSize: 14,
-                  height: 1.35,
+      backgroundColor: AppColors.background,
+      body: AppScreenBackground(
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    AppIconButtonSurface(
+                      icon: AppIcons.close,
+                      tooltip: 'Р—Р°РєСЂС‹С‚СЊ',
+                      onTap: () => Navigator.of(context).pop(),
+                    ),
+                    const AppPillBadge(
+                      label: 'VIDEO NOTE',
+                      icon: Icons.radio_button_checked_rounded,
+                      accent: true,
+                    ),
+                  ],
                 ),
-              ),
-            ),
-            Expanded(
-              child: Center(
-                child: _ready && _controller != null
-                    ? ClipOval(
-                        child: SizedBox(
-                          width: 280,
-                          height: 280,
-                          child: CameraPreview(_controller!),
+                const SizedBox(height: 18),
+                AppSurface(
+                  tone: AppSurfaceTone.elevated,
+                  radius: AppRadius.xxl,
+                  padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
+                  child: Column(
+                    children: [
+                      const Text(
+                        'Р’РёРґРµРѕСЃРѕРѕР±С‰РµРЅРёРµ',
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
                         ),
-                      )
-                    : const CircularProgressIndicator(
-                        color: AppColors.accent,
                       ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 28),
-              child: Listener(
-                onPointerDown: (_) => _onPointerDown(),
-                onPointerUp: (_) => _onPointerUp(),
-                onPointerCancel: (_) => _onPointerUp(),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 120),
-                  width: 72,
-                  height: 72,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: _recording ? Colors.redAccent : AppColors.accent,
-                    border: Border.all(color: Colors.white24, width: 2),
-                  ),
-                  alignment: Alignment.center,
-                  child: Icon(
-                    AppIcons.record,
-                    color: Colors.black,
-                    size: _recording ? 28 : 24,
+                      const SizedBox(height: 10),
+                      const Text(
+                        'РЈРґРµСЂР¶РёРІР°Р№С‚Рµ РєРЅРѕРїРєСѓ РІРЅРёР·Сѓ, С‡С‚РѕР±С‹ РЅР°С‡Р°С‚СЊ Р·Р°РїРёСЃСЊ. РћС‚РїСѓСЃС‚РёС‚Рµ, С‡С‚РѕР±С‹ СЃСЂР°Р·Сѓ РѕС‚РїСЂР°РІРёС‚СЊ.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 14,
+                          height: 1.45,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      AppPillBadge(
+                        label: _recording
+                            ? 'REC $durationLabel'
+                            : 'READY TO RECORD',
+                        icon: _recording
+                            ? Icons.fiber_manual_record_rounded
+                            : Icons.videocam_outlined,
+                        accent: _recording,
+                      ),
+                    ],
                   ),
                 ),
-              ),
+                const SizedBox(height: 20),
+                Expanded(
+                  child: Center(
+                    child: Container(
+                      width: 304,
+                      height: 304,
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        gradient: _recording
+                            ? AppGradients.accentPanel
+                            : AppGradients.heroPanel,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: _recording
+                              ? AppColors.accentBorder
+                              : AppColors.strokeSoft,
+                        ),
+                        boxShadow: _recording
+                            ? AppShadows.accentFab()
+                            : AppShadows.card,
+                      ),
+                      child: ClipOval(
+                        child: _ready && _controller != null
+                            ? CameraPreview(_controller!)
+                            : Container(
+                                color: AppColors.surfaceSoft,
+                                alignment: Alignment.center,
+                                child: const CircularProgressIndicator(
+                                  color: AppColors.accent,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Listener(
+                  onPointerDown: (_) => _onPointerDown(),
+                  onPointerUp: (_) => _onPointerUp(),
+                  onPointerCancel: (_) => _onPointerUp(),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 140),
+                    width: _recording ? 108 : 92,
+                    height: _recording ? 108 : 92,
+                    decoration: BoxDecoration(
+                      gradient: _recording
+                          ? const LinearGradient(
+                              colors: [
+                                Color(0xFFFF5E5E),
+                                Color(0xFFFF8247),
+                              ],
+                            )
+                          : AppGradients.accentPanel,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.white.withAlpha(_recording ? 160 : 90),
+                        width: 2,
+                      ),
+                      boxShadow: AppShadows.accentFab(),
+                    ),
+                    alignment: Alignment.center,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 140),
+                      width: _recording ? 34 : 42,
+                      height: _recording ? 34 : 42,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withAlpha(_recording ? 220 : 170),
+                        borderRadius: BorderRadius.circular(
+                          _recording ? 12 : 21,
+                        ),
+                      ),
+                      child: Icon(
+                        AppIcons.record,
+                        color: AppColors.textOnAccent,
+                        size: _recording ? 16 : 20,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'РќР°Р¶РјРёС‚Рµ Рё СѓРґРµСЂР¶РёРІР°Р№С‚Рµ',
+                  style: TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
+  }
+
+  String _formatDuration(Duration duration) {
+    final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
   }
 }

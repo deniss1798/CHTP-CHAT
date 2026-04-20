@@ -27,13 +27,46 @@ class AppScreenBackground extends StatelessWidget {
         children: [
           if (showAmbientGlow)
             Positioned(
-              top: -40,
-              right: -80,
+              top: -90,
+              right: -110,
               child: _AmbientBlob(
-                size: 280,
-                color: AppColors.accent.withAlpha(14),
+                size: 320,
+                color: AppColors.accent.withAlpha(20),
               ),
             ),
+          if (showAmbientGlow)
+            Positioned(
+              top: 120,
+              left: -120,
+              child: _AmbientBlob(
+                size: 260,
+                color: AppColors.accentBright.withAlpha(12),
+              ),
+            ),
+          if (showAmbientGlow)
+            Positioned(
+              bottom: -120,
+              right: MediaQuery.sizeOf(context).width * 0.12,
+              child: _AmbientBlob(
+                size: 300,
+                color: AppColors.backgroundTertiary.withAlpha(120),
+              ),
+            ),
+          IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    AppColors.accent.withAlpha(10),
+                    Colors.transparent,
+                    Colors.black.withAlpha(36),
+                  ],
+                ),
+              ),
+            ),
+          ),
           child,
         ],
       ),

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/app_shadows.dart';
+import '../../../../app/theme/design_tokens.dart';
 import '../chat_detail_formatters.dart';
 
 class ChatDetailSquareAvatar extends StatelessWidget {
@@ -24,52 +26,31 @@ class ChatDetailSquareAvatar extends StatelessWidget {
     Widget inner;
 
     if (safeUrl != null && safeUrl.isNotEmpty) {
-      inner = ClipRRect(
-        borderRadius: BorderRadius.circular(14),
-        child: Image.network(
-          safeUrl,
-          width: size,
-          height: size,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) {
-            return Container(
-              width: size,
-              height: size,
-              decoration: BoxDecoration(
-                color: AppColors.accent,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                chatDetailBuildInitials(title),
-                style: const TextStyle(
-                  color: Colors.black,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            );
-          },
-        ),
-      );
-    } else {
       inner = Container(
         width: size,
         height: size,
+        padding: const EdgeInsets.all(1.2),
         decoration: BoxDecoration(
-          color: AppColors.accent,
-          borderRadius: BorderRadius.circular(14),
+          gradient: AppGradients.surfacePanel,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.strokeSoft),
+          boxShadow: AppShadows.lift,
         ),
-        alignment: Alignment.center,
-        child: Text(
-          chatDetailBuildInitials(title),
-          style: const TextStyle(
-            color: Colors.black,
-            fontSize: 14,
-            fontWeight: FontWeight.w800,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: Image.network(
+            safeUrl,
+            width: size,
+            height: size,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              return _squareFallback(title);
+            },
           ),
         ),
       );
+    } else {
+      inner = _squareFallback(title);
     }
 
     if (!showOnlineDot) return inner;
@@ -97,6 +78,27 @@ class ChatDetailSquareAvatar extends StatelessWidget {
       ],
     );
   }
+
+  Widget _squareFallback(String value) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        gradient: AppGradients.accentPanel,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: AppShadows.primaryButton,
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        chatDetailBuildInitials(value),
+        style: const TextStyle(
+          color: AppColors.textOnAccent,
+          fontSize: 14,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
 }
 
 class ChatDetailCircleAvatar extends StatelessWidget {
@@ -116,47 +118,44 @@ class ChatDetailCircleAvatar extends StatelessWidget {
     final safeUrl = chatDetailNormalizedAvatarUrl(avatarUrl);
 
     if (safeUrl != null && safeUrl.isNotEmpty) {
-      return ClipOval(
-        child: Image.network(
-          safeUrl,
-          width: size,
-          height: size,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) {
-            return Container(
-              width: size,
-              height: size,
-              decoration: const BoxDecoration(
-                color: AppColors.accent,
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                chatDetailBuildInitials(title),
-                style: const TextStyle(
-                  color: Colors.black,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            );
-          },
+      return Container(
+        width: size,
+        height: size,
+        padding: const EdgeInsets.all(1.2),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: AppGradients.surfacePanel,
+          border: Border.all(color: AppColors.strokeSoft),
+          boxShadow: AppShadows.lift,
+        ),
+        child: ClipOval(
+          child: Image.network(
+            safeUrl,
+            width: size,
+            height: size,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => _circleFallback(),
+          ),
         ),
       );
     }
 
+    return _circleFallback();
+  }
+
+  Widget _circleFallback() {
     return Container(
       width: size,
       height: size,
       decoration: const BoxDecoration(
-        color: AppColors.accent,
+        gradient: AppGradients.accentPanel,
         shape: BoxShape.circle,
       ),
       alignment: Alignment.center,
       child: Text(
         chatDetailBuildInitials(title),
         style: const TextStyle(
-          color: Colors.black,
+          color: AppColors.textOnAccent,
           fontSize: 12,
           fontWeight: FontWeight.w800,
         ),

@@ -9,7 +9,7 @@ import '../../../../app/theme/app_icons.dart';
 import '../../../../app/theme/app_shadows.dart';
 import '../../../../app/theme/design_tokens.dart';
 import '../../../../app/widgets/app_screen_background.dart';
-import '../../../auth/data/services/auth_service.dart';
+import '../../../../app/widgets/app_surface.dart';
 import '../../data/services/profile_service.dart';
 import '../../../../core/network/api_client.dart';
 
@@ -22,7 +22,6 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final ProfileService _profileService = ProfileService();
-  final AuthService _authService = AuthService();
   final ImagePicker _imagePicker = ImagePicker();
 
   bool _isLoading = true;
@@ -192,15 +191,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (avatarUrl != null && avatarUrl.isNotEmpty) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(28),
-        child: Image.network(
-          avatarUrl,
-          width: 96,
-          height: 96,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) {
-            return _buildAvatarFallback(initials);
-          },
-        ),
+          child: Image.network(
+            avatarUrl,
+            width: 96,
+            height: 96,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              return _buildAvatarFallback(initials);
+            },
+          ),
       );
     }
 
@@ -212,14 +211,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
       width: 96,
       height: 96,
       decoration: BoxDecoration(
-        color: AppColors.accent,
-        borderRadius: BorderRadius.circular(28),
+        gradient: AppGradients.accentPanel,
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: AppShadows.primaryButton,
       ),
       alignment: Alignment.center,
       child: Text(
         initials,
         style: const TextStyle(
-          color: Colors.black,
+          color: AppColors.textOnAccent,
           fontSize: 28,
           fontWeight: FontWeight.w800,
         ),
@@ -232,29 +232,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required String value,
     required IconData icon,
   }) {
-    return Container(
-      width: double.infinity,
+    return AppSurface(
+      radius: AppRadius.xl,
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: Colors.white.withAlpha(10)),
-        boxShadow: AppShadows.lift,
-      ),
+      shadow: AppShadows.lift,
       child: Row(
         children: [
           Container(
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: AppColors.accent,
-              borderRadius: BorderRadius.circular(AppRadius.sm),
+              gradient: AppGradients.accentPanel,
+              borderRadius: BorderRadius.circular(AppRadius.md),
               boxShadow: AppShadows.primaryButton,
             ),
             alignment: Alignment.center,
             child: Icon(
               icon,
-              color: Colors.black,
+              color: AppColors.textOnAccent,
               size: 20,
             ),
           ),
@@ -329,62 +324,77 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Column(
         children: [
           const SizedBox(height: 12),
-          Stack(
-            children: [
-              _buildAvatar(),
-              Positioned(
-                right: 0,
-                bottom: 0,
-                child: GestureDetector(
-                  onTap: _isUploading ? null : _pickAndUploadAvatar,
-                  child: Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: AppColors.accent,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.black,
-                        width: 2,
+          AppSurface(
+            tone: AppSurfaceTone.elevated,
+            radius: AppRadius.xxl,
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 22),
+            child: Column(
+              children: [
+                const AppPillBadge(
+                  label: 'МОЙ АККАУНТ',
+                  accent: true,
+                ),
+                const SizedBox(height: 18),
+                Stack(
+                  children: [
+                    _buildAvatar(),
+                    Positioned(
+                      right: 0,
+                      bottom: 0,
+                      child: GestureDetector(
+                        onTap: _isUploading ? null : _pickAndUploadAvatar,
+                        child: Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            gradient: AppGradients.accentPanel,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: AppColors.background,
+                              width: 2,
+                            ),
+                            boxShadow: AppShadows.primaryButton,
+                          ),
+                          alignment: Alignment.center,
+                          child: _isUploading
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: AppColors.textOnAccent,
+                                  ),
+                                )
+                              : const Icon(
+                                  AppIcons.edit,
+                                  color: AppColors.textOnAccent,
+                                  size: 18,
+                                ),
+                        ),
                       ),
                     ),
-                    alignment: Alignment.center,
-                    child: _isUploading
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.black,
-                            ),
-                          )
-                        : const Icon(
-                            AppIcons.edit,
-                            color: Colors.black,
-                            size: 18,
-                          ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  _username(),
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          Text(
-            _username(),
-            style: const TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _email(),
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
+                const SizedBox(height: 8),
+                Text(
+                  _email(),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 24),

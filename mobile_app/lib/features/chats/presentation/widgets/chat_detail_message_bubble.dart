@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_icons.dart';
+import '../../../../app/theme/app_shadows.dart';
+import '../../../../app/theme/design_tokens.dart';
 import '../chat_detail_formatters.dart';
 import '../chat_detail_message_maps.dart';
 import 'chat_detail_avatar_widgets.dart';
@@ -118,10 +120,10 @@ class ChatDetailMessageBubble extends StatelessWidget {
     final bubbleShape = videoNoteCircleLayout
         ? BorderRadius.circular(110)
         : BorderRadius.only(
-            topLeft: const Radius.circular(14),
-            topRight: const Radius.circular(14),
-            bottomLeft: Radius.circular(isMine ? 14 : 4),
-            bottomRight: Radius.circular(isMine ? 4 : 14),
+            topLeft: const Radius.circular(18),
+            topRight: const Radius.circular(18),
+            bottomLeft: Radius.circular(isMine ? 18 : 8),
+            bottomRight: Radius.circular(isMine ? 8 : 18),
           );
 
     final bubble = Material(
@@ -140,16 +142,19 @@ class ChatDetailMessageBubble extends StatelessWidget {
               ? EdgeInsets.zero
               : const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
           decoration: BoxDecoration(
-            color: mediaOnly
-                ? Colors.transparent
-                : (isMine ? AppColors.bubbleMine : AppColors.bubbleOther),
+            gradient: mediaOnly
+                ? null
+                : (isMine ? AppGradients.bubbleMine : AppGradients.bubbleOther),
             borderRadius: bubbleShape,
             border: mediaOnly || !isMine
                 ? null
                 : Border.all(
-                    color: AppColors.accentBorder.withAlpha(100),
+                    color: AppColors.accentBorder.withAlpha(110),
                     width: 1,
                   ),
+            boxShadow: mediaOnly
+                ? null
+                : (isMine ? AppShadows.accentStroke : AppShadows.lift),
           ),
           child: Column(
             crossAxisAlignment:
@@ -161,7 +166,7 @@ class ChatDetailMessageBubble extends StatelessWidget {
                   child: Text(
                     senderName,
                     style: const TextStyle(
-                      color: AppColors.accentBright,
+                      color: AppColors.accentGlow,
                       fontSize: 12,
                       fontWeight: FontWeight.w800,
                     ),
@@ -178,11 +183,11 @@ class ChatDetailMessageBubble extends StatelessWidget {
                     child: Text(
                       'Переслано от ${senderNameForUserId(ChatDetailMessageMaps.intFromDynamic(message['forwarded_from_user_id'])!)}',
                       textAlign: TextAlign.left,
-                      style: const TextStyle(
-                        color: AppColors.textMuted,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        fontStyle: FontStyle.italic,
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          fontStyle: FontStyle.italic,
                       ),
                     ),
                   ),
@@ -203,8 +208,8 @@ class ChatDetailMessageBubble extends StatelessWidget {
                         padding: const EdgeInsets.only(right: 6),
                         child: Text(
                           'изменено',
-                          style: const TextStyle(
-                            color: AppColors.textMuted,
+                      style: const TextStyle(
+                            color: AppColors.textSecondary,
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
                           ),
@@ -225,7 +230,7 @@ class ChatDetailMessageBubble extends StatelessWidget {
                     Text(
                       time,
                       style: const TextStyle(
-                        color: AppColors.textMuted,
+                        color: AppColors.textSecondary,
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                       ),

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/app_shadows.dart';
+import '../../../../app/theme/design_tokens.dart';
 import '../chat_detail_formatters.dart';
 import '../chat_detail_message_maps.dart';
 
@@ -37,43 +39,60 @@ class ChatDetailReplyQuote extends StatelessWidget {
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: maxQuoteWidth),
           child: Container(
-            padding: const EdgeInsets.fromLTRB(10, 8, 12, 8),
+            padding: const EdgeInsets.fromLTRB(10, 9, 12, 9),
             decoration: BoxDecoration(
-              color: isMine
-                  ? Colors.black.withAlpha(28)
-                  : Colors.white.withAlpha(7),
-              borderRadius: BorderRadius.circular(10),
-              border: Border(
-                left: BorderSide(
-                  color: AppColors.accentBright.withAlpha(200),
-                  width: 3,
-                ),
+              gradient:
+                  isMine ? AppGradients.selectedPanel : AppGradients.surfacePanel,
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+              border: Border.all(
+                color: isMine
+                    ? AppColors.accent.withAlpha(80)
+                    : AppColors.strokeSoft,
               ),
+              boxShadow: AppShadows.lift,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  senderLabel,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: isMine ? AppColors.accentBright : AppColors.accent,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
+                Container(
+                  width: 4,
+                  margin: const EdgeInsets.only(top: 1),
+                  decoration: BoxDecoration(
+                    gradient: AppGradients.accentPanel,
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  preview,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    height: 1.25,
+                const SizedBox(width: 10),
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        senderLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color:
+                              isMine ? AppColors.accentBright : AppColors.accent,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        preview,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          height: 1.25,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],

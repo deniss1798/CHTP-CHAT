@@ -6,6 +6,10 @@ import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_icons.dart';
+import '../../../../app/theme/app_shadows.dart';
+import '../../../../app/theme/design_tokens.dart';
+import '../../../../app/widgets/app_screen_background.dart';
+import '../../../../app/widgets/app_surface.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../chats/data/services/chat_socket_service.dart';
 import '../../../chats/data/services/chats_service.dart';
@@ -194,25 +198,26 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
       },
       child: Scaffold(
         backgroundColor: AppColors.background,
-        body: SafeArea(
+        body: AppScreenBackground(
+          child: SafeArea(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
                 child: Row(
                   children: [
-                    IconButton(
-                      onPressed: () => session?.leave(),
-                      icon: const Icon(
-                        AppIcons.close,
-                        color: AppColors.textMuted,
-                      ),
+                    AppIconButtonSurface(
+                      icon: AppIcons.close,
+                      tooltip: 'Выйти',
+                      onTap: () => session?.leave(),
                     ),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          const AppPillBadge(label: 'GROUP CALL', accent: true),
+                          const SizedBox(height: 8),
                           Text(
                             widget.chatTitle,
                             maxLines: 1,
@@ -299,70 +304,69 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    IconButton.filled(
-                      style: IconButton.styleFrom(
-                        backgroundColor: AppColors.surfaceSoft,
-                        foregroundColor: AppColors.textPrimary,
+                child: AppSurface(
+                  radius: AppRadius.pill,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      AppIconButtonSurface(
+                        icon: _micOn ? AppIcons.mic : AppIcons.micOff,
+                        active: _micOn,
+                        onTap: session == null
+                            ? null
+                            : () {
+                                setState(() {
+                                  _micOn = !_micOn;
+                                  session.setMicEnabled(_micOn);
+                                });
+                              },
                       ),
-                      onPressed: session == null
-                          ? null
-                          : () {
-                              setState(() {
-                                _micOn = !_micOn;
-                                session.setMicEnabled(_micOn);
-                              });
-                            },
-                      icon: Icon(_micOn ? AppIcons.mic : AppIcons.micOff),
-                    ),
-                    const SizedBox(width: 16),
-                    IconButton.filled(
-                      style: IconButton.styleFrom(
-                        backgroundColor: AppColors.surfaceSoft,
-                        foregroundColor: AppColors.textPrimary,
+                      const SizedBox(width: 12),
+                      AppIconButtonSurface(
+                        icon: _camOn ? AppIcons.videocam : AppIcons.videocamOff,
+                        active: _camOn,
+                        onTap: session == null
+                            ? null
+                            : () async {
+                                final next = !_camOn;
+                                setState(() => _camOn = next);
+                                await session.setCameraEnabled(next);
+                                if (mounted) {
+                                  setState(() => _camOn = session.cameraOn);
+                                }
+                              },
                       ),
-                      onPressed: session == null
-                          ? null
-                          : () async {
-                              final next = !_camOn;
-                              setState(() => _camOn = next);
-                              await session.setCameraEnabled(next);
-                              if (mounted) {
-                                setState(() => _camOn = session.cameraOn);
-                              }
-                            },
-                      icon: Icon(
-                        _camOn ? Icons.videocam : Icons.videocam_off,
+                      const SizedBox(width: 12),
+                      AppIconButtonSurface(
+                        icon: Icons.cameraswitch_rounded,
+                        onTap: (session == null || !_camOn)
+                            ? null
+                            : () => session.switchCamera(),
                       ),
-                    ),
-                    const SizedBox(width: 16),
-                    IconButton.filled(
-                      style: IconButton.styleFrom(
-                        backgroundColor: AppColors.surfaceSoft,
-                        foregroundColor: AppColors.textPrimary,
+                      const SizedBox(width: 12),
+                      Container(
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [Color(0xFFE34B3F), Color(0xFFB7201B)],
+                          ),
+                          shape: BoxShape.circle,
+                          boxShadow: AppShadows.primaryButton,
+                        ),
+                        child: IconButton(
+                          onPressed: session == null ? null : () => session.leave(),
+                          icon: const Icon(AppIcons.callEnd, color: Colors.white),
+                        ),
                       ),
-                      onPressed: (session == null || !_camOn)
-                          ? null
-                          : () => session.switchCamera(),
-                      icon: const Icon(Icons.cameraswitch),
-                    ),
-                    const SizedBox(width: 16),
-                    IconButton.filled(
-                      style: IconButton.styleFrom(
-                        backgroundColor: Colors.red.shade700,
-                        foregroundColor: Colors.white,
-                      ),
-                      onPressed:
-                          session == null ? null : () => session.leave(),
-                      icon: const Icon(AppIcons.callEnd),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ],
           ),
+        ),
         ),
       ),
     );

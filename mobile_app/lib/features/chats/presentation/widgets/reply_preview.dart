@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_icons.dart';
+import '../../../../app/theme/app_shadows.dart';
+import '../../../../app/theme/design_tokens.dart';
 import '../chat_detail_formatters.dart';
 
 /// Баннер режима редактирования над полем ввода.
@@ -18,8 +20,10 @@ class ChatDetailEditModeBanner extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: AppColors.surfaceSoft,
-          borderRadius: BorderRadius.circular(12),
+          gradient: AppGradients.surfacePanel,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(color: AppColors.strokeSoft),
+          boxShadow: AppShadows.lift,
         ),
         child: Row(
           children: [
@@ -69,8 +73,10 @@ class ChatDetailReplyPreviewBar extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: AppColors.surfaceSoft,
-          borderRadius: BorderRadius.circular(12),
+          gradient: AppGradients.surfacePanel,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(color: AppColors.strokeSoft),
+          boxShadow: AppShadows.lift,
         ),
         child: Row(
           children: [

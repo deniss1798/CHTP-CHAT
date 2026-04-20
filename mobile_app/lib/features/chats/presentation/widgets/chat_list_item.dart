@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_shadows.dart';
 import '../../../../app/theme/design_tokens.dart';
+import '../../../../app/widgets/app_surface.dart';
 import '../../domain/chat_list_rules.dart';
 import '../models/chat_list_item_model.dart';
 
@@ -19,131 +20,110 @@ class ChatListItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isUnread = item.unreadCount > 0;
+    final selected = item.isSelected;
+    final subtitleColor = item.isTyping
+        ? AppColors.accentBright
+        : (isUnread ? AppColors.textPrimary : AppColors.textSecondary);
 
-    return GestureDetector(
-      onTap: onTap,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        child: Container(
-          decoration: BoxDecoration(
-            color: item.isSelected
-                ? AppColors.accent.withAlpha(22)
-                : (isUnread
-                    ? AppColors.accent.withAlpha(10)
-                    : AppColors.surface),
-            border: Border.all(
-              color: item.isSelected
-                  ? AppColors.accent.withAlpha(160)
-                  : Colors.white.withAlpha(isUnread ? 10 : 8),
-              width: 1,
-            ),
-            boxShadow: AppShadows.lift,
-          ),
-          child: IntrinsicHeight(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        child: AppSurface(
+          radius: AppRadius.xl,
+          tone: selected
+              ? AppSurfaceTone.selected
+              : (isUnread ? AppSurfaceTone.elevated : AppSurfaceTone.base),
+          borderColor: selected
+              ? AppColors.accent.withAlpha(140)
+              : (isUnread
+                  ? AppColors.accentBorder.withAlpha(120)
+                  : AppColors.strokeSoft),
+          shadow: selected ? [...AppShadows.card, ...AppShadows.accentStroke] : AppShadows.lift,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (isUnread)
-                  Container(
-                    width: 4,
-                    color: AppColors.accent,
-                  ),
+                _ChatListAvatar(
+                  title: item.title,
+                  avatarUrl: item.avatarUrl,
+                  showOnlineDot: item.isOnline,
+                  isSelected: selected,
+                ),
+                const SizedBox(width: 14),
                 Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _ChatListAvatar(
-                          title: item.title,
-                          avatarUrl: item.avatarUrl,
-                          showOnlineDot: item.isOnline,
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.only(top: 2),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  item.title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: AppColors.textPrimary,
-                                    fontSize: 17,
-                                    fontWeight: isUnread
-                                        ? FontWeight.w800
-                                        : FontWeight.w700,
-                                  ),
-                                ),
-                                const SizedBox(height: 7),
-                                Text(
-                                  item.subtitle,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: item.isTyping
-                                        ? AppColors.accent
-                                        : (isUnread
-                                            ? AppColors.textPrimary
-                                            : AppColors.textSecondary),
-                                    fontSize: 14,
-                                    fontStyle: item.isTyping
-                                        ? FontStyle.italic
-                                        : FontStyle.normal,
-                                    fontWeight: isUnread
-                                        ? FontWeight.w700
-                                        : FontWeight.w500,
-                                  ),
-                                ),
-                              ],
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              item.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: AppColors.textPrimary,
+                                fontSize: 16,
+                                fontWeight: isUnread ? FontWeight.w800 : FontWeight.w700,
+                                letterSpacing: -0.3,
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 10),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            if (item.timeLabel.isNotEmpty)
-                              Text(
-                                item.timeLabel,
-                                style: TextStyle(
-                                  color: isUnread
-                                      ? AppColors.accent
-                                      : AppColors.textSecondary,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
+                          if (item.timeLabel.isNotEmpty)
+                            AppPillBadge(
+                              label: item.timeLabel,
+                              accent: selected || isUnread,
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 9),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              item.subtitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: subtitleColor,
+                                fontSize: 13.5,
+                                fontStyle:
+                                    item.isTyping ? FontStyle.italic : FontStyle.normal,
+                                fontWeight: item.isTyping || isUnread
+                                    ? FontWeight.w700
+                                    : FontWeight.w600,
+                                height: 1.25,
+                              ),
+                            ),
+                          ),
+                          if (item.unreadCount > 0) ...[
+                            const SizedBox(width: 12),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                gradient: AppGradients.accentPanel,
+                                borderRadius: BorderRadius.circular(AppRadius.pill),
+                                boxShadow: AppShadows.primaryButton,
+                              ),
+                              child: Text(
+                                item.unreadCount > 99 ? '99+' : item.unreadCount.toString(),
+                                style: const TextStyle(
+                                  color: AppColors.textOnAccent,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w900,
                                 ),
                               ),
-                            const SizedBox(height: 10),
-                            if (item.unreadCount > 0)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 9,
-                                  vertical: 5,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppColors.accent,
-                                  borderRadius: BorderRadius.circular(999),
-                                  boxShadow: AppShadows.primaryButton,
-                                ),
-                                child: Text(
-                                  item.unreadCount > 99
-                                      ? '99+'
-                                      : item.unreadCount.toString(),
-                                  style: const TextStyle(
-                                    color: Colors.black,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ),
+                            ),
                           ],
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -160,11 +140,13 @@ class _ChatListAvatar extends StatelessWidget {
     required this.title,
     required this.avatarUrl,
     required this.showOnlineDot,
+    required this.isSelected,
   });
 
   final String title;
   final String? avatarUrl;
   final bool showOnlineDot;
+  final bool isSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -174,15 +156,23 @@ class _ChatListAvatar extends StatelessWidget {
     Widget inner;
     if (safeUrl.isNotEmpty) {
       inner = ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Image.network(
-          safeUrl,
-          width: size,
-          height: size,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) {
-            return _AvatarFallback(title: title, size: size);
-          },
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: isSelected ? AppColors.accent.withAlpha(110) : AppColors.strokeSoft,
+            ),
+          ),
+          child: Image.network(
+            safeUrl,
+            width: size,
+            height: size,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              return _AvatarFallback(title: title, size: size);
+            },
+          ),
         ),
       );
     } else {
@@ -199,12 +189,18 @@ class _ChatListAvatar extends StatelessWidget {
           right: 0,
           bottom: 0,
           child: Container(
-            width: 12,
-            height: 12,
+            width: 13,
+            height: 13,
             decoration: BoxDecoration(
               color: AppColors.accent,
               shape: BoxShape.circle,
-              border: Border.all(color: AppColors.background, width: 2),
+              border: Border.all(color: AppColors.background, width: 2.2),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.accent.withAlpha(120),
+                  blurRadius: 12,
+                ),
+              ],
             ),
           ),
         ),
@@ -228,14 +224,15 @@ class _AvatarFallback extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: AppColors.accent,
-        borderRadius: BorderRadius.circular(16),
+        gradient: AppGradients.accentPanel,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: AppShadows.primaryButton,
       ),
       alignment: Alignment.center,
       child: Text(
         resolveTitleInitials(title),
         style: const TextStyle(
-          color: Colors.black,
+          color: AppColors.textOnAccent,
           fontSize: 16,
           fontWeight: FontWeight.w800,
         ),

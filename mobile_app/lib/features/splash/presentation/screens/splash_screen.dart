@@ -4,7 +4,10 @@ import 'package:flutter/material.dart';
 import '../../../../app/app.dart';
 import '../../../../app/home_chats_route.dart';
 import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/app_shadows.dart';
+import '../../../../app/theme/design_tokens.dart';
 import '../../../../app/widgets/app_screen_background.dart';
+import '../../../../app/widgets/app_surface.dart';
 import '../../../../core/push/open_chat_from_push.dart';
 import '../../../../core/storage/secure_storage_service.dart';
 import '../../../auth/data/services/auth_service.dart';
@@ -74,26 +77,51 @@ class _SplashScreenState extends State<SplashScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: AppScreenBackground(
-        child: const SafeArea(
+        child: SafeArea(
           child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'ЧТП ЧАТ',
-                  style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 26,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.8,
-                  ),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: AppSurface(
+                tone: AppSurfaceTone.elevated,
+                radius: AppRadius.xxl,
+                padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 28),
+                shadow: AppShadows.card,
+                child: const Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AppPillBadge(label: 'SECURE MESSAGING', accent: true),
+                    SizedBox(height: 18),
+                    Text(
+                      'ЧТП ЧАТ',
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 30,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                    SizedBox(height: 10),
+                    Text(
+                      'Запускаем интерфейс и восстанавливаем сессию…',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    SizedBox(height: 20),
+                    SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        color: AppColors.accent,
+                        strokeWidth: 2.4,
+                      ),
+                    ),
+                  ],
                 ),
-                SizedBox(height: 12),
-                CircularProgressIndicator(
-                  color: AppColors.accent,
-                  strokeWidth: 2,
-                ),
-              ],
+              ),
             ),
           ),
         ),

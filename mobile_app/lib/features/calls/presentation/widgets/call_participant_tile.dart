@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/app_shadows.dart';
+import '../../../../app/theme/design_tokens.dart';
 
 /// Плитка участника: видео или аватар (если камера выкл / нет кадра).
 class CallParticipantTile extends StatelessWidget {
@@ -55,12 +57,17 @@ class CallParticipantTile extends StatelessWidget {
         attachHiddenVideoSurface && !hasFrame ? 0.08 : 0.02;
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(24),
       child: Stack(
         fit: StackFit.expand,
         children: [
-          ColoredBox(
-            color: AppColors.surfaceSoft.withValues(alpha: 0.45),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: AppGradients.heroPanel,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: AppColors.strokeSoft),
+              boxShadow: AppShadows.card,
+            ),
             child: Stack(
               fit: StackFit.expand,
               children: [
@@ -79,9 +86,29 @@ class CallParticipantTile extends StatelessWidget {
                 if (!hasFrame)
                   Positioned.fill(
                     child: IgnorePointer(
-                      child: Center(child: _buildAvatarPlace(context)),
+                          child: Center(child: _buildAvatarPlace(context)),
                     ),
                   ),
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: IgnorePointer(
+                    child: Container(
+                      height: 120,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black.withAlpha(110),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -90,19 +117,20 @@ class CallParticipantTile extends StatelessWidget {
             bottom: 8,
             child: DecoratedBox(
               decoration: BoxDecoration(
-                color: Colors.black54,
-                borderRadius: BorderRadius.circular(8),
+                color: AppColors.surfaceGlass,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.strokeSoft),
               ),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 child: Text(
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: AppColors.textPrimary,
                     fontSize: 12,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
@@ -145,7 +173,10 @@ class CallParticipantTile extends StatelessWidget {
               return Container(
                 width: size,
                 height: size,
-                color: AppColors.surfaceSoft.withValues(alpha: 0.55),
+                decoration: BoxDecoration(
+                  gradient: AppGradients.surfacePanel,
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                ),
                 alignment: Alignment.center,
                 child: SizedBox(
                   width: 22,
@@ -169,7 +200,10 @@ class CallParticipantTile extends StatelessWidget {
               return Container(
                 width: size,
                 height: size,
-                color: AppColors.surfaceSoft.withValues(alpha: 0.35),
+                decoration: BoxDecoration(
+                  gradient: AppGradients.surfacePanel,
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                ),
                 alignment: Alignment.center,
                 child: SizedBox(
                   width: 20,
@@ -194,14 +228,15 @@ class CallParticipantTile extends StatelessWidget {
       alignment: Alignment.center,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: AppColors.accent.withValues(alpha: 0.35),
+        gradient: AppGradients.accentPanel,
+        boxShadow: AppShadows.primaryButton,
       ),
       child: Text(
         _initial,
         style: TextStyle(
-          color: Colors.white,
+          color: AppColors.textOnAccent,
           fontSize: size * 0.36,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w800,
         ),
       ),
     );

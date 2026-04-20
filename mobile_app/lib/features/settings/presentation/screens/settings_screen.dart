@@ -6,6 +6,7 @@ import '../../../../app/theme/app_icons.dart';
 import '../../../../app/theme/app_shadows.dart';
 import '../../../../app/theme/design_tokens.dart';
 import '../../../../app/widgets/app_screen_background.dart';
+import '../../../../app/widgets/app_surface.dart';
 import '../../../../core/storage/secure_storage_service.dart';
 import '../../../calls/data/ice_config_service.dart';
 import '../../../auth/presentation/screens/auth_screen.dart';
@@ -29,19 +30,10 @@ class SettingsScreen extends StatelessWidget {
             Positioned(
               top: MediaQuery.paddingOf(context).top + 4,
               left: 8,
-              child: Material(
-                color: Colors.transparent,
-                child: IconButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.white.withAlpha(10),
-                    foregroundColor: AppColors.textPrimary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadius.sm),
-                    ),
-                  ),
-                  icon: const Icon(AppIcons.back, size: 18),
-                ),
+              child: AppIconButtonSurface(
+                icon: AppIcons.back,
+                tooltip: 'Назад',
+                onTap: () => Navigator.of(context).pop(),
               ),
             ),
             SafeArea(
@@ -53,33 +45,21 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   child: ConstrainedBox(
                     constraints: BoxConstraints(maxWidth: cardMaxWidth),
-                    child: Container(
-                      width: double.infinity,
+                    child: AppSurface(
+                      tone: AppSurfaceTone.elevated,
+                      radius: AppRadius.xxl,
                       padding: EdgeInsets.symmetric(
                         horizontal: isWide ? AppSpacing.xxxl : AppSpacing.xxl,
                         vertical: isWide ? 40 : AppSpacing.xxxl,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(AppRadius.xl),
-                        border: Border.all(
-                          color: Colors.white.withAlpha(14),
-                          width: 1,
-                        ),
-                        boxShadow: AppShadows.card,
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            'Настройки',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: AppColors.textMuted,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 1.2,
+                          const Center(
+                            child: AppPillBadge(
+                              label: 'SYSTEM PREFERENCES',
+                              accent: true,
                             ),
                           ),
                           SizedBox(height: isWide ? 24 : AppSpacing.xl),
@@ -102,9 +82,19 @@ class SettingsScreen extends StatelessWidget {
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(AppRadius.md),
                             ),
-                            leading: const Icon(
-                              AppIcons.person,
-                              color: AppColors.accent,
+                            leading: Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                gradient: AppGradients.accentPanel,
+                                borderRadius: BorderRadius.circular(AppRadius.md),
+                                boxShadow: AppShadows.primaryButton,
+                              ),
+                              alignment: Alignment.center,
+                              child: const Icon(
+                                AppIcons.person,
+                                color: AppColors.textOnAccent,
+                              ),
                             ),
                             title: const Text(
                               'Мой профиль',
@@ -140,9 +130,19 @@ class SettingsScreen extends StatelessWidget {
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(AppRadius.md),
                             ),
-                            leading: Icon(
-                              AppIcons.deleteForever,
-                              color: Colors.redAccent,
+                            leading: Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                color: Colors.redAccent.withAlpha(28),
+                                borderRadius: BorderRadius.circular(AppRadius.md),
+                                border: Border.all(color: Colors.redAccent.withAlpha(70)),
+                              ),
+                              alignment: Alignment.center,
+                              child: const Icon(
+                                AppIcons.deleteForever,
+                                color: Colors.redAccent,
+                              ),
                             ),
                             title: const Text(
                               'Удалить аккаунт',

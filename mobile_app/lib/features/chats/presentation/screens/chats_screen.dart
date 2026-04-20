@@ -124,9 +124,10 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
   Future<void> _openCreateChatSheet() async {
     final result = await ChatsCreateSheet.show(context);
     if (!mounted || result == null) return;
+    final navigator = Navigator.of(context);
 
     if (result == 'private') {
-      final created = await Navigator.of(context).push<Map<String, dynamic>>(
+      final created = await navigator.push<Map<String, dynamic>>(
         MaterialPageRoute(builder: (_) => const UserPickerScreen()),
       );
 
@@ -154,7 +155,7 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
     }
 
     if (result == 'group') {
-      final created = await Navigator.of(context).push<Map<String, dynamic>>(
+      final created = await navigator.push<Map<String, dynamic>>(
         MaterialPageRoute(builder: (_) => const GroupChatCreateScreen()),
       );
 
@@ -321,21 +322,26 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
                   Positioned(
                     right: widget.embedded ? 12 : 20,
                     bottom: widget.embedded ? 16 : 20,
-                    child: GestureDetector(
-                      onTap: _openCreateChatSheet,
-                      child: Container(
-                        width: AppSizes.fab,
-                        height: AppSizes.fab,
-                        decoration: BoxDecoration(
-                          color: AppColors.accent,
-                          shape: BoxShape.circle,
-                          boxShadow: AppShadows.accentFab(),
-                        ),
-                        alignment: Alignment.center,
-                        child: const Icon(
-                          Icons.add,
-                          color: Colors.black,
-                          size: 22,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: _openCreateChatSheet,
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                        child: Ink(
+                          width: AppSizes.fab,
+                          height: AppSizes.fab,
+                          decoration: BoxDecoration(
+                            gradient: AppGradients.accentPanel,
+                            shape: BoxShape.circle,
+                            boxShadow: AppShadows.accentFab(),
+                          ),
+                          child: const Center(
+                            child: Icon(
+                              Icons.add_rounded,
+                              color: AppColors.textOnAccent,
+                              size: 24,
+                            ),
+                          ),
                         ),
                       ),
                     ),

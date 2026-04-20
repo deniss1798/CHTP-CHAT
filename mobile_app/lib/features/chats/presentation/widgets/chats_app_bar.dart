@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_icons.dart';
 import '../../../../app/theme/design_tokens.dart';
+import '../../../../app/widgets/app_surface.dart';
 
 class ChatsAppBar extends StatelessWidget {
   const ChatsAppBar({
@@ -18,83 +19,85 @@ class ChatsAppBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 3,
-                    height: 18,
-                    decoration: BoxDecoration(
-                      color: AppColors.accent,
-                      borderRadius: BorderRadius.circular(2),
+                  Row(
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: AppColors.accent,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.accent.withAlpha(120),
+                              blurRadius: 14,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      const Text(
+                        'Ч Т П',
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 5,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      AppPillBadge(
+                        label: '$chatCount чатов',
+                        accent: true,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  Text(
+                    'Сообщения',
+                    style: textTheme.headlineLarge?.copyWith(
+                      fontSize: 36,
+                      height: 0.98,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(height: 10),
                   const Text(
-                    'ЧТП',
+                    'Все переписки, звонки и активность в одном ритме.',
                     style: TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 6,
+                      color: AppColors.textSecondary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      height: 1.35,
                     ),
                   ),
                 ],
               ),
             ),
-            IconButton(
-              style: IconButton.styleFrom(
-                backgroundColor: Colors.white.withAlpha(10),
-                foregroundColor: AppColors.textPrimary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppRadius.sm),
-                ),
-              ),
-              onPressed: () {
-                onOpenSettings();
-              },
-              icon: const Icon(AppIcons.settings),
+            const SizedBox(width: AppSpacing.md),
+            AppIconButtonSurface(
+              icon: AppIcons.settings,
+              tooltip: 'Настройки',
+              onTap: onOpenSettings,
             ),
             const SizedBox(width: AppSpacing.sm),
-            IconButton(
-              style: IconButton.styleFrom(
-                backgroundColor: Colors.white.withAlpha(10),
-                foregroundColor: AppColors.textPrimary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppRadius.sm),
-                ),
-              ),
-              onPressed: () {
-                onLogout();
-              },
-              icon: const Icon(AppIcons.logout),
+            AppIconButtonSurface(
+              icon: AppIcons.logout,
+              tooltip: 'Выйти',
+              onTap: onLogout,
             ),
           ],
-        ),
-        const SizedBox(height: 10),
-        const Text(
-          'Сообщения',
-          style: TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 28,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.6,
-            height: 1,
-          ),
-        ),
-        const SizedBox(height: 10),
-        Text(
-          '$chatCount чатов',
-          style: const TextStyle(
-            color: AppColors.textSecondary,
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-          ),
         ),
       ],
     );

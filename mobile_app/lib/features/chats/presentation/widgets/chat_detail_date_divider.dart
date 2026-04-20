@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/app_shadows.dart';
+import '../../../../app/theme/design_tokens.dart';
 
 class ChatDetailDateDivider extends StatelessWidget {
   const ChatDetailDateDivider({super.key, required this.label});
@@ -19,8 +21,10 @@ class ChatDetailDateDivider extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: Colors.white.withAlpha(18),
-            borderRadius: BorderRadius.circular(12),
+            gradient: AppGradients.surfacePanel,
+            borderRadius: BorderRadius.circular(AppRadius.pill),
+            border: Border.all(color: AppColors.strokeSoft),
+            boxShadow: AppShadows.lift,
           ),
           child: Text(
             label,

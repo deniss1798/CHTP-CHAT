@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_icons.dart';
+import '../../../../app/widgets/app_surface.dart';
 
 /// Шапка экрана чата (назад, аватар, заголовок, звонки, меню группы).
 class ChatDetailAppBar extends StatelessWidget {
@@ -40,24 +41,21 @@ class ChatDetailAppBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(10, 10, 14, 10),
+      padding: const EdgeInsets.fromLTRB(10, 10, 12, 10),
       decoration: BoxDecoration(
-        color: AppColors.background,
-        border: Border(
-          bottom: BorderSide(
-            color: Colors.white.withAlpha(10),
-          ),
+        color: AppColors.background.withAlpha(220),
+        border: const Border(
+          bottom: BorderSide(color: AppColors.strokeSoft),
         ),
       ),
       child: Row(
         children: [
-          IconButton(
-            onPressed: onBack,
-            icon: const Icon(
-              AppIcons.back,
-              color: AppColors.textPrimary,
-            ),
+          AppIconButtonSurface(
+            icon: AppIcons.back,
+            tooltip: 'Назад',
+            onTap: onBack,
           ),
+          const SizedBox(width: 10),
           Expanded(
             child: Row(
               children: [
@@ -75,81 +73,62 @@ class ChatDetailAppBar extends StatelessWidget {
                         style: const TextStyle(
                           color: AppColors.textPrimary,
                           fontSize: 17,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
                         ),
                       ),
-                      if (!isGroupChat) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          peerSubtitle,
-                          style: TextStyle(
-                            color: peerOnline
-                                ? AppColors.accentBright
-                                : AppColors.textMuted,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
+                      const SizedBox(height: 4),
+                      if (!isGroupChat)
+                        AppPillBadge(
+                          label: peerSubtitle,
+                          accent: peerOnline,
+                          icon: peerOnline ? AppIcons.checkCircle : null,
                         ),
-                      ],
                     ],
                   ),
                 ),
               ],
             ),
           ),
+          const SizedBox(width: 8),
           if (!isGroupChat)
-            IconButton(
+            AppIconButtonSurface(
+              icon: AppIcons.call,
               tooltip: 'Голосовой звонок',
-              onPressed: onVoiceCall,
-              icon: const Icon(
-                AppIcons.call,
-                color: AppColors.accent,
-              ),
+              onTap: onVoiceCall,
+              active: true,
             ),
           if (isGroupChat)
-            IconButton(
+            AppIconButtonSurface(
+              icon: Icons.groups_rounded,
               tooltip: 'Групповой звонок',
-              onPressed: onGroupCall,
-              icon: const Icon(
-                Icons.groups,
-                color: AppColors.accent,
-              ),
+              onTap: onGroupCall,
+              active: true,
             ),
-          if (isGroupChat)
-            IconButton(
+          if (isGroupChat) ...[
+            const SizedBox(width: 8),
+            AppIconButtonSurface(
+              icon: AppIcons.photoCamera,
               tooltip: 'Изменить аватар группы',
-              onPressed: isUploadingChatAvatar ? null : onPickGroupAvatar,
-              icon: isUploadingChatAvatar
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: AppColors.accent,
-                      ),
-                    )
-                  : const Icon(
-                      AppIcons.photoCamera,
-                      color: AppColors.accent,
-                    ),
+              onTap: isUploadingChatAvatar ? null : onPickGroupAvatar,
+              iconColor: isUploadingChatAvatar
+                  ? AppColors.textMuted
+                  : AppColors.accentBright,
             ),
-          if (isGroupChat)
-            IconButton(
+            const SizedBox(width: 8),
+            AppIconButtonSurface(
+              icon: AppIcons.personAdd,
               tooltip: 'Добавить участника',
-              onPressed: onAddMember,
-              icon: const Icon(
-                AppIcons.personAdd,
-                color: AppColors.accent,
-              ),
+              onTap: onAddMember,
             ),
-          if (isGroupChat)
+            const SizedBox(width: 4),
             PopupMenuButton<String>(
               tooltip: 'Меню группы',
+              color: AppColors.surfaceRaised,
               icon: const Icon(
                 AppIcons.moreVert,
                 color: AppColors.textPrimary,
               ),
-              color: AppColors.surface,
               onSelected: onMenuSelected,
               itemBuilder: (context) {
                 return [
@@ -169,6 +148,7 @@ class ChatDetailAppBar extends StatelessWidget {
                 ];
               },
             ),
+          ],
         ],
       ),
     );

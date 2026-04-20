@@ -7,6 +7,8 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_icons.dart';
 import '../../../../app/theme/app_shadows.dart';
 import '../../../../app/theme/design_tokens.dart';
+import '../../../../app/widgets/app_screen_background.dart';
+import '../../../../app/widgets/app_surface.dart';
 import '../../../../core/network/api_client.dart';
 import '../../data/services/create_chat_service.dart';
 import '../../data/services/users_service.dart';
@@ -169,19 +171,20 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
           width: size,
           height: size,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) {
+          errorBuilder: (context, error, stackTrace) {
             return Container(
               width: size,
               height: size,
               decoration: BoxDecoration(
-                color: AppColors.accent,
+                gradient: AppGradients.accentPanel,
                 borderRadius: BorderRadius.circular(r),
+                boxShadow: AppShadows.primaryButton,
               ),
               alignment: Alignment.center,
               child: Text(
                 _initials(title),
                 style: TextStyle(
-                  color: Colors.black,
+                  color: AppColors.textOnAccent,
                   fontSize: size * 0.36,
                   fontWeight: FontWeight.w800,
                 ),
@@ -196,14 +199,15 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: AppColors.accent,
+        gradient: AppGradients.accentPanel,
         borderRadius: BorderRadius.circular(r),
+        boxShadow: AppShadows.primaryButton,
       ),
       alignment: Alignment.center,
       child: Text(
         _initials(title),
         style: TextStyle(
-          color: Colors.black,
+          color: AppColors.textOnAccent,
           fontSize: size * 0.36,
           fontWeight: FontWeight.w800,
         ),
@@ -268,11 +272,11 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
         ),
       );
     } finally {
-      if (!mounted) return;
-
-      setState(() {
-        _isCreating = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isCreating = false;
+        });
+      }
     }
   }
 
@@ -345,7 +349,7 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
       itemCount: _filteredUsers.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      separatorBuilder: (context, index) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final user = _filteredUsers[index];
         final username = (user['username'] ?? '').toString();
@@ -354,16 +358,10 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
 
         return GestureDetector(
           onTap: _isCreating ? null : () => _createPrivateChat(user),
-          child: Container(
+          child: AppSurface(
+            radius: AppRadius.xl,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: Colors.white.withAlpha(10),
-              ),
-              boxShadow: AppShadows.lift,
-            ),
+            shadow: AppShadows.lift,
             child: Row(
               children: [
                 _buildUserAvatar(
@@ -423,10 +421,7 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: AppGradients.background,
-        ),
+      body: AppScreenBackground(
         child: SafeArea(
           child: Column(
             children: [
@@ -434,21 +429,26 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
                 padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
                 child: Row(
                   children: [
-                    IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(
-                        AppIcons.back,
-                        color: AppColors.textPrimary,
-                      ),
+                    AppIconButtonSurface(
+                      icon: AppIcons.back,
+                      tooltip: 'Назад',
+                      onTap: () => Navigator.of(context).pop(),
                     ),
                     const Expanded(
-                      child: Text(
-                        'Выбор пользователя',
-                        style: TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          AppPillBadge(label: 'DIRECT CHAT'),
+                          SizedBox(height: 8),
+                          Text(
+                            'Выбор пользователя',
+                            style: TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -456,25 +456,30 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 10, 20, 18),
-                child: TextField(
-                  controller: _searchController,
-                  style: const TextStyle(color: AppColors.textPrimary),
-                  decoration: InputDecoration(
-                    hintText: 'Поиск по username',
-                    hintStyle: const TextStyle(color: AppColors.textMuted),
-                    filled: true,
-                    fillColor: AppColors.surfaceSoft,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 18,
-                      vertical: 16,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(20),
-                      borderSide: BorderSide.none,
-                    ),
-                    prefixIcon: const Icon(
-                      AppIcons.search,
-                      color: AppColors.textMuted,
+                child: AppSurface(
+                  radius: AppRadius.xxl,
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                  shadow: AppShadows.lift,
+                  child: TextField(
+                    controller: _searchController,
+                    style: const TextStyle(color: AppColors.textPrimary),
+                    decoration: InputDecoration(
+                      hintText: 'Поиск по username',
+                      hintStyle: const TextStyle(color: AppColors.textMuted),
+                      filled: true,
+                      fillColor: Colors.transparent,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 16,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        borderSide: BorderSide.none,
+                      ),
+                      prefixIcon: const Icon(
+                        AppIcons.search,
+                        color: AppColors.textMuted,
+                      ),
                     ),
                   ),
                 ),

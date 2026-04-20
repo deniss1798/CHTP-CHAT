@@ -9,6 +9,8 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_icons.dart';
 import '../../../../app/theme/app_shadows.dart';
 import '../../../../app/theme/design_tokens.dart';
+import '../../../../app/widgets/app_screen_background.dart';
+import '../../../../app/widgets/app_surface.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../auth/data/services/auth_service.dart';
 import '../../data/services/chat_avatar_service.dart';
@@ -268,19 +270,20 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
           width: size,
           height: size,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) {
+          errorBuilder: (context, error, stackTrace) {
             return Container(
               width: size,
               height: size,
               decoration: BoxDecoration(
-                color: AppColors.accent,
+                gradient: AppGradients.accentPanel,
                 borderRadius: BorderRadius.circular(r),
+                boxShadow: AppShadows.primaryButton,
               ),
               alignment: Alignment.center,
               child: Text(
                 _initials(title),
                 style: TextStyle(
-                  color: Colors.black,
+                  color: AppColors.textOnAccent,
                   fontSize: size * 0.36,
                   fontWeight: FontWeight.w800,
                 ),
@@ -295,14 +298,15 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: AppColors.accent,
+        gradient: AppGradients.accentPanel,
         borderRadius: BorderRadius.circular(r),
+        boxShadow: AppShadows.primaryButton,
       ),
       alignment: Alignment.center,
       child: Text(
         _initials(title),
         style: TextStyle(
-          color: Colors.black,
+          color: AppColors.textOnAccent,
           fontSize: size * 0.36,
           fontWeight: FontWeight.w800,
         ),
@@ -351,14 +355,15 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
       width: 72,
       height: 72,
       decoration: BoxDecoration(
-        color: AppColors.accent,
+        gradient: AppGradients.accentPanel,
         borderRadius: BorderRadius.circular(20),
+        boxShadow: AppShadows.primaryButton,
       ),
       alignment: Alignment.center,
       child: Text(
         _initials(title),
         style: const TextStyle(
-          color: Colors.black,
+          color: AppColors.textOnAccent,
           fontSize: 22,
           fontWeight: FontWeight.w800,
         ),
@@ -433,11 +438,11 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
         ),
       );
     } finally {
-      if (!mounted) return;
-
-      setState(() {
-        _isCreating = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isCreating = false;
+        });
+      }
     }
   }
 
@@ -499,76 +504,93 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-          child: Column(
-            children: [
-              _buildGroupAvatarPreview(),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: _isCreating ? null : _pickGroupAvatar,
-                    icon: const Icon(AppIcons.photoLibrary),
-                    label: Text(
-                      _selectedAvatarFile == null
-                          ? 'Выбрать аватар'
-                          : 'Изменить аватар',
-                    ),
-                  ),
-                  if (_selectedAvatarFile != null) ...[
-                    const SizedBox(width: 10),
+          child: AppSurface(
+            tone: AppSurfaceTone.elevated,
+            radius: AppRadius.xxl,
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+            child: Column(
+              children: [
+                const AppPillBadge(label: 'GROUP SETUP', accent: true),
+                const SizedBox(height: 14),
+                _buildGroupAvatarPreview(),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
                     OutlinedButton.icon(
-                      onPressed: _isCreating ? null : _removeGroupAvatar,
-                      icon: const Icon(AppIcons.close),
-                      label: const Text('Убрать'),
+                      onPressed: _isCreating ? null : _pickGroupAvatar,
+                      icon: const Icon(AppIcons.photoLibrary),
+                      label: Text(
+                        _selectedAvatarFile == null
+                            ? 'Выбрать аватар'
+                            : 'Изменить аватар',
+                      ),
                     ),
+                    if (_selectedAvatarFile != null) ...[
+                      const SizedBox(width: 10),
+                      OutlinedButton.icon(
+                        onPressed: _isCreating ? null : _removeGroupAvatar,
+                        icon: const Icon(AppIcons.close),
+                        label: const Text('Убрать'),
+                      ),
+                    ],
                   ],
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-          child: TextField(
-            controller: _titleController,
-            onChanged: (_) => setState(() {}),
-            style: const TextStyle(color: AppColors.textPrimary),
-            decoration: InputDecoration(
-              hintText: 'Название группы',
-              hintStyle: const TextStyle(color: AppColors.textMuted),
-              filled: true,
-              fillColor: AppColors.surfaceSoft,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: 14,
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppRadius.md),
-                borderSide: BorderSide.none,
+          child: AppSurface(
+            radius: AppRadius.xl,
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            shadow: AppShadows.lift,
+            child: TextField(
+              controller: _titleController,
+              onChanged: (_) => setState(() {}),
+              style: const TextStyle(color: AppColors.textPrimary),
+              decoration: InputDecoration(
+                hintText: 'Название группы',
+                hintStyle: const TextStyle(color: AppColors.textMuted),
+                filled: true,
+                fillColor: Colors.transparent,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 14,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  borderSide: BorderSide.none,
+                ),
               ),
             ),
           ),
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-          child: TextField(
-            controller: _searchController,
-            style: const TextStyle(color: AppColors.textPrimary),
-            decoration: InputDecoration(
-              hintText: 'Поиск участников',
-              hintStyle: const TextStyle(color: AppColors.textMuted),
-              filled: true,
-              fillColor: AppColors.surfaceSoft,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: 14,
+          child: AppSurface(
+            radius: AppRadius.xl,
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            shadow: AppShadows.lift,
+            child: TextField(
+              controller: _searchController,
+              style: const TextStyle(color: AppColors.textPrimary),
+              decoration: InputDecoration(
+                hintText: 'Поиск участников',
+                hintStyle: const TextStyle(color: AppColors.textMuted),
+                filled: true,
+                fillColor: Colors.transparent,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 14,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  borderSide: BorderSide.none,
+                ),
+                prefixIcon: const Icon(AppIcons.search, color: AppColors.textMuted),
               ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppRadius.md),
-                borderSide: BorderSide.none,
-              ),
-              prefixIcon: const Icon(AppIcons.search, color: AppColors.textMuted),
             ),
           ),
         ),
@@ -576,13 +598,9 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Align(
             alignment: Alignment.centerLeft,
-            child: Text(
-              'Выбрано: ${_selectedUserIds.length}',
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
+            child: AppPillBadge(
+              label: 'Выбрано: ${_selectedUserIds.length}',
+              accent: _selectedUserIds.isNotEmpty,
             ),
           ),
         ),
@@ -640,7 +658,7 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
       return ListView.separated(
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
         itemCount: selectedOnly.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        separatorBuilder: (context, index) => const SizedBox(height: 12),
         itemBuilder: (context, index) {
           return _buildUserTile(selectedOnly[index]);
         },
@@ -697,7 +715,7 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
       itemCount: _searchResults.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      separatorBuilder: (context, index) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final user = _searchResults[index];
         return _buildUserTile(user);
@@ -723,21 +741,14 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
 
     return GestureDetector(
       onTap: () => _toggleUser(user),
-      child: Container(
+      child: AppSurface(
+        tone: isSelected ? AppSurfaceTone.selected : AppSurfaceTone.base,
+        radius: AppRadius.xl,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.accent.withAlpha(18)
-              : AppColors.surface,
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(
-            color: isSelected
-                ? AppColors.accent.withAlpha(180)
-                : Colors.white.withAlpha(10),
-            width: 1,
-          ),
-          boxShadow: AppShadows.lift,
-        ),
+        borderColor: isSelected
+            ? AppColors.accent.withAlpha(180)
+            : AppColors.strokeSoft,
+        shadow: isSelected ? [...AppShadows.lift, ...AppShadows.accentStroke] : AppShadows.lift,
         child: Row(
           children: [
             _buildUserAvatar(
@@ -771,18 +782,18 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
               ),
             ),
             const SizedBox(width: 10),
-            Icon(
-              isSelected
-                  ? AppIcons.checkCircle
-                  : AppIcons.radioOff,
-              size: AppSizes.iconMd,
-              color: isSelected
-                  ? AppColors.accent
-                  : AppColors.textMuted,
-            ),
-          ],
+              Icon(
+                isSelected
+                    ? AppIcons.checkCircle
+                    : AppIcons.radioOff,
+                size: AppSizes.iconMd,
+                color: isSelected
+                    ? AppColors.accentBright
+                    : AppColors.textMuted,
+              ),
+            ],
+          ),
         ),
-      ),
     );
   }
 
@@ -790,10 +801,7 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: AppGradients.background,
-        ),
+      body: AppScreenBackground(
         child: SafeArea(
           child: Column(
             children: [
@@ -801,24 +809,29 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
                 padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
                 child: Row(
                   children: [
-                    IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(
-                        AppIcons.back,
-                        color: AppColors.textPrimary,
+                      AppIconButtonSurface(
+                        icon: AppIcons.back,
+                        tooltip: 'Назад',
+                        onTap: () => Navigator.of(context).pop(),
                       ),
-                    ),
-                    const Expanded(
-                      child: Text(
-                        'Новая группа',
-                        style: TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            AppPillBadge(label: 'NEW GROUP'),
+                            SizedBox(height: 8),
+                            Text(
+                              'Новая группа',
+                              style: TextStyle(
+                                color: AppColors.textPrimary,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                  ],
+                    ],
                 ),
               ),
               Expanded(child: _buildBody()),

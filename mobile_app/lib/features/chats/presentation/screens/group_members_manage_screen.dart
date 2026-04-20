@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_icons.dart';
+import '../../../../app/theme/app_shadows.dart';
+import '../../../../app/theme/design_tokens.dart';
 import '../../../../app/widgets/app_screen_background.dart';
+import '../../../../app/widgets/app_surface.dart';
 import '../../data/models/chat_models.dart';
 import '../../data/services/chats_service.dart';
 
@@ -130,21 +133,26 @@ class _GroupMembersManageScreenState extends State<GroupMembersManageScreen> {
             children: [
               Row(
                 children: [
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(true),
-                    icon: const Icon(
-                      AppIcons.back,
-                      color: AppColors.textPrimary,
-                    ),
+                  AppIconButtonSurface(
+                    icon: AppIcons.back,
+                    tooltip: 'Назад',
+                    onTap: () => Navigator.of(context).pop(true),
                   ),
                   const Expanded(
-                    child: Text(
-                      'Участники',
-                      style: TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        AppPillBadge(label: 'GROUP ROSTER'),
+                        SizedBox(height: 6),
+                        Text(
+                          'Участники',
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -188,7 +196,7 @@ class _GroupMembersManageScreenState extends State<GroupMembersManageScreen> {
                         : ListView.separated(
                             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                             itemCount: _members.length,
-                            separatorBuilder: (_, __) =>
+                            separatorBuilder: (context, index) =>
                                 const SizedBox(height: 8),
                             itemBuilder: (context, index) {
                               final member = _members[index];
@@ -199,16 +207,10 @@ class _GroupMembersManageScreenState extends State<GroupMembersManageScreen> {
                                   member.id != widget.currentUserId &&
                                   !_busy;
 
-                              return Container(
+                              return AppSurface(
+                                radius: AppRadius.xl,
                                 padding: const EdgeInsets.all(14),
-                                decoration: BoxDecoration(
-                                  color: AppColors.surface.withAlpha(210),
-                                  borderRadius: BorderRadius.circular(18),
-                                  border: Border.all(
-                                    color:
-                                        AppColors.accentBorder.withAlpha(110),
-                                  ),
-                                ),
+                                shadow: AppShadows.lift,
                                 child: Row(
                                   children: [
                                     _buildAvatar(avatar, username),
@@ -270,7 +272,7 @@ class _GroupMembersManageScreenState extends State<GroupMembersManageScreen> {
           width: 48,
           height: 48,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _fallback(title),
+          errorBuilder: (context, error, stackTrace) => _fallback(title),
         ),
       );
     }
@@ -283,14 +285,15 @@ class _GroupMembersManageScreenState extends State<GroupMembersManageScreen> {
       width: 48,
       height: 48,
       decoration: BoxDecoration(
-        color: AppColors.accent,
-        borderRadius: BorderRadius.circular(14),
+        gradient: AppGradients.accentPanel,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: AppShadows.primaryButton,
       ),
       alignment: Alignment.center,
       child: Text(
         ch,
         style: const TextStyle(
-          color: Colors.black,
+          color: AppColors.textOnAccent,
           fontWeight: FontWeight.w800,
         ),
       ),
