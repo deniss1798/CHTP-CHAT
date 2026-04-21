@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.application.messages.reaction_commands import (
@@ -31,13 +31,14 @@ async def add_reaction(
 @router.delete("/{message_id}/reactions", response_model=MessageResponse)
 async def remove_reaction(
     message_id: int,
-    body: MessageReactionBody,
+    emoji: str = Query(..., min_length=1, max_length=32),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """DELETE без JSON-тела: emoji в query (надёжно для веб-клиентов и прокси)."""
     return await execute_remove_message_reaction(
         db,
         current_user=current_user,
         message_id=message_id,
-        emoji=body.emoji,
+        emoji=emoji,
     )

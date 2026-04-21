@@ -457,91 +457,74 @@ mixin _ChatDetailComposerAndActionsLogic
     }
   }
 
-  Future<void> _showMessageActions(Map<String, dynamic> message) async {
-    final isMine = _isMine(message);
+  Future<void> _showMessageActions(
+    Map<String, dynamic> message, [
+    Offset? menuPosition,
+  ]) async {
     final messageId = ChatDetailMessageMaps.intFromDynamic(message['id']);
     if (messageId == null) return;
 
-    final messageType = (message['message_type'] ?? 'text').toString();
     final text = (message['text'] ?? '').toString().trim();
 
-    final action = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
-      ),
-      builder: (ctx) {
-        const iconStyle = IconThemeData(
-          color: AppColors.textSecondary,
-          size: 22,
-        );
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(4, 6, 4, 10),
-            child: IconTheme(
-              data: iconStyle,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ListTile(
-                    dense: true,
-                    leading: const Icon(AppIcons.reply),
-                    title: const Text('Ответить'),
-                    onTap: () => Navigator.of(ctx).pop('reply'),
-                  ),
-                  ListTile(
-                    dense: true,
-                    leading: const Icon(Icons.forward_rounded),
-                    title: const Text('Переслать'),
-                    onTap: () => Navigator.of(ctx).pop('forward'),
-                  ),
-                  ListTile(
-                    dense: true,
-                    leading: const Text('👍', style: TextStyle(fontSize: 22)),
-                    title: const Text('Реакция 👍'),
-                    onTap: () => Navigator.of(ctx).pop('react:👍'),
-                  ),
-                  ListTile(
-                    dense: true,
-                    leading: const Text('❤️', style: TextStyle(fontSize: 22)),
-                    title: const Text('Реакция ❤️'),
-                    onTap: () => Navigator.of(ctx).pop('react:❤️'),
-                  ),
-                  if (text.isNotEmpty)
-                    ListTile(
-                      dense: true,
-                      leading: const Icon(AppIcons.copy),
-                      title: const Text('Копировать'),
-                      onTap: () => Navigator.of(ctx).pop('copy'),
-                    ),
-                  if (isMine && messageType == 'text' && text.isNotEmpty)
-                    ListTile(
-                      dense: true,
-                      leading: const Icon(AppIcons.edit),
-                      title: const Text('Изменить'),
-                      onTap: () => Navigator.of(ctx).pop('edit'),
-                    ),
-                  if (isMine)
-                    ListTile(
-                      dense: true,
-                      leading: const Icon(
-                        AppIcons.delete,
-                        color: Colors.redAccent,
-                      ),
-                      title: const Text(
-                        'Удалить',
-                        style: TextStyle(color: Colors.redAccent),
-                      ),
-                      onTap: () => Navigator.of(ctx).pop('delete'),
-                    ),
-                ],
+    final String? action;
+    if (menuPosition != null) {
+      final size = MediaQuery.sizeOf(context);
+      final padding = MediaQuery.paddingOf(context);
+      const menuW = 300.0;
+      final left = menuPosition.dx.clamp(8.0, size.width - menuW - 8);
+      final top = menuPosition.dy.clamp(padding.top + 8, size.height - 320);
+
+      action = await showGeneralDialog<String>(
+        context: context,
+        barrierDismissible: true,
+        barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+        barrierColor: Colors.transparent,
+        pageBuilder: (ctx, _, __) {
+          return Stack(
+            children: [
+              Positioned.fill(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => Navigator.of(ctx).pop(),
+                  child: const ColoredBox(color: Colors.transparent),
+                ),
               ),
-            ),
+              Positioned(
+                left: left,
+                top: top,
+                width: menuW,
+                child: Material(
+                  color: AppColors.surface,
+                  elevation: 12,
+                  borderRadius: BorderRadius.circular(12),
+                  clipBehavior: Clip.antiAlias,
+                  child: ChatMessageActionsPanel(
+                    message: message,
+                    currentUserId: _currentUserId,
+                    onAction: (code) => Navigator.of(ctx).pop(code),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      );
+    } else {
+      action = await showModalBottomSheet<String>(
+        context: context,
+        backgroundColor: AppColors.surface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
+        ),
+        builder: (ctx) => SafeArea(
+          child: ChatMessageActionsPanel(
+            message: message,
+            currentUserId: _currentUserId,
+            onAction: (code) => Navigator.of(ctx).pop(code),
           ),
-        );
-      },
-    );
+        ),
+      );
+    }
 
     if (!mounted) return;
 
@@ -913,7 +896,10 @@ mixin _ChatDetailComposerAndActionsLogic
       );
       if (!mounted) return;
       setState(() {
-        final idx = _messages.indexWhere((m) => m['id'] == updated['id']);
+        final uid = ChatDetailMessageMaps.intFromDynamic(updated['id']);
+        final idx = _messages.indexWhere(
+          (m) => ChatDetailMessageMaps.intFromDynamic(m['id']) == uid,
+        );
         if (idx >= 0) {
           _messages[idx] = updated;
         }
@@ -934,17 +920,83 @@ mixin _ChatDetailComposerAndActionsLogic
     }
   }
 
-  Future<void> _pickAndSendVoiceFile() async {
-    if (_isSendingVoice || _editingMessage != null) return;
-    final r = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const ['m4a', 'mp3', 'ogg', 'aac', 'wav', 'webm'],
-    );
-    if (r == null || r.files.isEmpty) return;
-    final f = r.files.single;
-    final path = f.path;
-    if (path == null || path.isEmpty) return;
-    final name = f.name.trim().isEmpty ? 'voice.m4a' : f.name.trim();
+  Future<void> _toggleVoiceRecording() async {
+    if (_editingMessage != null || _isSendingVoice) return;
+
+    if (_recordingVoice) {
+      String? path;
+      try {
+        path = await _voiceRecorder.stop();
+      } catch (_) {
+        path = null;
+      }
+      if (!mounted) return;
+      setState(() => _recordingVoice = false);
+      if (path != null && path.isNotEmpty) {
+        final name = path.split(RegExp(r'[\\/]')).last;
+        await _uploadVoiceRecording(path, name);
+      }
+      return;
+    }
+
+    if (!kIsWeb) {
+      final st = await Permission.microphone.request();
+      if (!st.isGranted) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: AppColors.surfaceSoft,
+            content: Text('Нужен доступ к микрофону'),
+          ),
+        );
+        return;
+      }
+    }
+
+    if (!await _voiceRecorder.hasPermission()) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: AppColors.surfaceSoft,
+          content: Text('Нет разрешения на запись звука'),
+        ),
+      );
+      return;
+    }
+
+    final tmpPath = kIsWeb
+        ? 'voice_recording'
+        : '${(await getTemporaryDirectory()).path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+
+    try {
+      await _voiceRecorder.start(
+        const RecordConfig(encoder: AudioEncoder.aacLc),
+        path: tmpPath,
+      );
+      if (!mounted) return;
+      setState(() => _recordingVoice = true);
+    } catch (e) {
+      if (kIsWeb) {
+        await _pickAndSendVoiceFile();
+        return;
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.surfaceSoft,
+          content: Text(
+            chatDetailExtractErrorMessage(
+              e,
+              fallback: 'Не удалось начать запись',
+            ),
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _uploadVoiceRecording(String path, String fileName) async {
+    if (_isSendingVoice) return;
 
     setState(() {
       _isSendingVoice = true;
@@ -956,13 +1008,16 @@ mixin _ChatDetailComposerAndActionsLogic
         await _messagesService.sendVoiceMessage(
           chatId: widget.chatId,
           filePath: path,
-          fileName: name,
+          fileName: fileName,
           replyToMessageId: replyId,
         ),
       );
       if (!mounted) return;
       setState(() {
-        final exists = _messages.any((m) => m['id'] == created['id']);
+        final uid = ChatDetailMessageMaps.intFromDynamic(created['id']);
+        final exists = _messages.any(
+          (m) => ChatDetailMessageMaps.intFromDynamic(m['id']) == uid,
+        );
         if (!exists) {
           _messages.add(created);
           _messages.sort((a, b) {
@@ -995,6 +1050,20 @@ mixin _ChatDetailComposerAndActionsLogic
         ),
       );
     }
+  }
+
+  Future<void> _pickAndSendVoiceFile() async {
+    if (_isSendingVoice || _editingMessage != null || _recordingVoice) return;
+    final r = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['m4a', 'mp3', 'ogg', 'aac', 'wav', 'webm'],
+    );
+    if (r == null || r.files.isEmpty) return;
+    final f = r.files.single;
+    final path = f.path;
+    if (path == null || path.isEmpty) return;
+    final name = f.name.trim().isEmpty ? 'voice.m4a' : f.name.trim();
+    await _uploadVoiceRecording(path, name);
   }
 
   void _openFullscreenImage(String url) {

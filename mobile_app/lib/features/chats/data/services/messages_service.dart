@@ -200,7 +200,7 @@ class MessagesService {
   }) async {
     final response = await _dio.delete(
       '/messages/$messageId/reactions',
-      data: {'emoji': emoji},
+      queryParameters: {'emoji': emoji},
       options: await _authorizedOptions(),
     );
     return _responseMap(response);

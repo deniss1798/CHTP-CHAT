@@ -30,6 +30,9 @@ import '../../data/services/presence_service.dart';
 import 'chat_member_add_screen.dart';
 import 'video_note_record_screen.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:record/record.dart';
 import '../../data/services/chat_avatar_service.dart';
 import '../../data/services/chats_service.dart';
 import 'group_members_manage_screen.dart';
@@ -41,6 +44,7 @@ import '../widgets/chat_detail_avatar_widgets.dart';
 import '../widgets/chat_detail_fullscreen_image_viewer.dart';
 import '../widgets/chat_detail_fullscreen_video_page.dart';
 import '../widgets/chat_detail_messages_list.dart';
+import '../widgets/chat_message_actions_panel.dart';
 import '../widgets/message_input_bar.dart';
 
 part 'chat_detail_screen_logic.dart';
@@ -79,7 +83,9 @@ abstract class _ChatDetailScreenStateBase extends State<ChatDetailScreen> {
   final ChatsService _chatsService = ChatsService();
   final ImagePicker _imagePicker = ImagePicker();
   final PresenceService _presenceService = PresenceService();
+  final AudioRecorder _voiceRecorder = AudioRecorder();
 
+  bool _recordingVoice = false;
   bool _isUploadingChatAvatar = false;
   bool _isSendingImage = false;
   bool _isSendingVideo = false;
@@ -174,6 +180,7 @@ class _ChatDetailScreenState extends _ChatDetailScreenStateBase
     _chatSocketService.dispose();
     _messageController.dispose();
     _scrollController.dispose();
+    unawaited(_voiceRecorder.dispose());
     super.dispose();
   }
 
@@ -231,7 +238,7 @@ class _ChatDetailScreenState extends _ChatDetailScreenStateBase
                 _editingMessage = null;
               });
             },
-            onMessageLongPress: _showMessageActions,
+            onMessageActions: _showMessageActions,
             onOpenFullscreenImage: _openFullscreenImage,
             onOpenFullscreenVideo: _openFullscreenVideo,
             onOpenSenderProfile: (userId) {
@@ -273,11 +280,13 @@ class _ChatDetailScreenState extends _ChatDetailScreenStateBase
           isSendingVideo: _isSendingVideo,
           isSendingDocument: _isSendingDocument,
           isSendingVoice: _isSendingVoice,
+          isRecordingVoice: _recordingVoice,
           onCancelEdit: _cancelEdit,
           onCancelReply: _cancelReply,
           onPickAttachment: _showAttachmentPicker,
           onVideoNote: _openVideoNoteRecorder,
-          onPickVoice: _pickAndSendVoiceFile,
+          onVoiceRecordTap: _toggleVoiceRecording,
+          onVoicePickFile: _pickAndSendVoiceFile,
           onSend: _sendMessage,
         ),
       ],

@@ -68,8 +68,9 @@ class ApiClient {
   /// Сборка: `flutter run --dart-define=API_BASE_URL=https://example.com/api`
   static String get baseUrl {
     const env = String.fromEnvironment('API_BASE_URL');
+    // Бэкенд дублирует роуты с префиксом /api (см. main.py). За nginx без /api часто 404.
     final raw =
-        env.trim().isNotEmpty ? env.trim() : 'http://83.217.201.40';
+        env.trim().isNotEmpty ? env.trim() : 'http://83.217.201.40/api';
     if (raw.endsWith('/')) {
       return raw.substring(0, raw.length - 1);
     }

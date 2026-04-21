@@ -17,7 +17,7 @@ class ChatDetailMessagesList extends StatelessWidget {
     required this.memberAvatarUrls,
     required this.onRefresh,
     required this.onSwipeReply,
-    required this.onMessageLongPress,
+    required this.onMessageActions,
     required this.onOpenFullscreenImage,
     required this.onOpenFullscreenVideo,
     required this.onOpenSenderProfile,
@@ -32,7 +32,8 @@ class ChatDetailMessagesList extends StatelessWidget {
   final Map<int, String?> memberAvatarUrls;
   final Future<void> Function() onRefresh;
   final void Function(Map<String, dynamic> message) onSwipeReply;
-  final void Function(Map<String, dynamic> message) onMessageLongPress;
+  final void Function(Map<String, dynamic> message, Offset? menuPosition)
+      onMessageActions;
   final void Function(String url) onOpenFullscreenImage;
   final void Function(String url, {required bool isVideoNote}) onOpenFullscreenVideo;
   final void Function(int userId) onOpenSenderProfile;
@@ -134,7 +135,7 @@ class ChatDetailMessagesList extends StatelessWidget {
                 senderAvatarUrl: _senderAvatarUrl(message),
                 senderNameForUserId: _senderNameForUserId,
                 isMine: _isMine(message),
-                onLongPress: () => onMessageLongPress(message),
+                onOpenActions: (pos) => onMessageActions(message, pos),
                 onOpenFullscreenImage: onOpenFullscreenImage,
                 onOpenFullscreenVideo: onOpenFullscreenVideo,
                 onOpenSenderProfile: onOpenSenderProfile,

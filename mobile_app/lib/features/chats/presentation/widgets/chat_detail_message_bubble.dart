@@ -9,6 +9,7 @@ import '../chat_detail_message_maps.dart';
 import 'chat_detail_avatar_widgets.dart';
 import 'chat_detail_message_content.dart';
 import 'chat_detail_reply_quote.dart';
+import 'chat_message_actions_panel.dart';
 
 class ChatDetailMessageBubble extends StatelessWidget {
   const ChatDetailMessageBubble({
@@ -20,7 +21,7 @@ class ChatDetailMessageBubble extends StatelessWidget {
     required this.senderAvatarUrl,
     required this.senderNameForUserId,
     required this.isMine,
-    required this.onLongPress,
+    required this.onOpenActions,
     required this.onOpenFullscreenImage,
     required this.onOpenFullscreenVideo,
     required this.onOpenSenderProfile,
@@ -34,7 +35,8 @@ class ChatDetailMessageBubble extends StatelessWidget {
   final String? senderAvatarUrl;
   final String Function(int? userId) senderNameForUserId;
   final bool isMine;
-  final VoidCallback onLongPress;
+  /// [menuPosition] — глобальные координаты для меню у курсора (ПКМ); `null` — снизу (тап на телефоне).
+  final void Function(Offset? menuPosition) onOpenActions;
   final void Function(String url) onOpenFullscreenImage;
   final void Function(String url, {required bool isVideoNote}) onOpenFullscreenVideo;
   final void Function(int userId) onOpenSenderProfile;
@@ -178,7 +180,11 @@ class ChatDetailMessageBubble extends StatelessWidget {
         borderRadius: bubbleShape,
         splashColor: mediaOnly ? Colors.transparent : Colors.white.withAlpha(28),
         highlightColor: mediaOnly ? Colors.transparent : null,
-        onLongPress: onLongPress,
+        onTap: primaryTapOpensMessageMenu(context)
+            ? () => onOpenActions(null)
+            : null,
+        onSecondaryTapDown: (details) =>
+            onOpenActions(details.globalPosition),
         child: Container(
           constraints: BoxConstraints(
             maxWidth: MediaQuery.of(context).size.width * 0.72,
