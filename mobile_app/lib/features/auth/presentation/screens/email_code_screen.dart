@@ -135,12 +135,7 @@ class _EmailCodeScreenState extends State<EmailCodeScreen> {
                 child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(height: AppSpacing.lg),
-                      const AppPillBadge(
-                        label: 'EMAIL VERIFICATION',
-                        accent: true,
-                      ),
-                      const SizedBox(height: AppSpacing.xxl),
+                      const SizedBox(height: AppSpacing.xl),
                       Text(
                         'Подтверждение почты',
                         style: wide

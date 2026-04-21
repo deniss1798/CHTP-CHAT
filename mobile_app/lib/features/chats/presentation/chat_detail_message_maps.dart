@@ -45,6 +45,18 @@ class ChatDetailMessageMaps {
       replyToId = int.tryParse(rawReplyId.toString());
     }
 
+    final reactionsRaw = raw['reactions'];
+    final reactions = <Map<String, dynamic>>[];
+    if (reactionsRaw is List) {
+      for (final r in reactionsRaw) {
+        if (r is Map<String, dynamic>) {
+          reactions.add(r);
+        } else if (r is Map) {
+          reactions.add(Map<String, dynamic>.from(r));
+        }
+      }
+    }
+
     return {
       'id': raw['id'],
       'chat_id': raw['chat_id'],
@@ -63,6 +75,7 @@ class ChatDetailMessageMaps {
       'reply_to': replyTo,
       'forwarded_from_user_id': intFromDynamic(raw['forwarded_from_user_id']),
       'delivery_status': raw['delivery_status']?.toString(),
+      'reactions': reactions,
     };
   }
 }

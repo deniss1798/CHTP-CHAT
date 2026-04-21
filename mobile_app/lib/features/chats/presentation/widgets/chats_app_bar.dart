@@ -8,12 +8,10 @@ import '../../../../app/widgets/app_surface.dart';
 class ChatsAppBar extends StatelessWidget {
   const ChatsAppBar({
     super.key,
-    required this.chatCount,
     required this.onOpenSettings,
     required this.onLogout,
   });
 
-  final int chatCount;
   final Future<void> Function() onOpenSettings;
   final Future<void> Function() onLogout;
 
@@ -49,37 +47,34 @@ class ChatsAppBar extends StatelessWidget {
                       ),
                       const SizedBox(width: 10),
                       const Text(
-                        'Ч Т П',
+                        'ЧТП ЧАТ',
                         style: TextStyle(
                           color: AppColors.textPrimary,
                           fontSize: 12,
                           fontWeight: FontWeight.w800,
-                          letterSpacing: 5,
+                          letterSpacing: 0.6,
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      AppPillBadge(
-                        label: '$chatCount чатов',
-                        accent: true,
                       ),
                     ],
                   ),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 16),
                   Text(
                     'Сообщения',
                     style: textTheme.headlineLarge?.copyWith(
                       fontSize: 36,
-                      height: 0.98,
+                      height: 1.02,
+                      letterSpacing: -0.9,
                     ),
                   ),
                   const SizedBox(height: 10),
-                  const Text(
-                    'Все переписки, звонки и активность в одном ритме.',
+                  Text(
+                    'Все переписки и звонки в одном месте.',
                     style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      height: 1.35,
+                      color: AppColors.textSecondary.withAlpha(210),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      height: 1.45,
+                      letterSpacing: 0.1,
                     ),
                   ),
                 ],

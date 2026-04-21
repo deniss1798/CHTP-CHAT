@@ -12,14 +12,14 @@ class AppTheme {
           fontSize: 34,
           fontWeight: FontWeight.w800,
           color: AppColors.textPrimary,
-          height: 1.02,
-          letterSpacing: -1.0,
+          height: 1.05,
+          letterSpacing: -0.85,
         ),
         headlineMedium: TextStyle(
           fontSize: 26,
           fontWeight: FontWeight.w800,
           color: AppColors.textPrimary,
-          letterSpacing: -0.7,
+          letterSpacing: -0.55,
         ),
         titleLarge: TextStyle(
           fontSize: 19,
@@ -67,8 +67,20 @@ class AppTheme {
       useMaterial3: true,
       scaffoldBackgroundColor: AppColors.background,
       brightness: Brightness.dark,
+      splashColor: AppColors.accent.withAlpha(28),
+      highlightColor: AppColors.textPrimary.withAlpha(10),
       textTheme: baseTextTheme,
       colorScheme: colorScheme,
+      pageTransitionsTheme: PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: const FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.linux: const FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.windows: const FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.macOS: const CupertinoPageTransitionsBuilder(),
+          TargetPlatform.iOS: const CupertinoPageTransitionsBuilder(),
+          TargetPlatform.fuchsia: const FadeUpwardsPageTransitionsBuilder(),
+        },
+      ),
       iconTheme: const IconThemeData(
         color: AppColors.textSecondary,
         size: 22,
@@ -87,10 +99,10 @@ class AppTheme {
           color: AppColors.textPrimary,
           size: 22,
         ),
-        titleTextStyle: GoogleFonts.plusJakartaSans(
+        titleTextStyle: GoogleFonts.manrope(
           fontSize: 18,
           fontWeight: FontWeight.w800,
-          letterSpacing: -0.5,
+          letterSpacing: -0.35,
           color: AppColors.textPrimary,
         ),
       ),
@@ -198,12 +210,34 @@ class AppTheme {
         behavior: SnackBarBehavior.floating,
         elevation: 0,
         backgroundColor: AppColors.surfaceGlass,
-        contentTextStyle: const TextStyle(
+        contentTextStyle: GoogleFonts.manrope(
           color: AppColors.textPrimary,
-          fontWeight: FontWeight.w500,
+          fontWeight: FontWeight.w600,
+          fontSize: 14,
         ),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.lg),
+        ),
+      ),
+      tooltipTheme: TooltipThemeData(
+        decoration: BoxDecoration(
+          color: AppColors.surfaceRaised,
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+          border: Border.all(color: AppColors.strokeSoft),
+        ),
+        textStyle: GoogleFonts.manrope(
+          color: AppColors.textSecondary,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        waitDuration: const Duration(milliseconds: 500),
+      ),
+      scrollbarTheme: ScrollbarThemeData(
+        thickness: WidgetStateProperty.all(4),
+        radius: const Radius.circular(AppRadius.pill),
+        thumbColor: WidgetStateProperty.all(
+          AppColors.textMuted.withAlpha(120),
         ),
       ),
       dividerTheme: DividerThemeData(

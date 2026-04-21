@@ -21,6 +21,7 @@ class ChatDetailMessagesList extends StatelessWidget {
     required this.onOpenFullscreenImage,
     required this.onOpenFullscreenVideo,
     required this.onOpenSenderProfile,
+    required this.onReactionEmojiTap,
   });
 
   final List<Map<String, dynamic>> messages;
@@ -35,6 +36,7 @@ class ChatDetailMessagesList extends StatelessWidget {
   final void Function(String url) onOpenFullscreenImage;
   final void Function(String url, {required bool isVideoNote}) onOpenFullscreenVideo;
   final void Function(int userId) onOpenSenderProfile;
+  final void Function(Map<String, dynamic> message, String emoji) onReactionEmojiTap;
 
   bool _isMine(Map<String, dynamic> message) {
     final senderId = message['sender_id'];
@@ -136,6 +138,7 @@ class ChatDetailMessagesList extends StatelessWidget {
                 onOpenFullscreenImage: onOpenFullscreenImage,
                 onOpenFullscreenVideo: onOpenFullscreenVideo,
                 onOpenSenderProfile: onOpenSenderProfile,
+                onReactionEmojiTap: (emoji) => onReactionEmojiTap(message, emoji),
               ),
             ),
           );

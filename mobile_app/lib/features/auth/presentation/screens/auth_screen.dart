@@ -196,12 +196,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(height: AppSpacing.lg),
-                      const AppPillBadge(
-                        label: 'CHTP PRIVATE ACCESS',
-                        accent: true,
-                      ),
-                      const SizedBox(height: AppSpacing.xxl),
+                      const SizedBox(height: AppSpacing.xl),
                       Text(
                         'Добро пожаловать',
                         style: wide
@@ -211,20 +206,13 @@ class _AuthScreenState extends State<AuthScreen> {
                               )
                             : textTheme.headlineLarge,
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 14),
                       Text(
                         isLoginMode
-                            ? 'Войдите, чтобы продолжить общение'
-                            : 'Создайте аккаунт и подтвердите email',
-                        style: textTheme.bodyMedium,
-                      ),
-                      const SizedBox(height: 12),
-                      const Text(
-                        'Тот же фирменный чёрно-янтарный характер, но с более чистым и статусным ритмом интерфейса.',
-                        style: TextStyle(
-                          color: AppColors.textMuted,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
+                            ? 'Войдите, чтобы продолжить'
+                            : 'Укажите данные — отправим код на почту',
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: AppColors.textSecondary,
                           height: 1.4,
                         ),
                       ),
@@ -296,7 +284,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                       color: AppColors.textPrimary,
                                     ),
                                     decoration: const InputDecoration(
-                                      hintText: 'Email',
+                                      hintText: 'Электронная почта',
                                       prefixIcon: Icon(
                                         AppIcons.email,
                                         color: AppColors.textMuted,
@@ -463,7 +451,12 @@ class _SegmentButton extends StatelessWidget {
           gradient: selected ? AppGradients.accentPanel : null,
           color: selected ? null : Colors.transparent,
           borderRadius: BorderRadius.circular(AppRadius.md),
-          boxShadow: selected ? AppShadows.primaryButton : null,
+          border: Border.all(
+            color: selected
+                ? AppColors.accent.withAlpha(90)
+                : Colors.transparent,
+          ),
+          boxShadow: selected ? AppShadows.lift : null,
         ),
         alignment: Alignment.center,
         child: Text(

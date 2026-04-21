@@ -9,6 +9,8 @@ class ChatsScreenState {
     this.allChats = const <ChatSummary>[],
     this.filteredChats = const <ChatSummary>[],
     this.typingLabelByChatId = const <int, String>{},
+    this.chatsNextCursor,
+    this.chatsLoadingMore = false,
   });
 
   final bool isLoading;
@@ -18,6 +20,8 @@ class ChatsScreenState {
   final List<ChatSummary> allChats;
   final List<ChatSummary> filteredChats;
   final Map<int, String> typingLabelByChatId;
+  final String? chatsNextCursor;
+  final bool chatsLoadingMore;
 
   ChatsScreenState copyWith({
     bool? isLoading,
@@ -29,6 +33,9 @@ class ChatsScreenState {
     List<ChatSummary>? allChats,
     List<ChatSummary>? filteredChats,
     Map<int, String>? typingLabelByChatId,
+    String? chatsNextCursor,
+    bool clearChatsNextCursor = false,
+    bool? chatsLoadingMore,
   }) {
     return ChatsScreenState(
       isLoading: isLoading ?? this.isLoading,
@@ -40,6 +47,9 @@ class ChatsScreenState {
       allChats: allChats ?? this.allChats,
       filteredChats: filteredChats ?? this.filteredChats,
       typingLabelByChatId: typingLabelByChatId ?? this.typingLabelByChatId,
+      chatsNextCursor:
+          clearChatsNextCursor ? null : (chatsNextCursor ?? this.chatsNextCursor),
+      chatsLoadingMore: chatsLoadingMore ?? this.chatsLoadingMore,
     );
   }
 }

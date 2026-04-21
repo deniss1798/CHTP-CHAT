@@ -58,6 +58,15 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
       return;
     }
 
+    if (q.length < 2) {
+      setState(() {
+        _filteredUsers = [];
+        _error = null;
+        _isSearching = false;
+      });
+      return;
+    }
+
     setState(() {
       _isSearching = true;
       _error = null;
@@ -424,9 +433,10 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
       body: AppScreenBackground(
         child: SafeArea(
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
+                padding: const EdgeInsets.fromLTRB(8, 14, 16, 4),
                 child: Row(
                   children: [
                     AppIconButtonSurface(
@@ -434,51 +444,55 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
                       tooltip: 'Назад',
                       onTap: () => Navigator.of(context).pop(),
                     ),
+                    const SizedBox(width: 10),
                     const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          AppPillBadge(label: 'DIRECT CHAT'),
-                          SizedBox(height: 8),
-                          Text(
-                            'Выбор пользователя',
-                            style: TextStyle(
-                              color: AppColors.textPrimary,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ],
+                      child: Text(
+                        'Кому написать',
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 10, 20, 18),
-                child: AppSurface(
-                  radius: AppRadius.xxl,
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-                  shadow: AppShadows.lift,
-                  child: TextField(
-                    controller: _searchController,
-                    style: const TextStyle(color: AppColors.textPrimary),
-                    decoration: InputDecoration(
-                      hintText: 'Поиск по username',
-                      hintStyle: const TextStyle(color: AppColors.textMuted),
-                      filled: true,
-                      fillColor: Colors.transparent,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 16,
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      maxWidth: AppBreakpoints.contentMaxWidth,
+                    ),
+                    child: AppSurface(
+                      radius: AppRadius.xl,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 2,
                       ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        borderSide: BorderSide.none,
-                      ),
-                      prefixIcon: const Icon(
-                        AppIcons.search,
-                        color: AppColors.textMuted,
+                      shadow: AppShadows.lift,
+                      child: TextField(
+                        controller: _searchController,
+                        style: const TextStyle(color: AppColors.textPrimary),
+                        decoration: InputDecoration(
+                          hintText: 'Поиск по имени',
+                          hintStyle: const TextStyle(color: AppColors.textMuted),
+                          filled: true,
+                          fillColor: Colors.transparent,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide.none,
+                          ),
+                          prefixIcon: const Icon(
+                            AppIcons.search,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
                       ),
                     ),
                   ),

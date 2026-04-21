@@ -171,8 +171,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const AppPillBadge(label: 'PUBLIC PROFILE', accent: true),
-          SizedBox(height: isWide ? 28 : AppSpacing.xl),
           _buildAvatar(username, avatarSize),
           SizedBox(height: isWide ? 28 : AppSpacing.xl),
           Text(

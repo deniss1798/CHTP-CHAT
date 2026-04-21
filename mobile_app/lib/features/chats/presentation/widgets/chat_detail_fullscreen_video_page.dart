@@ -3,9 +3,7 @@ import 'package:video_player/video_player.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_icons.dart';
-import '../../../../app/theme/app_shadows.dart';
 import '../../../../app/theme/design_tokens.dart';
-import '../../../../app/widgets/app_screen_background.dart';
 import '../../../../app/widgets/app_surface.dart';
 
 class ChatDetailFullscreenVideoPage extends StatefulWidget {
@@ -46,7 +44,7 @@ class _ChatDetailFullscreenVideoPageState
 
     final uri = Uri.tryParse(widget.url);
     if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
-      setState(() => _initError = 'РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ Р°РґСЂРµСЃ РІРёРґРµРѕ');
+      setState(() => _initError = 'Некорректный адрес видео');
       return;
     }
 
@@ -101,34 +99,28 @@ class _ChatDetailFullscreenVideoPageState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
-      body: AppScreenBackground(
-        child: SafeArea(
-          child: Stack(
-            children: [
-              Positioned.fill(child: _buildBody()),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    AppIconButtonSurface(
-                      icon: AppIcons.close,
-                      tooltip: 'Р—Р°РєСЂС‹С‚СЊ',
-                      onTap: () => Navigator.of(context).pop(),
-                    ),
-                    AppPillBadge(
-                      label:
-                          widget.isVideoNote ? 'VIDEO NOTE' : 'VIDEO VIEWER',
-                      icon: widget.isVideoNote
-                          ? Icons.radio_button_checked_rounded
-                          : Icons.ondemand_video_rounded,
-                    ),
-                  ],
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            Positioned.fill(child: _buildBody()),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: Material(
+                  color: Colors.black45,
+                  shape: const CircleBorder(),
+                  clipBehavior: Clip.antiAlias,
+                  child: IconButton(
+                    icon: const Icon(AppIcons.close, color: Colors.white),
+                    tooltip: 'Закрыть',
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -159,7 +151,7 @@ class _ChatDetailFullscreenVideoPageState
                 onPressed: () => setState(_attach),
                 icon: const Icon(AppIcons.refresh, color: AppColors.accent),
                 label: const Text(
-                  'РџРѕРІС‚РѕСЂРёС‚СЊ',
+                  'Повторить',
                   style: TextStyle(color: AppColors.accent),
                 ),
               ),
@@ -207,35 +199,23 @@ class _ChatDetailFullscreenVideoPageState
         alignment: Alignment.center,
         children: [
           Center(
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                gradient: AppGradients.heroPanel,
-                borderRadius: BorderRadius.circular(
-                  widget.isVideoNote ? 999 : AppRadius.xxl,
-                ),
-                border: Border.all(color: AppColors.strokeSoft),
-                boxShadow: AppShadows.card,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(
+                widget.isVideoNote ? 999 : 8,
               ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(
-                  widget.isVideoNote ? 999 : AppRadius.xl,
-                ),
-                child: videoChild,
-              ),
+              child: videoChild,
             ),
           ),
           AnimatedOpacity(
             opacity: _showOverlay ? 1 : 0,
             duration: const Duration(milliseconds: 150),
             child: Container(
-              width: 58,
-              height: 58,
+              width: 56,
+              height: 56,
               decoration: BoxDecoration(
-                gradient: AppGradients.heroPanel,
-                borderRadius: BorderRadius.circular(29),
-                border: Border.all(color: AppColors.strokeSoft),
-                boxShadow: AppShadows.lift,
+                color: Colors.black54,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white24),
               ),
               alignment: Alignment.center,
               child: Icon(

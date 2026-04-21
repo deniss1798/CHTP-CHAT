@@ -9,32 +9,32 @@ abstract final class AppShadows {
   /// Плавающая карточка / панель.
   static List<BoxShadow> get card => [
         BoxShadow(
-          color: Colors.black.withAlpha(170),
-          blurRadius: 28,
-          offset: const Offset(0, 18),
-          spreadRadius: -10,
+          color: Colors.black.withAlpha(130),
+          blurRadius: 24,
+          offset: const Offset(0, 14),
+          spreadRadius: -12,
         ),
         BoxShadow(
-          color: AppColors.accent.withAlpha(22),
-          blurRadius: 26,
-          offset: const Offset(0, 8),
-          spreadRadius: -16,
+          color: AppColors.accent.withAlpha(16),
+          blurRadius: 22,
+          offset: const Offset(0, 6),
+          spreadRadius: -14,
         ),
       ];
 
   /// Лёгкий подъём списков и тайлов.
   static List<BoxShadow> get lift => [
         BoxShadow(
-          color: Colors.black.withAlpha(120),
-          blurRadius: 18,
-          offset: const Offset(0, 10),
-          spreadRadius: -6,
+          color: Colors.black.withAlpha(88),
+          blurRadius: 16,
+          offset: const Offset(0, 8),
+          spreadRadius: -4,
         ),
         BoxShadow(
-          color: AppColors.accent.withAlpha(14),
-          blurRadius: 16,
-          offset: const Offset(0, 4),
-          spreadRadius: -12,
+          color: AppColors.accent.withAlpha(10),
+          blurRadius: 14,
+          offset: const Offset(0, 3),
+          spreadRadius: -10,
         ),
       ];
 

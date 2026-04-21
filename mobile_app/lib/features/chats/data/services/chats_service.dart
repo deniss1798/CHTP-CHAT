@@ -8,8 +8,10 @@ import '../models/chat_models.dart';
 class ChatsService {
   final Dio _dio = ApiClient.dio;
 
-  Future<List<ChatSummary>> getChats({
+  Future<ChatListPageResult> getChatsPage({
     required int currentUserId,
+    int limit = 50,
+    String? cursor,
   }) async {
     final token = await SecureStorageService.getAccessToken();
 
@@ -19,6 +21,10 @@ class ChatsService {
 
     final response = await _dio.get(
       '/chats/',
+      queryParameters: {
+        'limit': limit,
+        if (cursor != null && cursor.isNotEmpty) 'cursor': cursor,
+      },
       options: Options(
         headers: {
           'Authorization': 'Bearer $token',
@@ -28,23 +34,82 @@ class ChatsService {
 
     final data = response.data;
 
-    if (data is! List) {
-      throw Exception('Неожиданный формат ответа /chats/');
+    if (data is Map<String, dynamic>) {
+      return _chatListPageFromMap(data);
+    }
+    if (data is Map) {
+      return _chatListPageFromMap(Map<String, dynamic>.from(data));
     }
 
-    final chats = data
-        .whereType<Map>()
-        .map((e) => Map<String, dynamic>.from(e))
-        .map(ChatSummary.fromApi)
-        .toList();
+    if (data is List) {
+      final chats = data
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .map(ChatSummary.fromApi)
+          .toList();
+      chats.sort((a, b) {
+        final aMs = serverInstantMillis(a.lastMessageAtRaw) ?? 0;
+        final bMs = serverInstantMillis(b.lastMessageAtRaw) ?? 0;
+        return bMs.compareTo(aMs);
+      });
+      return ChatListPageResult(
+        chats: chats,
+        hasMore: false,
+        nextCursor: null,
+      );
+    }
 
+    throw Exception('Неожиданный формат ответа /chats/');
+  }
+
+  ChatListPageResult _chatListPageFromMap(Map<String, dynamic> data) {
+    final raw = data['chats'];
+    final chats = <ChatSummary>[];
+    if (raw is List) {
+      for (final item in raw) {
+        if (item is Map<String, dynamic>) {
+          chats.add(ChatSummary.fromApi(item));
+        } else if (item is Map) {
+          chats.add(ChatSummary.fromApi(Map<String, dynamic>.from(item)));
+        }
+      }
+    }
     chats.sort((a, b) {
       final aMs = serverInstantMillis(a.lastMessageAtRaw) ?? 0;
       final bMs = serverInstantMillis(b.lastMessageAtRaw) ?? 0;
       return bMs.compareTo(aMs);
     });
+    final next = data['next_cursor']?.toString();
+    final hasMore = data['has_more'] == true;
+    return ChatListPageResult(
+      chats: chats,
+      hasMore: hasMore,
+      nextCursor: (next != null && next.isNotEmpty) ? next : null,
+    );
+  }
 
-    return chats;
+  Future<List<ChatSummary>> getChats({
+    required int currentUserId,
+  }) async {
+    final out = <ChatSummary>[];
+    String? cursor;
+    do {
+      final page = await getChatsPage(
+        currentUserId: currentUserId,
+        limit: 100,
+        cursor: cursor,
+      );
+      out.addAll(page.chats);
+      cursor = page.hasMore ? page.nextCursor : null;
+    } while (cursor != null);
+
+    out.sort((a, b) {
+      final aMs = serverInstantMillis(a.lastMessageAtRaw) ?? 0;
+      final bMs = serverInstantMillis(b.lastMessageAtRaw) ?? 0;
+      return bMs.compareTo(aMs);
+    });
+
+    return out;
   }
 
   Future<ChatDetail> fetchChatDetail(int chatId) async {

@@ -97,6 +97,32 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
       return;
     }
 
+    if (incoming['event'] == ChatWsContract.eventMessageReactionsUpdated) {
+      final mid = ChatDetailMessageMaps.intFromDynamic(incoming['message_id']);
+      if (mid == null) return;
+      final raw = incoming['reactions'];
+      final reactions = <Map<String, dynamic>>[];
+      if (raw is List) {
+        for (final r in raw) {
+          if (r is Map<String, dynamic>) {
+            reactions.add(r);
+          } else if (r is Map) {
+            reactions.add(Map<String, dynamic>.from(r));
+          }
+        }
+      }
+      if (!mounted) return;
+      setState(() {
+        final idx = _messages.indexWhere((m) => m['id'] == mid);
+        if (idx >= 0) {
+          final copy = Map<String, dynamic>.from(_messages[idx]);
+          copy['reactions'] = reactions;
+          _messages[idx] = copy;
+        }
+      });
+      return;
+    }
+
     if (incoming['event'] == ChatWsContract.eventMessageUpdated) {
       final msg = incoming['message'];
       if (msg is! Map) return;
@@ -117,7 +143,17 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
       setState(() {
         final idx = _messages.indexWhere((m) => m['id'] == incomingId);
         if (idx >= 0) {
-          _messages[idx] = normalized;
+          final prev = _messages[idx];
+          var merged = normalized;
+          final nr = merged['reactions'];
+          if (nr is! List || nr.isEmpty) {
+            final pr = prev['reactions'];
+            if (pr is List && pr.isNotEmpty) {
+              merged = Map<String, dynamic>.from(merged);
+              merged['reactions'] = pr;
+            }
+          }
+          _messages[idx] = merged;
         }
       });
 

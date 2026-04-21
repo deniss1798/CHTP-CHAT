@@ -38,6 +38,19 @@ ALLOWED_DOCUMENT_EXTENSIONS: dict[str, str] = {
     ".txt": "text/plain",
 }
 
+MAX_VOICE_SIZE = 10 * 1024 * 1024  # 10 MB
+
+ALLOWED_VOICE_TYPES: dict[str, str] = {
+    "audio/ogg": ".ogg",
+    "audio/opus": ".opus",
+    "audio/mpeg": ".mp3",
+    "audio/mp4": ".m4a",
+    "audio/aac": ".aac",
+    "audio/webm": ".webm",
+    "audio/x-m4a": ".m4a",
+    "audio/wav": ".wav",
+}
+
 PRIVATE_MEDIA_MESSAGE_TYPES: frozenset[str] = frozenset(
-    {"image", "video", "video_note", "document"}
+    {"image", "video", "video_note", "document", "voice"}
 )

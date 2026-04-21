@@ -24,6 +24,7 @@ class ChatDetailMessageBubble extends StatelessWidget {
     required this.onOpenFullscreenImage,
     required this.onOpenFullscreenVideo,
     required this.onOpenSenderProfile,
+    this.onReactionEmojiTap,
   });
 
   final Map<String, dynamic> message;
@@ -37,6 +38,51 @@ class ChatDetailMessageBubble extends StatelessWidget {
   final void Function(String url) onOpenFullscreenImage;
   final void Function(String url, {required bool isVideoNote}) onOpenFullscreenVideo;
   final void Function(int userId) onOpenSenderProfile;
+  final void Function(String emoji)? onReactionEmojiTap;
+
+  Widget _reactionStrip() {
+    final raw = message['reactions'];
+    if (raw is! List || raw.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 4,
+        alignment: isMine ? WrapAlignment.end : WrapAlignment.start,
+        children: [
+          for (final r in raw)
+            if (r is Map)
+              Material(
+                color: AppColors.surfaceSoft,
+                borderRadius: BorderRadius.circular(12),
+                child: InkWell(
+                  onTap: onReactionEmojiTap != null
+                      ? () {
+                          final e = r['emoji']?.toString() ?? '';
+                          if (e.isEmpty) return;
+                          onReactionEmojiTap!(e);
+                        }
+                      : null,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    child: Text(
+                      '${r['emoji']} ${r['count']}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -65,24 +111,24 @@ class ChatDetailMessageBubble extends StatelessWidget {
           children: [
             mainContent,
             Positioned(
-              right: 8,
-              bottom: 8,
+              right: 6,
+              bottom: 6,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                 decoration: BoxDecoration(
-                  color: Colors.black.withAlpha(150),
-                  borderRadius: BorderRadius.circular(8),
+                  color: Colors.black.withAlpha(115),
+                  borderRadius: BorderRadius.circular(6),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (isUpdated)
                       Padding(
-                        padding: const EdgeInsets.only(right: 6),
+                        padding: const EdgeInsets.only(right: 5),
                         child: Text(
                           'изм.',
                           style: TextStyle(
-                            color: Colors.white.withAlpha(200),
+                            color: Colors.white.withAlpha(190),
                             fontSize: 10,
                             fontWeight: FontWeight.w600,
                           ),
@@ -93,17 +139,17 @@ class ChatDetailMessageBubble extends StatelessWidget {
                         (message['delivery_status']?.toString() == 'read')
                             ? AppIcons.doneAll
                             : AppIcons.done,
-                        size: 15,
+                        size: 14,
                         color: (message['delivery_status']?.toString() == 'read')
-                            ? AppColors.accentBright
-                            : AppColors.textMuted,
+                            ? const Color(0xFF5EB8FF)
+                            : Colors.white.withAlpha(210),
                       ),
-                      const SizedBox(width: 5),
+                      const SizedBox(width: 4),
                     ],
                     Text(
                       time,
-                      style: const TextStyle(
-                        color: Color(0xFFE8EAED),
+                      style: TextStyle(
+                        color: Colors.white.withAlpha(235),
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                       ),
@@ -246,7 +292,14 @@ class ChatDetailMessageBubble extends StatelessWidget {
     if (isMine) {
       return Align(
         alignment: Alignment.centerRight,
-        child: bubble,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            bubble,
+            _reactionStrip(),
+          ],
+        ),
       );
     }
 
@@ -276,7 +329,16 @@ class ChatDetailMessageBubble extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           leadingAvatar,
-          Flexible(child: bubble),
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                bubble,
+                _reactionStrip(),
+              ],
+            ),
+          ),
         ],
       ),
     );

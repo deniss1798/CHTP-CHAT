@@ -3,16 +3,14 @@ import 'package:video_player/video_player.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_icons.dart';
-import '../../../../app/theme/app_shadows.dart';
-import '../../../../app/theme/design_tokens.dart';
 
-/// Р’СЃС‚СЂРѕРµРЅРЅРѕРµ РІРёРґРµРѕ РІ РїСѓР·С‹СЂРµ СЃРѕРѕР±С‰РµРЅРёСЏ (РІ С‚.С‡. video note).
+/// Встроенное видео в пузыре (в т.ч. видеокружок).
 class ChatDetailVideoMessageWidget extends StatefulWidget {
   final String url;
   final bool isMine;
   final bool isVideoNote;
 
-  /// Р”Р»СЏ РѕР±С‹С‡РЅРѕРіРѕ РІРёРґРµРѕ: РѕС‚РєСЂС‹С‚СЊ РЅР° РІРµСЃСЊ СЌРєСЂР°РЅ. Р”Р»СЏ РєСЂСѓР¶РєРѕРІ ([isVideoNote]) РЅРµ РёСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ.
+  /// Для обычного видео: открыть на весь экран. Для кружков ([isVideoNote]) не используется.
   final VoidCallback? onOpenFullscreen;
 
   const ChatDetailVideoMessageWidget({
@@ -51,7 +49,7 @@ class _ChatDetailVideoMessageWidgetState
 
     final uri = Uri.tryParse(widget.url);
     if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
-      _initError = 'РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ Р°РґСЂРµСЃ РІРёРґРµРѕ';
+      _initError = 'Некорректный адрес видео';
       return;
     }
 
@@ -120,7 +118,7 @@ class _ChatDetailVideoMessageWidgetState
             ),
             const SizedBox(height: 8),
             const Text(
-              'РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ РІРёРґРµРѕ',
+              'Не удалось загрузить видео',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: AppColors.textSecondary,
@@ -130,7 +128,7 @@ class _ChatDetailVideoMessageWidgetState
             ),
             const SizedBox(height: 6),
             const Text(
-              'РќР° РџРљ РёРЅРѕРіРґР° РЅРµ РїРѕРґРґРµСЂР¶РёРІР°РµС‚СЃСЏ РєРѕРґРµРє СЃ С‚РµР»РµС„РѕРЅР°. РџРѕРІС‚РѕСЂРёС‚Рµ РїРѕРїС‹С‚РєСѓ.',
+              'На ПК иногда не поддерживается кодек с телефона. Повторите попытку.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: AppColors.textMuted,
@@ -142,7 +140,7 @@ class _ChatDetailVideoMessageWidgetState
             TextButton.icon(
               onPressed: () => setState(_attachController),
               icon: const Icon(AppIcons.refresh, size: 18),
-              label: const Text('РџРѕРІС‚РѕСЂРёС‚СЊ'),
+              label: const Text('Повторить'),
             ),
           ],
         ),
@@ -156,7 +154,7 @@ class _ChatDetailVideoMessageWidgetState
           height: 28,
           child: CircularProgressIndicator(
             strokeWidth: 2,
-            color: AppColors.accent.withAlpha(220),
+            color: AppColors.textMuted.withAlpha(200),
           ),
         ),
       );
@@ -222,9 +220,9 @@ class _ChatDetailVideoMessageWidgetState
   }) {
     return Container(
       decoration: BoxDecoration(
-        gradient: AppGradients.surfacePanel,
+        color: AppColors.surfaceSoft,
         borderRadius: BorderRadius.circular(
-          widget.isVideoNote ? 999 : AppRadius.lg,
+          widget.isVideoNote ? 999 : 12,
         ),
         border: Border.all(color: AppColors.strokeSoft),
       ),
@@ -236,19 +234,17 @@ class _ChatDetailVideoMessageWidgetState
 
   Widget _buildOverlayButton({required IconData icon}) {
     return Container(
-      width: 48,
-      height: 48,
+      width: 46,
+      height: 46,
       decoration: BoxDecoration(
-        gradient: AppGradients.heroPanel,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.strokeSoft),
-        boxShadow: AppShadows.lift,
+        color: Colors.black.withAlpha(140),
+        shape: BoxShape.circle,
       ),
       alignment: Alignment.center,
       child: Icon(
         icon,
         color: Colors.white,
-        size: 24,
+        size: 22,
       ),
     );
   }

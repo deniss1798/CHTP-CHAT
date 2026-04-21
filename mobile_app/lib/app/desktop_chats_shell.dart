@@ -3,10 +3,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'desktop_chat_session.dart';
 import 'theme/app_colors.dart';
-import 'theme/app_icons.dart';
-import 'theme/app_shadows.dart';
-import 'theme/design_tokens.dart';
-import 'widgets/app_surface.dart';
 import '../features/chats/presentation/screens/chat_detail_screen.dart';
 import '../features/chats/presentation/screens/chats_screen.dart';
 
@@ -143,51 +139,15 @@ class _DesktopEmptyChatPane extends StatelessWidget {
       color: AppColors.background,
       child: Center(
         child: Padding(
-          padding: const EdgeInsets.all(28),
-          child: AppSurface(
-            tone: AppSurfaceTone.elevated,
-            radius: AppRadius.xxl,
-            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
-            shadow: [...AppShadows.card, ...AppShadows.accentStroke],
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 76,
-                  height: 76,
-                  decoration: BoxDecoration(
-                    gradient: AppGradients.accentPanel,
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: AppShadows.primaryButton,
-                  ),
-                  alignment: Alignment.center,
-                  child: const Icon(
-                    AppIcons.chat,
-                    size: 34,
-                    color: AppColors.textOnAccent,
-                  ),
-                ),
-                const SizedBox(height: 22),
-                const Text(
-                  'Выберите чат',
-                  style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  'Слева уже собраны все переписки. Откройте нужный диалог, и справа появится полная рабочая сцена общения.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    height: 1.45,
-                  ),
-                ),
-              ],
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            'Выберите чат в списке слева',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppColors.textMuted.withAlpha(200),
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              height: 1.4,
             ),
           ),
         ),

@@ -12,12 +12,14 @@ class ChatDetailAttachmentPreview extends StatelessWidget {
     required this.isBusy,
     required this.onPickAttachment,
     required this.onVideoNote,
+    required this.onPickVoice,
   });
 
   final bool isEditing;
   final bool isBusy;
   final VoidCallback onPickAttachment;
   final VoidCallback onVideoNote;
+  final VoidCallback onPickVoice;
 
   @override
   Widget build(BuildContext context) {
@@ -39,6 +41,16 @@ class ChatDetailAttachmentPreview extends StatelessWidget {
             icon: AppIcons.videocam,
             tooltip: 'Видеосообщение',
             onTap: (isEditing || isBusy) ? null : onVideoNote,
+            iconColor: isEditing ? AppColors.textMuted : AppColors.accentBright,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Tooltip(
+          message: 'Голосовое (выберите аудиофайл)',
+          child: AppIconButtonSurface(
+            icon: Icons.mic_none_rounded,
+            tooltip: 'Голосовое',
+            onTap: (isEditing || isBusy) ? null : onPickVoice,
             iconColor: isEditing ? AppColors.textMuted : AppColors.accentBright,
           ),
         ),

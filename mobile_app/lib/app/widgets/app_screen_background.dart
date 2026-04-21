@@ -31,7 +31,7 @@ class AppScreenBackground extends StatelessWidget {
               right: -110,
               child: _AmbientBlob(
                 size: 320,
-                color: AppColors.accent.withAlpha(20),
+                color: AppColors.accent.withAlpha(14),
               ),
             ),
           if (showAmbientGlow)
@@ -40,7 +40,7 @@ class AppScreenBackground extends StatelessWidget {
               left: -120,
               child: _AmbientBlob(
                 size: 260,
-                color: AppColors.accentBright.withAlpha(12),
+                color: AppColors.accentBright.withAlpha(8),
               ),
             ),
           if (showAmbientGlow)
@@ -49,7 +49,7 @@ class AppScreenBackground extends StatelessWidget {
               right: MediaQuery.sizeOf(context).width * 0.12,
               child: _AmbientBlob(
                 size: 300,
-                color: AppColors.backgroundTertiary.withAlpha(120),
+                color: AppColors.backgroundTertiary.withAlpha(88),
               ),
             ),
           IgnorePointer(
@@ -59,9 +59,9 @@ class AppScreenBackground extends StatelessWidget {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    AppColors.accent.withAlpha(10),
+                    AppColors.accent.withAlpha(6),
                     Colors.transparent,
-                    Colors.black.withAlpha(36),
+                    Colors.black.withAlpha(28),
                   ],
                 ),
               ),

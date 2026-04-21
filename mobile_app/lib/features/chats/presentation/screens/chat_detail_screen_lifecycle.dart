@@ -325,9 +325,89 @@ mixin _ChatDetailLifecycleLogic on _ChatDetailScreenStateBase, _ChatDetailStateH
     await _loadChatDetails();
   }
 
+  void _onMessagesScroll() {
+    if (!_scrollController.hasClients) return;
+    if (_isLoadingOlder || !_hasMoreMessages) return;
+    final pos = _scrollController.position;
+    if (pos.pixels <= 64) {
+      unawaited(_loadOlderMessages());
+    }
+  }
+
+  Future<void> _loadOlderMessages() async {
+    if (_isLoadingOlder || !_hasMoreMessages || _messages.isEmpty) return;
+    final first = _messages.first;
+    final mid = ChatDetailMessageMaps.intFromDynamic(first['id']);
+    if (mid == null) return;
+
+    setState(() {
+      _isLoadingOlder = true;
+    });
+
+    try {
+      final page = await _messagesService.getMessagesPage(
+        widget.chatId,
+        beforeMessageId: mid,
+        limit: 50,
+      );
+      if (!mounted) return;
+
+      final prevMax = _scrollController.hasClients
+          ? _scrollController.position.maxScrollExtent
+          : 0.0;
+      final prevOffset = _scrollController.hasClients
+          ? _scrollController.offset
+          : 0.0;
+
+      var normalized = page.messages
+          .map(ChatDetailMessageMaps.normalizeMessageMap)
+          .toList();
+
+      normalized = normalized.map((m) {
+        if (_currentUserId == null) return m;
+        if (!_isMine(m)) return m;
+        final id = ChatDetailMessageMaps.intFromDynamic(m['id']);
+        if (id == null) return m;
+        final copy = Map<String, dynamic>.from(m);
+        copy['delivery_status'] = _computeDeliveryForOutgoing(id);
+        return copy;
+      }).toList();
+
+      normalized.sort((a, b) {
+        final am = serverInstantMillis(a['created_at']?.toString());
+        final bm = serverInstantMillis(b['created_at']?.toString());
+        return (am ?? 0).compareTo(bm ?? 0);
+      });
+
+      if (!mounted) return;
+
+      setState(() {
+        _messages = [...normalized, ..._messages];
+        _hasMoreMessages = page.hasMore;
+        _isLoadingOlder = false;
+      });
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scrollController.hasClients) return;
+        final newMax = _scrollController.position.maxScrollExtent;
+        _scrollController.jumpTo(newMax - prevMax + prevOffset);
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingOlder = false;
+      });
+    }
+  }
+
   Future<void> _loadMessages() async {
     try {
-      final messages = await _messagesService.getMessages(widget.chatId);
+      final page = await _messagesService.getMessagesPage(
+        widget.chatId,
+        limit: 50,
+      );
+      final messages = page.messages;
+      _hasMoreMessages = page.hasMore;
       _lastReadByUserId.clear();
       try {
         final rows = await _messagesService.getChatReadState(widget.chatId);

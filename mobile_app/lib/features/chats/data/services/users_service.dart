@@ -36,7 +36,7 @@ class UsersService {
   /// Поиск по username (серверный `GET /users/?q=`). Пустой запрос — пустой список.
   Future<List<Map<String, dynamic>>> searchUsers(String query) async {
     final q = query.trim();
-    if (q.isEmpty) {
+    if (q.isEmpty || q.length < 2) {
       return [];
     }
 

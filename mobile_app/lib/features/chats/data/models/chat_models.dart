@@ -207,3 +207,15 @@ class ChatSummary {
     );
   }
 }
+
+class ChatListPageResult {
+  const ChatListPageResult({
+    required this.chats,
+    required this.hasMore,
+    this.nextCursor,
+  });
+
+  final List<ChatSummary> chats;
+  final bool hasMore;
+  final String? nextCursor;
+}

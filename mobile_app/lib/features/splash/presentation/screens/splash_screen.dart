@@ -89,8 +89,6 @@ class _SplashScreenState extends State<SplashScreen> {
                 child: const Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    AppPillBadge(label: 'SECURE MESSAGING', accent: true),
-                    SizedBox(height: 18),
                     Text(
                       'ЧТП ЧАТ',
                       style: TextStyle(
@@ -100,9 +98,9 @@ class _SplashScreenState extends State<SplashScreen> {
                         letterSpacing: 0.2,
                       ),
                     ),
-                    SizedBox(height: 10),
+                    SizedBox(height: 12),
                     Text(
-                      'Запускаем интерфейс и восстанавливаем сессию…',
+                      'Загрузка…',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: AppColors.textSecondary,

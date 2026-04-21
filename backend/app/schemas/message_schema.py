@@ -15,6 +15,12 @@ class MessageCreate(BaseModel):
     reply_to_message_id: int | None = None
 
 
+class ReactionGroup(BaseModel):
+    emoji: str
+    count: int
+    reacted_by_me: bool
+
+
 class MessageReplyPreview(BaseModel):
     id: int
     sender_id: int
@@ -25,6 +31,17 @@ class MessageReplyPreview(BaseModel):
 
 class MessageUpdate(BaseModel):
     text: str = Field(..., min_length=1)
+
+
+class MessageReactionBody(BaseModel):
+    emoji: str = Field(..., min_length=1, max_length=32)
+
+
+class MessageListPage(BaseModel):
+    """Страница истории чата (курсор по id сообщения)."""
+
+    messages: list["MessageResponse"]
+    has_more: bool
 
 
 class MessageResponse(BaseModel):
@@ -52,5 +69,10 @@ class MessageResponse(BaseModel):
     # Только для исходящих сообщений текущего пользователя: sent / read
     delivery_status: Literal["sent", "read"] | None = None
 
+    reactions: list[ReactionGroup] = Field(default_factory=list)
+
     class Config:
         from_attributes = True
+
+
+MessageListPage.model_rebuild()

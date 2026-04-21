@@ -45,12 +45,11 @@ class ChatsIncomingCallDialogs {
           });
 
           return _IncomingCallDialogCard(
-            badge: 'INCOMING CALL',
             title: title,
-            subtitle: '$title Р·РІРѕРЅРёС‚ РІР°Рј',
+            subtitle: 'Входящий звонок',
             icon: AppIcons.call,
-            acceptLabel: 'РџСЂРёРЅСЏС‚СЊ',
-            declineLabel: 'РћС‚РєР»РѕРЅРёС‚СЊ',
+            acceptLabel: 'Принять',
+            declineLabel: 'Отклонить',
             onDecline: () async {
               VoiceCallRing.end(callId);
               Navigator.of(dialogContext).pop();
@@ -122,12 +121,11 @@ class ChatsIncomingCallDialogs {
         context: context,
         barrierDismissible: false,
         builder: (dialogContext) => _IncomingCallDialogCard(
-          badge: 'GROUP CALL',
           title: title,
-          subtitle: 'Р’Р°СЃ Р·РѕРІСѓС‚ РІ Р·РІРѕРЅРѕРє В«$titleВ»',
+          subtitle: 'Вас зовут в групповой звонок',
           icon: Icons.groups_rounded,
-          acceptLabel: 'РџСЂРёСЃРѕРµРґРёРЅРёС‚СЊСЃСЏ',
-          declineLabel: 'РћС‚РєР»РѕРЅРёС‚СЊ',
+          acceptLabel: 'Присоединиться',
+          declineLabel: 'Отклонить',
           onDecline: () {
             VoiceCallRing.end(callId);
             Navigator.of(dialogContext).pop();
@@ -163,7 +161,6 @@ class ChatsIncomingCallDialogs {
 
 class _IncomingCallDialogCard extends StatelessWidget {
   const _IncomingCallDialogCard({
-    required this.badge,
     required this.title,
     required this.subtitle,
     required this.icon,
@@ -173,7 +170,6 @@ class _IncomingCallDialogCard extends StatelessWidget {
     required this.onAccept,
   });
 
-  final String badge;
   final String title;
   final String subtitle;
   final IconData icon;
@@ -194,12 +190,6 @@ class _IncomingCallDialogCard extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            AppPillBadge(
-              label: badge,
-              icon: icon,
-              accent: true,
-            ),
-            const SizedBox(height: 18),
             Container(
               width: 74,
               height: 74,

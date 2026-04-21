@@ -9,6 +9,7 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_icons.dart';
 import '../../../../app/theme/app_shadows.dart';
 import '../../../../app/theme/design_tokens.dart';
+import '../../../../app/widgets/app_content_frame.dart';
 import '../../../../app/widgets/app_screen_background.dart';
 import '../../../../app/widgets/app_surface.dart';
 import '../../../../core/network/api_client.dart';
@@ -103,6 +104,15 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
     final q = _searchController.text.trim();
 
     if (q.isEmpty) {
+      setState(() {
+        _searchResults = [];
+        _searchError = null;
+        _isSearching = false;
+      });
+      return;
+    }
+
+    if (q.length < 2) {
       setState(() {
         _searchResults = [];
         _searchError = null;
@@ -510,8 +520,6 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
             padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
             child: Column(
               children: [
-                const AppPillBadge(label: 'GROUP SETUP', accent: true),
-                const SizedBox(height: 14),
                 _buildGroupAvatarPreview(),
                 const SizedBox(height: 12),
                 Row(
@@ -598,9 +606,15 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Align(
             alignment: Alignment.centerLeft,
-            child: AppPillBadge(
-              label: 'Выбрано: ${_selectedUserIds.length}',
-              accent: _selectedUserIds.isNotEmpty,
+            child: Text(
+              'Выбрано: ${_selectedUserIds.length}',
+              style: TextStyle(
+                color: _selectedUserIds.isNotEmpty
+                    ? AppColors.textPrimary
+                    : AppColors.textMuted,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ),
@@ -806,35 +820,35 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
+                padding: const EdgeInsets.fromLTRB(8, 14, 16, 8),
                 child: Row(
                   children: [
-                      AppIconButtonSurface(
-                        icon: AppIcons.back,
-                        tooltip: 'Назад',
-                        onTap: () => Navigator.of(context).pop(),
-                      ),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            AppPillBadge(label: 'NEW GROUP'),
-                            SizedBox(height: 8),
-                            Text(
-                              'Новая группа',
-                              style: TextStyle(
-                                color: AppColors.textPrimary,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ],
+                    AppIconButtonSurface(
+                      icon: AppIcons.back,
+                      tooltip: 'Назад',
+                      onTap: () => Navigator.of(context).pop(),
+                    ),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text(
+                        'Новая группа',
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
-                    ],
+                    ),
+                  ],
                 ),
               ),
-              Expanded(child: _buildBody()),
+              Expanded(
+                child: AppContentFrame(
+                  maxWidth: AppBreakpoints.formPanelMaxWidth,
+                  padding: EdgeInsets.zero,
+                  child: _buildBody(),
+                ),
+              ),
             ],
           ),
         ),

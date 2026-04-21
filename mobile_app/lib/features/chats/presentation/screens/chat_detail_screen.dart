@@ -30,7 +30,6 @@ import '../../data/services/presence_service.dart';
 import 'chat_member_add_screen.dart';
 import 'video_note_record_screen.dart';
 import 'package:image_picker/image_picker.dart';
-import '../../data/models/chat_models.dart';
 import '../../data/services/chat_avatar_service.dart';
 import '../../data/services/chats_service.dart';
 import 'group_members_manage_screen.dart';
@@ -85,6 +84,9 @@ abstract class _ChatDetailScreenStateBase extends State<ChatDetailScreen> {
   bool _isSendingImage = false;
   bool _isSendingVideo = false;
   bool _isSendingDocument = false;
+  bool _isSendingVoice = false;
+  bool _hasMoreMessages = true;
+  bool _isLoadingOlder = false;
 
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -148,6 +150,7 @@ class _ChatDetailScreenState extends _ChatDetailScreenStateBase
     _chatTitle = widget.title;
     _chatAvatarUrl = widget.avatarUrl;
     _messageController.addListener(_onMessageTextChanged);
+    _scrollController.addListener(_onMessagesScroll);
     if (!_isGroupChat) {
       _lastSeenSubtitleTimer = Timer.periodic(const Duration(minutes: 1), (_) {
         if (!mounted) return;
@@ -166,6 +169,7 @@ class _ChatDetailScreenState extends _ChatDetailScreenStateBase
     _localTypingStopTimer?.cancel();
     _remoteTypingHideTimer?.cancel();
     _messageController.removeListener(_onMessageTextChanged);
+    _scrollController.removeListener(_onMessagesScroll);
     _socketSubscription?.cancel();
     _chatSocketService.dispose();
     _messageController.dispose();
@@ -237,6 +241,7 @@ class _ChatDetailScreenState extends _ChatDetailScreenStateBase
                 ),
               );
             },
+            onReactionEmojiTap: _toggleReactionEmoji,
           ),
         ),
         if (_typingUserId != null)
@@ -267,10 +272,12 @@ class _ChatDetailScreenState extends _ChatDetailScreenStateBase
           isSendingImage: _isSendingImage,
           isSendingVideo: _isSendingVideo,
           isSendingDocument: _isSendingDocument,
+          isSendingVoice: _isSendingVoice,
           onCancelEdit: _cancelEdit,
           onCancelReply: _cancelReply,
           onPickAttachment: _showAttachmentPicker,
           onVideoNote: _openVideoNoteRecorder,
+          onPickVoice: _pickAndSendVoiceFile,
           onSend: _sendMessage,
         ),
       ],

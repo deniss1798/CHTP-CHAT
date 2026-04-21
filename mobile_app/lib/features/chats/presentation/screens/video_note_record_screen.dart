@@ -11,7 +11,7 @@ import '../../../../app/theme/design_tokens.dart';
 import '../../../../app/widgets/app_screen_background.dart';
 import '../../../../app/widgets/app_surface.dart';
 
-/// Р—Р°РїРёСЃСЊ РєСЂСѓРіР»РѕРіРѕ РІРёРґРµРѕСЃРѕРѕР±С‰РµРЅРёСЏ РІ СЃС‚РёР»Рµ Telegram: СѓРґРµСЂР¶РёРІР°Р№С‚Рµ РєРЅРѕРїРєСѓ Р·Р°РїРёСЃРё.
+/// Запись круглого видеосообщения: удерживайте кнопку записи.
 class VideoNoteRecordScreen extends StatefulWidget {
   const VideoNoteRecordScreen({super.key});
 
@@ -41,7 +41,7 @@ class _VideoNoteRecordScreenState extends State<VideoNoteRecordScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('РќСѓР¶РЅС‹ СЂР°Р·СЂРµС€РµРЅРёСЏ РєР°РјРµСЂС‹ Рё РјРёРєСЂРѕС„РѕРЅР°'),
+          content: Text('Нужны разрешения камеры и микрофона'),
         ),
       );
       Navigator.of(context).pop();
@@ -52,7 +52,7 @@ class _VideoNoteRecordScreenState extends State<VideoNoteRecordScreen> {
     if (cameras.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('РљР°РјРµСЂР° РЅРµ РЅР°Р№РґРµРЅР°')),
+        const SnackBar(content: Text('Камера не найдена')),
       );
       Navigator.of(context).pop();
       return;
@@ -74,7 +74,7 @@ class _VideoNoteRecordScreenState extends State<VideoNoteRecordScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('РљР°РјРµСЂР°: $e')),
+        SnackBar(content: Text('Камера: $e')),
       );
       Navigator.of(context).pop();
       return;
@@ -115,7 +115,7 @@ class _VideoNoteRecordScreenState extends State<VideoNoteRecordScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('РќРµ СѓРґР°Р»РѕСЃСЊ РЅР°С‡Р°С‚СЊ Р·Р°РїРёСЃСЊ: $e')),
+        SnackBar(content: Text('Не удалось начать запись: $e')),
       );
     }
   }
@@ -146,7 +146,7 @@ class _VideoNoteRecordScreenState extends State<VideoNoteRecordScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'РЎР»РёС€РєРѕРј РєРѕСЂРѕС‚РєРѕ вЂ” СѓРґРµСЂР¶РёРІР°Р№С‚Рµ РєРЅРѕРїРєСѓ РґРѕР»СЊС€Рµ',
+              'Слишком коротко — удерживайте кнопку дольше',
             ),
           ),
         );
@@ -157,7 +157,7 @@ class _VideoNoteRecordScreenState extends State<VideoNoteRecordScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('РћС€РёР±РєР° Р·Р°РїРёСЃРё: $e')),
+        SnackBar(content: Text('Ошибка записи: $e')),
       );
     }
   }
@@ -185,18 +185,13 @@ class _VideoNoteRecordScreenState extends State<VideoNoteRecordScreen> {
             child: Column(
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     AppIconButtonSurface(
                       icon: AppIcons.close,
-                      tooltip: 'Р—Р°РєСЂС‹С‚СЊ',
+                      tooltip: 'Закрыть',
                       onTap: () => Navigator.of(context).pop(),
                     ),
-                    const AppPillBadge(
-                      label: 'VIDEO NOTE',
-                      icon: Icons.radio_button_checked_rounded,
-                      accent: true,
-                    ),
+                    const Spacer(),
                   ],
                 ),
                 const SizedBox(height: 18),
@@ -207,33 +202,37 @@ class _VideoNoteRecordScreenState extends State<VideoNoteRecordScreen> {
                   child: Column(
                     children: [
                       const Text(
-                        'Р’РёРґРµРѕСЃРѕРѕР±С‰РµРЅРёРµ',
+                        'Видеосообщение',
                         style: TextStyle(
                           color: AppColors.textPrimary,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                       const SizedBox(height: 10),
                       const Text(
-                        'РЈРґРµСЂР¶РёРІР°Р№С‚Рµ РєРЅРѕРїРєСѓ РІРЅРёР·Сѓ, С‡С‚РѕР±С‹ РЅР°С‡Р°С‚СЊ Р·Р°РїРёСЃСЊ. РћС‚РїСѓСЃС‚РёС‚Рµ, С‡С‚РѕР±С‹ СЃСЂР°Р·Сѓ РѕС‚РїСЂР°РІРёС‚СЊ.',
+                        'Удерживайте кнопку внизу, чтобы записать. Отпустите — отправится.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: AppColors.textSecondary,
                           fontSize: 14,
                           height: 1.45,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
-                      const SizedBox(height: 18),
-                      AppPillBadge(
-                        label: _recording
-                            ? 'REC $durationLabel'
-                            : 'READY TO RECORD',
-                        icon: _recording
-                            ? Icons.fiber_manual_record_rounded
-                            : Icons.videocam_outlined,
-                        accent: _recording,
+                      const SizedBox(height: 14),
+                      Text(
+                        _recording
+                            ? 'Запись · $durationLabel'
+                            : 'Готово к записи',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: _recording
+                              ? AppColors.accentBright
+                              : AppColors.textMuted,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ],
                   ),
@@ -319,7 +318,7 @@ class _VideoNoteRecordScreenState extends State<VideoNoteRecordScreen> {
                 ),
                 const SizedBox(height: 12),
                 const Text(
-                  'РќР°Р¶РјРёС‚Рµ Рё СѓРґРµСЂР¶РёРІР°Р№С‚Рµ',
+                  'Нажмите и удерживайте',
                   style: TextStyle(
                     color: AppColors.textMuted,
                     fontSize: 13,

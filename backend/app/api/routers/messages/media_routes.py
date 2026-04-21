@@ -6,6 +6,7 @@ from app.application.messages.commands import (
     send_photo_message as execute_send_photo_message,
     send_video_message as execute_send_video_message,
     send_video_note_message as execute_send_video_note_message,
+    send_voice_message as execute_send_voice_message,
 )
 from app.core.dependencies import get_current_user
 from app.db.database import get_db
@@ -59,6 +60,23 @@ async def send_video_note_message(
     current_user: User = Depends(get_current_user),
 ):
     return await execute_send_video_note_message(
+        db,
+        current_user=current_user,
+        chat_id=chat_id,
+        file=file,
+        reply_to_message_id=reply_to_message_id,
+    )
+
+
+@router.post("/voice", response_model=MessageResponse)
+async def send_voice_message(
+    chat_id: int = Form(...),
+    file: UploadFile = File(...),
+    reply_to_message_id: int | None = Form(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return await execute_send_voice_message(
         db,
         current_user=current_user,
         chat_id=chat_id,

@@ -17,6 +17,8 @@ String? previewForLastMessageType(String rawType) {
       return 'Видео';
     case 'video_note':
       return 'Видеосообщение';
+    case 'voice':
+      return 'Голосовое';
     case 'audio':
       return 'Аудио';
     case 'document':

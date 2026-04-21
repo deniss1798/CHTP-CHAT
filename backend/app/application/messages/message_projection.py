@@ -5,7 +5,8 @@ from sqlalchemy.orm import Session
 from app.application.media.constants import PRIVATE_MEDIA_MESSAGE_TYPES
 from app.models.chat_member import ChatMember
 from app.models.message import Message
-from app.schemas.message_schema import MessageReplyPreview, MessageResponse
+from app.application.messages.reaction_service import reaction_groups_for_messages
+from app.schemas.message_schema import MessageReplyPreview, MessageResponse, ReactionGroup
 from app.infrastructure.storage.s3_storage import S3StorageService, is_private_s3_ready
 
 
@@ -115,6 +116,11 @@ def message_to_response(
             db, message.chat_id, message, viewer_user_id
         )
 
+    rlist: list[ReactionGroup] = []
+    if viewer_user_id is not None:
+        rmap = reaction_groups_for_messages(db, [message.id], viewer_user_id)
+        rlist = rmap.get(message.id, [])
+
     return MessageResponse(
         id=message.id,
         chat_id=message.chat_id,
@@ -132,6 +138,7 @@ def message_to_response(
         reply_to=reply_preview,
         forwarded_from_user_id=message.forwarded_from_user_id,
         delivery_status=delivery_status,
+        reactions=rlist,
     )
 
 
@@ -141,6 +148,7 @@ def message_to_response_batched(
     get_storage: Callable[[], S3StorageService],
     db: Session,
     viewer_user_id: int,
+    reactions: list[ReactionGroup] | None = None,
 ) -> MessageResponse:
     reply_preview: MessageReplyPreview | None = None
     if message.reply_to_message_id:
@@ -178,6 +186,7 @@ def message_to_response_batched(
         reply_to=reply_preview,
         forwarded_from_user_id=message.forwarded_from_user_id,
         delivery_status=delivery_status,
+        reactions=reactions or [],
     )
 
 
@@ -217,6 +226,7 @@ def build_message_payload(
         "reply_to_message_id": message.reply_to_message_id,
         "reply_to": reply_to_dict,
         "forwarded_from_user_id": message.forwarded_from_user_id,
+        "reactions": [],
     }
 
 

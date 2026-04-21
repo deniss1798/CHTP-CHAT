@@ -21,6 +21,8 @@ def push_preview_for_message(message: Message) -> str:
         return "🎥 Видеосообщение"
     if mt == "document":
         return "📎 Файл"
+    if mt == "voice":
+        return "🎤 Голосовое"
     return "Новое сообщение"
 
 

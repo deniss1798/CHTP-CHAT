@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_icons.dart';
+import '../../../../app/theme/app_shadows.dart';
 import '../../../../app/theme/design_tokens.dart';
 import '../../../../app/widgets/app_surface.dart';
 
@@ -18,6 +19,7 @@ class ChatsSearchField extends StatelessWidget {
     return AppSurface(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
       radius: AppRadius.xxl,
+      shadow: AppShadows.lift,
       child: TextField(
         onChanged: onChanged,
         style: const TextStyle(

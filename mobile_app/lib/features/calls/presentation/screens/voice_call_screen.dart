@@ -222,7 +222,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                padding: const EdgeInsets.fromLTRB(8, 10, 8, 4),
                 child: Row(
                   children: [
                     AppIconButtonSurface(
@@ -230,11 +230,10 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
                       tooltip: 'Завершить',
                       onTap: () => session?.hangUp(),
                     ),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         children: [
-                          const AppPillBadge(label: 'PRIVATE CALL', accent: true),
-                          const SizedBox(height: 8),
                           Text(
                             widget.peerTitle,
                             textAlign: TextAlign.center,
@@ -244,6 +243,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
                               color: AppColors.textPrimary,
                               fontSize: 18,
                               fontWeight: FontWeight.w700,
+                              letterSpacing: -0.35,
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -253,14 +253,14 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
                             maxLines: 2,
                             style: const TextStyle(
                               color: AppColors.textSecondary,
-                              fontSize: 14,
+                              fontSize: 13,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(width: 48),
+                    const SizedBox(width: 56),
                   ],
                 ),
               ),

@@ -77,12 +77,19 @@ class ChatDetailAppBar extends StatelessWidget {
                           letterSpacing: -0.3,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 2),
                       if (!isGroupChat)
-                        AppPillBadge(
-                          label: peerSubtitle,
-                          accent: peerOnline,
-                          icon: peerOnline ? AppIcons.checkCircle : null,
+                        Text(
+                          peerSubtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: peerOnline
+                                ? AppColors.accentBright
+                                : AppColors.textSecondary,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                     ],
                   ),

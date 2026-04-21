@@ -5,4 +5,5 @@ abstract final class ChatWsContract {
   static const String payloadTypeReadReceipt = 'read_receipt';
   static const String eventMessageUpdated = 'message_updated';
   static const String eventMessageDeleted = 'message_deleted';
+  static const String eventMessageReactionsUpdated = 'message_reactions_updated';
 }

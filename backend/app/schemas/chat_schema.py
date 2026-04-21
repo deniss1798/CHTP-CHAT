@@ -59,6 +59,12 @@ class ChatResponse(BaseModel):
         from_attributes = True
 
 
+class ChatListPage(BaseModel):
+    chats: list[ChatResponse]
+    has_more: bool
+    next_cursor: str | None = None
+
+
 class ChatMemberResponse(BaseModel):
     id: int
     username: str

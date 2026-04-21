@@ -405,3 +405,50 @@ async def send_document_message(
     )
 
     return message_to_response(new_message, db, viewer_user_id=current_user.id)
+
+
+async def send_voice_message(
+    db: Session,
+    *,
+    current_user: User,
+    chat_id: int,
+    file: UploadFile,
+    reply_to_message_id: int | None,
+) -> MessageResponse:
+    repo = MessagesRepository(db)
+    require_chat_member(db, chat_id, current_user)
+    validate_reply_target(db, chat_id, reply_to_message_id)
+    media_svc.require_private_s3_or_503()
+
+    content, extension, resolved_mime = await media_svc.read_and_validate_voice(file)
+    media_key, media_url = media_svc.upload_private_message_voice(
+        chat_id=chat_id,
+        content=content,
+        extension=extension,
+        content_type=resolved_mime,
+    )
+
+    new_message = Message(
+        chat_id=chat_id,
+        sender_id=current_user.id,
+        text="",
+        message_type="voice",
+        media_key=media_key,
+        media_url=media_url,
+        media_mime_type=resolved_mime,
+        media_size=len(content),
+        is_updated=False,
+        reply_to_message_id=reply_to_message_id,
+    )
+    repo.add(new_message)
+    repo.commit_refresh(new_message)
+    new_message.media_url = media_svc.presign_media_url(new_message.media_key)
+
+    await _notify_new_message(
+        db,
+        new_message=new_message,
+        current_user=current_user,
+        preview="Голосовое",
+    )
+
+    return message_to_response(new_message, db, viewer_user_id=current_user.id)

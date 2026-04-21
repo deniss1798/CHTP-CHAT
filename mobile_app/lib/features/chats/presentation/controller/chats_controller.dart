@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
+import '../../../../core/formatting/server_time.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/notifiers/chats_list_refresh_notifier.dart';
 import '../../../../core/push/local_notifications_service.dart';
@@ -178,7 +179,12 @@ class ChatsController extends ChangeNotifier {
     }
 
     try {
-      var chats = await _chatsService.getChats(currentUserId: _state.currentUserId!);
+      final page = await _chatsService.getChatsPage(
+        currentUserId: _state.currentUserId!,
+        limit: 50,
+        cursor: null,
+      );
+      var chats = page.chats;
       final localReads = await _localChatStateService.getAllLastReadMessageIds();
 
       chats = chats.map((chat) {
@@ -208,6 +214,8 @@ class ChatsController extends ChangeNotifier {
           filteredChats: _applySearchToList(chats, _state.searchQuery),
           isLoading: false,
           clearError: true,
+          chatsNextCursor: page.hasMore ? page.nextCursor : null,
+          clearChatsNextCursor: !page.hasMore,
         ),
       );
     } catch (error) {
@@ -435,5 +443,63 @@ class ChatsController extends ChangeNotifier {
     if (_isDisposed) return;
     _state = nextState;
     notifyListeners();
+  }
+
+  Future<void> loadMoreChats() async {
+    if (_state.currentUserId == null) return;
+    final cursor = _state.chatsNextCursor;
+    if (cursor == null || cursor.isEmpty || _state.chatsLoadingMore) {
+      return;
+    }
+
+    _setState(_state.copyWith(chatsLoadingMore: true));
+
+    try {
+      final page = await _chatsService.getChatsPage(
+        currentUserId: _state.currentUserId!,
+        limit: 50,
+        cursor: cursor,
+      );
+      final localReads = await _localChatStateService.getAllLastReadMessageIds();
+
+      final byId = {for (final c in _state.allChats) c.id: c};
+      for (final c in page.chats) {
+        var updated = c;
+        final localRead = localReads[c.id];
+        if (localRead != null && localRead > updated.myLastReadMessageId) {
+          updated = updated.copyWith(myLastReadMessageId: localRead);
+        }
+        final unreadCount = resolveUnreadCount(
+          serverUnreadCount: updated.unreadCount,
+          currentUserId: _state.currentUserId,
+          lastMessageId: updated.lastMessageId,
+          lastMessageSenderId: updated.lastMessageSenderId,
+          myLastReadMessageId: updated.myLastReadMessageId,
+        );
+        if (updated.unreadCount != unreadCount) {
+          updated = updated.copyWith(unreadCount: unreadCount);
+        }
+        byId[c.id] = updated;
+      }
+
+      final merged = byId.values.toList();
+      merged.sort((a, b) {
+        final aMs = serverInstantMillis(a.lastMessageAtRaw) ?? 0;
+        final bMs = serverInstantMillis(b.lastMessageAtRaw) ?? 0;
+        return bMs.compareTo(aMs);
+      });
+
+      _setState(
+        _state.copyWith(
+          allChats: merged,
+          filteredChats: _applySearchToList(merged, _state.searchQuery),
+          chatsNextCursor: page.hasMore ? page.nextCursor : null,
+          clearChatsNextCursor: !page.hasMore,
+          chatsLoadingMore: false,
+        ),
+      );
+    } catch (_) {
+      _setState(_state.copyWith(chatsLoadingMore: false));
+    }
   }
 }

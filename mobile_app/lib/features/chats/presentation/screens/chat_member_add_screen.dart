@@ -331,23 +331,17 @@ class _ChatMemberAddScreenState extends State<ChatMemberAddScreen> {
                       tooltip: 'Назад',
                       onTap: () => Navigator.of(context).pop(),
                     ),
+                    const SizedBox(width: 10),
                     const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          AppPillBadge(label: 'GROUP MEMBERS'),
-                          SizedBox(height: 8),
-                          Text(
-                            'Добавить участника',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: AppColors.textPrimary,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ],
+                      child: Text(
+                        'Добавить участника',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ],

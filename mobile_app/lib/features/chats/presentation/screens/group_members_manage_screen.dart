@@ -138,21 +138,15 @@ class _GroupMembersManageScreenState extends State<GroupMembersManageScreen> {
                     tooltip: 'Назад',
                     onTap: () => Navigator.of(context).pop(true),
                   ),
+                  const SizedBox(width: 10),
                   const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        AppPillBadge(label: 'GROUP ROSTER'),
-                        SizedBox(height: 6),
-                        Text(
-                          'Участники',
-                          style: TextStyle(
-                            color: AppColors.textPrimary,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ],
+                    child: Text(
+                      'Участники',
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ],

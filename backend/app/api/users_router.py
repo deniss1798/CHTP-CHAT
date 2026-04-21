@@ -100,14 +100,15 @@ def get_me(current_user: User = Depends(get_current_user)):
 
 @router.get("/", response_model=list[UserResponse])
 def search_users(
-    q: str = Query("", min_length=0, max_length=50),
+    q: str = Query("", max_length=50),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    query = db.query(User)
+    raw = q.strip()
+    if len(raw) < 2:
+        return []
 
-    if q.strip():
-        query = query.filter(User.username.ilike(f"%{q.strip()}%"))
+    query = db.query(User).filter(User.username.ilike(f"%{raw}%"))
 
     users = (
         query.filter(User.id != current_user.id)

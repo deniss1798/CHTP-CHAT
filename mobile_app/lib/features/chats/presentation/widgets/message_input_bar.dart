@@ -20,10 +20,12 @@ class ChatDetailMessageInputBar extends StatelessWidget {
     required this.isSendingImage,
     required this.isSendingVideo,
     required this.isSendingDocument,
+    required this.isSendingVoice,
     required this.onCancelEdit,
     required this.onCancelReply,
     required this.onPickAttachment,
     required this.onVideoNote,
+    required this.onPickVoice,
     required this.onSend,
   });
 
@@ -35,16 +37,19 @@ class ChatDetailMessageInputBar extends StatelessWidget {
   final bool isSendingImage;
   final bool isSendingVideo;
   final bool isSendingDocument;
+  final bool isSendingVoice;
   final VoidCallback onCancelEdit;
   final VoidCallback onCancelReply;
   final VoidCallback onPickAttachment;
   final VoidCallback onVideoNote;
+  final VoidCallback onPickVoice;
   final VoidCallback onSend;
 
   @override
   Widget build(BuildContext context) {
     final reply = replyingTo;
-    final busy = isSendingImage || isSendingVideo || isSendingDocument;
+    final busy =
+        isSendingImage || isSendingVideo || isSendingDocument || isSendingVoice;
 
     return SafeArea(
       top: false,
@@ -76,6 +81,7 @@ class ChatDetailMessageInputBar extends StatelessWidget {
                   isBusy: busy,
                   onPickAttachment: onPickAttachment,
                   onVideoNote: onVideoNote,
+                  onPickVoice: onPickVoice,
                 ),
                 Expanded(
                   child: AppSurface(

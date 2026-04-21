@@ -5,9 +5,11 @@ from fastapi import HTTPException, UploadFile, status
 from app.application.media.constants import (
     ALLOWED_IMAGE_TYPES,
     ALLOWED_VIDEO_TYPES,
+    ALLOWED_VOICE_TYPES,
     MAX_DOCUMENT_SIZE,
     MAX_IMAGE_SIZE,
     MAX_VIDEO_SIZE,
+    MAX_VOICE_SIZE,
 )
 from app.application.messages.document_rules import (
     sanitize_document_filename,
@@ -181,6 +183,61 @@ def upload_private_message_document(
 ) -> tuple[str, str]:
     storage = S3StorageService()
     return storage.upload_private_message_document(
+        content=content,
+        chat_id=chat_id,
+        extension=extension,
+        content_type=content_type,
+    )
+
+
+async def read_and_validate_voice(file: UploadFile) -> tuple[bytes, str, str]:
+    ct_raw = (file.content_type or "").split(";")[0].strip().lower()
+    extension: str | None = None
+    if ct_raw in ALLOWED_VOICE_TYPES:
+        extension = ALLOWED_VOICE_TYPES[ct_raw]
+    else:
+        lower_name = (file.filename or "").lower()
+        for ext, ert in (
+            (".m4a", "audio/mp4"),
+            (".ogg", "audio/ogg"),
+            (".opus", "audio/opus"),
+            (".mp3", "audio/mpeg"),
+            (".aac", "audio/aac"),
+            (".webm", "audio/webm"),
+            (".wav", "audio/wav"),
+        ):
+            if lower_name.endswith(ext):
+                ct_raw = ert
+                extension = ALLOWED_VOICE_TYPES[ert]
+                break
+    if extension is None or ct_raw not in ALLOWED_VOICE_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unsupported audio format",
+        )
+    content = await file.read()
+    if not content:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Empty file",
+        )
+    if len(content) > MAX_VOICE_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File is too large. Max size is 10 MB",
+        )
+    return content, extension, ct_raw
+
+
+def upload_private_message_voice(
+    *,
+    chat_id: int,
+    content: bytes,
+    extension: str,
+    content_type: str,
+) -> tuple[str, str]:
+    storage = S3StorageService()
+    return storage.upload_private_message_voice(
         content=content,
         chat_id=chat_id,
         extension=extension,

@@ -40,7 +40,9 @@ class ChatListItem extends StatelessWidget {
               : (isUnread
                   ? AppColors.accentBorder.withAlpha(120)
                   : AppColors.strokeSoft),
-          shadow: selected ? [...AppShadows.card, ...AppShadows.accentStroke] : AppShadows.lift,
+          shadow: selected
+              ? [...AppShadows.lift, ...AppShadows.accentStroke]
+              : AppShadows.lift,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
             child: Row(
@@ -73,9 +75,15 @@ class ChatListItem extends StatelessWidget {
                             ),
                           ),
                           if (item.timeLabel.isNotEmpty)
-                            AppPillBadge(
-                              label: item.timeLabel,
-                              accent: selected || isUnread,
+                            Text(
+                              item.timeLabel,
+                              style: TextStyle(
+                                color: selected || isUnread
+                                    ? AppColors.textSecondary
+                                    : AppColors.textMuted,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                         ],
                       ),
@@ -108,8 +116,9 @@ class ChatListItem extends StatelessWidget {
                               ),
                               decoration: BoxDecoration(
                                 gradient: AppGradients.accentPanel,
-                                borderRadius: BorderRadius.circular(AppRadius.pill),
-                                boxShadow: AppShadows.primaryButton,
+                                borderRadius:
+                                    BorderRadius.circular(AppRadius.pill),
+                                boxShadow: AppShadows.lift,
                               ),
                               child: Text(
                                 item.unreadCount > 99 ? '99+' : item.unreadCount.toString(),

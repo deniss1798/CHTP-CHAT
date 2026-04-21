@@ -469,54 +469,74 @@ mixin _ChatDetailComposerAndActionsLogic
       context: context,
       backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
       ),
       builder: (ctx) {
+        const iconStyle = IconThemeData(
+          color: AppColors.textSecondary,
+          size: 22,
+        );
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  leading: const Icon(AppIcons.reply, color: AppColors.accent),
-                  title: const Text('Reply'),
-                  onTap: () => Navigator.of(ctx).pop('reply'),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.forward, color: AppColors.accent),
-                  title: const Text('Forward'),
-                  onTap: () => Navigator.of(ctx).pop('forward'),
-                ),
-                if (text.isNotEmpty)
+            padding: const EdgeInsets.fromLTRB(4, 6, 4, 10),
+            child: IconTheme(
+              data: iconStyle,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
                   ListTile(
-                    leading: const Icon(
-                      AppIcons.copy,
-                      color: AppColors.textPrimary,
-                    ),
-                    title: const Text('Copy'),
-                    onTap: () => Navigator.of(ctx).pop('copy'),
+                    dense: true,
+                    leading: const Icon(AppIcons.reply),
+                    title: const Text('Ответить'),
+                    onTap: () => Navigator.of(ctx).pop('reply'),
                   ),
-                if (isMine && messageType == 'text' && text.isNotEmpty)
                   ListTile(
-                    leading: const Icon(
-                      AppIcons.edit,
-                      color: AppColors.textPrimary,
-                    ),
-                    title: const Text('Edit'),
-                    onTap: () => Navigator.of(ctx).pop('edit'),
+                    dense: true,
+                    leading: const Icon(Icons.forward_rounded),
+                    title: const Text('Переслать'),
+                    onTap: () => Navigator.of(ctx).pop('forward'),
                   ),
-                if (isMine)
                   ListTile(
-                    leading: const Icon(
-                      AppIcons.delete,
-                      color: Colors.redAccent,
-                    ),
-                    title: const Text('Delete'),
-                    onTap: () => Navigator.of(ctx).pop('delete'),
+                    dense: true,
+                    leading: const Text('👍', style: TextStyle(fontSize: 22)),
+                    title: const Text('Реакция 👍'),
+                    onTap: () => Navigator.of(ctx).pop('react:👍'),
                   ),
-                const SizedBox(height: 4),
-              ],
+                  ListTile(
+                    dense: true,
+                    leading: const Text('❤️', style: TextStyle(fontSize: 22)),
+                    title: const Text('Реакция ❤️'),
+                    onTap: () => Navigator.of(ctx).pop('react:❤️'),
+                  ),
+                  if (text.isNotEmpty)
+                    ListTile(
+                      dense: true,
+                      leading: const Icon(AppIcons.copy),
+                      title: const Text('Копировать'),
+                      onTap: () => Navigator.of(ctx).pop('copy'),
+                    ),
+                  if (isMine && messageType == 'text' && text.isNotEmpty)
+                    ListTile(
+                      dense: true,
+                      leading: const Icon(AppIcons.edit),
+                      title: const Text('Изменить'),
+                      onTap: () => Navigator.of(ctx).pop('edit'),
+                    ),
+                  if (isMine)
+                    ListTile(
+                      dense: true,
+                      leading: const Icon(
+                        AppIcons.delete,
+                        color: Colors.redAccent,
+                      ),
+                      title: const Text(
+                        'Удалить',
+                        style: TextStyle(color: Colors.redAccent),
+                      ),
+                      onTap: () => Navigator.of(ctx).pop('delete'),
+                    ),
+                ],
+              ),
             ),
           ),
         );
@@ -538,11 +558,17 @@ mixin _ChatDetailComposerAndActionsLogic
       return;
     }
 
+    if (action != null && action.startsWith('react:')) {
+      final emoji = action.substring(6);
+      await _toggleReactionEmoji(message, emoji);
+      return;
+    }
+
     if (action == 'copy' && text.isNotEmpty) {
       await Clipboard.setData(ClipboardData(text: text));
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Text copied')),
+        const SnackBar(content: Text('Текст скопирован')),
       );
       return;
     }
@@ -567,7 +593,7 @@ mixin _ChatDetailComposerAndActionsLogic
   String _titleForForwardChat(ChatSummary chat) {
     final title = chat.title.trim();
     if (title.isNotEmpty) return title;
-    return 'Chat ${chat.id}';
+    return 'Чат ${chat.id}';
   }
 
   Future<void> _pickForwardTarget(Map<String, dynamic> message) async {
@@ -585,7 +611,7 @@ mixin _ChatDetailComposerAndActionsLogic
           content: Text(
             chatDetailExtractErrorMessage(
               e,
-              fallback: 'Failed to load chats',
+              fallback: 'Не удалось загрузить чаты',
             ),
           ),
         ),
@@ -611,7 +637,7 @@ mixin _ChatDetailComposerAndActionsLogic
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    'Forward to...',
+                    'Переслать в…',
                     style: TextStyle(
                       color: AppColors.textPrimary,
                       fontSize: 16,
@@ -686,7 +712,7 @@ mixin _ChatDetailComposerAndActionsLogic
         requestChatsListRefresh();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Message forwarded')),
+          const SnackBar(content: Text('Сообщение переслано')),
         );
         Navigator.of(context).push(
           MaterialPageRoute(
@@ -707,7 +733,7 @@ mixin _ChatDetailComposerAndActionsLogic
           content: Text(
             chatDetailExtractErrorMessage(
               e,
-              fallback: 'Failed to forward message',
+              fallback: 'Не удалось переслать сообщение',
             ),
           ),
         ),
@@ -721,17 +747,17 @@ mixin _ChatDetailComposerAndActionsLogic
       builder: (ctx) {
         return AlertDialog(
           backgroundColor: AppColors.surface,
-          title: const Text('Delete message?'),
-          content: const Text('This action cannot be undone.'),
+          title: const Text('Удалить сообщение?'),
+          content: const Text('Это действие нельзя отменить.'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('Cancel'),
+              child: const Text('Отмена'),
             ),
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(true),
               child: const Text(
-                'Delete',
+                'Удалить',
                 style: TextStyle(color: Colors.redAccent),
               ),
             ),
@@ -840,6 +866,130 @@ mixin _ChatDetailComposerAndActionsLogic
             chatDetailExtractErrorMessage(
               e,
               fallback: 'Failed to update message',
+            ),
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _toggleReactionEmoji(
+    Map<String, dynamic> message,
+    String emoji,
+  ) async {
+    final messageId = ChatDetailMessageMaps.intFromDynamic(message['id']);
+    if (messageId == null) return;
+
+    var mine = false;
+    final raw = message['reactions'];
+    if (raw is List) {
+      for (final r in raw) {
+        Map<String, dynamic>? m;
+        if (r is Map<String, dynamic>) {
+          m = r;
+        } else if (r is Map) {
+          m = Map<String, dynamic>.from(r);
+        }
+        if (m != null &&
+            m['emoji']?.toString() == emoji &&
+            m['reacted_by_me'] == true) {
+          mine = true;
+          break;
+        }
+      }
+    }
+
+    try {
+      final updated = ChatDetailMessageMaps.normalizeMessageMap(
+        mine
+            ? await _messagesService.removeReaction(
+                messageId: messageId,
+                emoji: emoji,
+              )
+            : await _messagesService.addReaction(
+                messageId: messageId,
+                emoji: emoji,
+              ),
+      );
+      if (!mounted) return;
+      setState(() {
+        final idx = _messages.indexWhere((m) => m['id'] == updated['id']);
+        if (idx >= 0) {
+          _messages[idx] = updated;
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.surfaceSoft,
+          content: Text(
+            chatDetailExtractErrorMessage(
+              e,
+              fallback: 'Не удалось обновить реакцию',
+            ),
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _pickAndSendVoiceFile() async {
+    if (_isSendingVoice || _editingMessage != null) return;
+    final r = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['m4a', 'mp3', 'ogg', 'aac', 'wav', 'webm'],
+    );
+    if (r == null || r.files.isEmpty) return;
+    final f = r.files.single;
+    final path = f.path;
+    if (path == null || path.isEmpty) return;
+    final name = f.name.trim().isEmpty ? 'voice.m4a' : f.name.trim();
+
+    setState(() {
+      _isSendingVoice = true;
+    });
+
+    try {
+      final replyId = _pendingReplyToMessageId();
+      final created = ChatDetailMessageMaps.normalizeMessageMap(
+        await _messagesService.sendVoiceMessage(
+          chatId: widget.chatId,
+          filePath: path,
+          fileName: name,
+          replyToMessageId: replyId,
+        ),
+      );
+      if (!mounted) return;
+      setState(() {
+        final exists = _messages.any((m) => m['id'] == created['id']);
+        if (!exists) {
+          _messages.add(created);
+          _messages.sort((a, b) {
+            final am = serverInstantMillis(a['created_at']?.toString());
+            final bm = serverInstantMillis(b['created_at']?.toString());
+            return (am ?? 0).compareTo(bm ?? 0);
+          });
+        }
+        _replyingTo = null;
+        _isSendingVoice = false;
+      });
+      await _markCurrentChatAsRead();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToBottom();
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isSendingVoice = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.surfaceSoft,
+          content: Text(
+            chatDetailExtractErrorMessage(
+              e,
+              fallback: 'Не удалось отправить голосовое',
             ),
           ),
         ),

@@ -213,7 +213,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       decoration: BoxDecoration(
         gradient: AppGradients.accentPanel,
         borderRadius: BorderRadius.circular(30),
-        boxShadow: AppShadows.primaryButton,
+        boxShadow: AppShadows.lift,
       ),
       alignment: Alignment.center,
       child: Text(
@@ -244,7 +244,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             decoration: BoxDecoration(
               gradient: AppGradients.accentPanel,
               borderRadius: BorderRadius.circular(AppRadius.md),
-              boxShadow: AppShadows.primaryButton,
+              boxShadow: AppShadows.lift,
             ),
             alignment: Alignment.center,
             child: Icon(
@@ -319,109 +319,111 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
-      child: Column(
-        children: [
-          const SizedBox(height: 12),
-          AppSurface(
-            tone: AppSurfaceTone.elevated,
-            radius: AppRadius.xxl,
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 22),
-            child: Column(
-              children: [
-                const AppPillBadge(
-                  label: 'МОЙ АККАУНТ',
-                  accent: true,
-                ),
-                const SizedBox(height: 18),
-                Stack(
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(
+          maxWidth: AppBreakpoints.authPanelMaxWidth,
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
+          child: Column(
+            children: [
+              const SizedBox(height: 8),
+              AppSurface(
+                tone: AppSurfaceTone.elevated,
+                radius: AppRadius.xxl,
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 22),
+                child: Column(
                   children: [
-                    _buildAvatar(),
-                    Positioned(
-                      right: 0,
-                      bottom: 0,
-                      child: GestureDetector(
-                        onTap: _isUploading ? null : _pickAndUploadAvatar,
-                        child: Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            gradient: AppGradients.accentPanel,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: AppColors.background,
-                              width: 2,
-                            ),
-                            boxShadow: AppShadows.primaryButton,
-                          ),
-                          alignment: Alignment.center,
-                          child: _isUploading
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: AppColors.textOnAccent,
-                                  ),
-                                )
-                              : const Icon(
-                                  AppIcons.edit,
-                                  color: AppColors.textOnAccent,
-                                  size: 18,
+                    Stack(
+                      children: [
+                        _buildAvatar(),
+                        Positioned(
+                          right: 0,
+                          bottom: 0,
+                          child: GestureDetector(
+                            onTap: _isUploading ? null : _pickAndUploadAvatar,
+                            child: Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                gradient: AppGradients.accentPanel,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: AppColors.background,
+                                  width: 2,
                                 ),
+                                boxShadow: AppShadows.lift,
+                              ),
+                              alignment: Alignment.center,
+                              child: _isUploading
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: AppColors.textOnAccent,
+                                      ),
+                                    )
+                                  : const Icon(
+                                      AppIcons.edit,
+                                      color: AppColors.textOnAccent,
+                                      size: 18,
+                                    ),
+                            ),
+                          ),
                         ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                    Text(
+                      _username(),
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _email(),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 18),
+              ),
+              const SizedBox(height: 24),
+              _buildInfoCard(
+                label: 'Имя пользователя',
+                value: _username(),
+                icon: AppIcons.person,
+              ),
+              const SizedBox(height: 12),
+              _buildInfoCard(
+                label: 'Почта',
+                value: _email(),
+                icon: AppIcons.mail,
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 16),
                 Text(
-                  _username(),
-                  style: const TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _email(),
+                  _error!,
                   textAlign: TextAlign.center,
                   style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 14,
+                    color: Colors.redAccent,
+                    fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
-            ),
+            ],
           ),
-          const SizedBox(height: 24),
-          _buildInfoCard(
-            label: 'Username',
-            value: _username(),
-            icon: AppIcons.email,
-          ),
-          const SizedBox(height: 12),
-          _buildInfoCard(
-            label: 'Email',
-            value: _email(),
-            icon: AppIcons.mail,
-          ),
-          if (_error != null) ...[
-            const SizedBox(height: 16),
-            Text(
-              _error!,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.redAccent,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ],
+        ),
       ),
     );
   }

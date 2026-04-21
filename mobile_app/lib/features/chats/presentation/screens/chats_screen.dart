@@ -266,11 +266,22 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
       return const ChatsEmptyState();
     }
 
-    return ChatsList(
-      items: items,
-      embedded: widget.embedded,
-      onRefresh: () => _controller.refresh(),
-      onTap: _openChatFromItem,
+    return NotificationListener<ScrollNotification>(
+      onNotification: (ScrollNotification n) {
+        if (n is ScrollUpdateNotification) {
+          final m = n.metrics;
+          if (m.pixels >= m.maxScrollExtent - 140) {
+            unawaited(_controller.loadMoreChats());
+          }
+        }
+        return false;
+      },
+      child: ChatsList(
+        items: items,
+        embedded: widget.embedded,
+        onRefresh: () => _controller.refresh(),
+        onTap: _openChatFromItem,
+      ),
     );
   }
 
@@ -302,7 +313,6 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             ChatsAppBar(
-                              chatCount: state.allChats.length,
                               onOpenSettings: _openSettings,
                               onLogout: _logout,
                             ),

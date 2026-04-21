@@ -35,6 +35,16 @@ abstract final class AppSizes {
 /// Узкая колонка для форм на широком окне (десктоп / большое окно).
 abstract final class AppBreakpoints {
   static const double authPanelMaxWidth = 420;
+
+  /// Вторичные экраны (поиск контакта, подстраницы).
+  static const double contentMaxWidth = 520;
+
+  /// Формы с длинными списками (создание группы).
+  static const double formPanelMaxWidth = 560;
+
+  /// Карточные экраны (настройки).
+  static const double settingsPanelMaxWidth = 440;
+
   static const double wideLayoutMinWidth = 720;
 }
 

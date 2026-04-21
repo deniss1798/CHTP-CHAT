@@ -18,6 +18,33 @@ class MessagesRepository:
             .all()
         )
 
+    def list_latest_for_chat(self, chat_id: int, limit: int) -> list[Message]:
+        """Последние [limit] сообщений по возрастанию id."""
+        rows = (
+            self._db.query(Message)
+            .filter(Message.chat_id == chat_id)
+            .order_by(Message.id.desc())
+            .limit(limit)
+            .all()
+        )
+        return list(reversed(rows))
+
+    def list_older_than(
+        self, chat_id: int, before_message_id: int, limit: int
+    ) -> list[Message]:
+        """Сообщения старее before_message_id (id < …), по возрастанию id."""
+        rows = (
+            self._db.query(Message)
+            .filter(
+                Message.chat_id == chat_id,
+                Message.id < before_message_id,
+            )
+            .order_by(Message.id.desc())
+            .limit(limit)
+            .all()
+        )
+        return list(reversed(rows))
+
     def list_by_ids(self, ids: list[int]) -> list[Message]:
         if not ids:
             return []

@@ -1,9 +1,9 @@
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../app/theme/app_colors.dart';
-import '../../../../app/theme/app_shadows.dart';
 import '../../../../app/theme/design_tokens.dart';
 import '../chat_detail_formatters.dart';
 import 'chat_detail_video_message_widget.dart';
@@ -28,32 +28,22 @@ class ChatDetailMessageContent extends StatelessWidget {
     final messageType = (message['message_type'] ?? 'text').toString();
     final mediaUrl = (message['media_url'] ?? '').toString().trim();
 
+    if (messageType == 'voice' && mediaUrl.isNotEmpty) {
+      return _VoiceMessageBar(url: mediaUrl);
+    }
+
     if (messageType == 'document' && mediaUrl.isNotEmpty) {
       return _buildDocumentCard(mediaUrl);
     }
 
     if (messageType == 'video_note' && mediaUrl.isNotEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(3),
-        decoration: BoxDecoration(
-          gradient:
-              isMine ? AppGradients.selectedPanel : AppGradients.surfacePanel,
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: isMine
-                ? AppColors.accent.withAlpha(75)
-                : AppColors.strokeSoft,
-          ),
-          boxShadow: AppShadows.lift,
-        ),
-        child: SizedBox(
-          width: 220,
-          height: 220,
-          child: ChatDetailVideoMessageWidget(
-            url: mediaUrl,
-            isMine: isMine,
-            isVideoNote: true,
-          ),
+      return SizedBox(
+        width: 220,
+        height: 220,
+        child: ChatDetailVideoMessageWidget(
+          url: mediaUrl,
+          isMine: isMine,
+          isVideoNote: true,
         ),
       );
     }
@@ -64,46 +54,48 @@ class ChatDetailMessageContent extends StatelessWidget {
         onTap: () => onOpenFullscreenImage(mediaUrl),
         child: ConstrainedBox(
           constraints: const BoxConstraints(
-            maxWidth: 220,
-            maxHeight: 280,
+            maxWidth: 260,
+            maxHeight: 360,
           ),
-          child: _buildMediaFrame(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(AppRadius.lg),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: AspectRatio(
+              aspectRatio: 3 / 4,
               child: Image.network(
                 mediaUrl,
                 fit: BoxFit.cover,
+                width: double.infinity,
                 loadingBuilder: (context, child, progress) {
                   if (progress == null) return child;
-                  return Container(
-                    width: 220,
-                    height: 220,
-                    color: Colors.black.withAlpha(14),
-                    alignment: Alignment.center,
-                    child: SizedBox(
-                      width: 26,
-                      height: 26,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: AppColors.accent.withAlpha(220),
+                  return ColoredBox(
+                    color: AppColors.surfaceSoft,
+                    child: Center(
+                      child: SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.textMuted.withAlpha(200),
+                        ),
                       ),
                     ),
                   );
                 },
                 errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    width: 220,
-                    height: 160,
+                  return ColoredBox(
                     color: AppColors.surfaceSoft,
-                    alignment: Alignment.center,
-                    padding: const EdgeInsets.all(16),
-                    child: const Text(
-                      'РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ С„РѕС‚Рѕ',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
+                    child: const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Text(
+                          'Не удалось загрузить фото',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
                     ),
                   );
@@ -118,19 +110,17 @@ class ChatDetailMessageContent extends StatelessWidget {
     if (messageType == 'video' && mediaUrl.isNotEmpty) {
       return ConstrainedBox(
         constraints: const BoxConstraints(
-          maxWidth: 240,
-          maxHeight: 280,
+          maxWidth: 260,
+          maxHeight: 320,
         ),
-        child: _buildMediaFrame(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(AppRadius.lg),
-            child: ChatDetailVideoMessageWidget(
-              url: mediaUrl,
-              isMine: isMine,
-              isVideoNote: false,
-              onOpenFullscreen: () =>
-                  onOpenFullscreenVideo(mediaUrl, isVideoNote: false),
-            ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: ChatDetailVideoMessageWidget(
+            url: mediaUrl,
+            isMine: isMine,
+            isVideoNote: false,
+            onOpenFullscreen: () =>
+                onOpenFullscreenVideo(mediaUrl, isVideoNote: false),
           ),
         ),
       );
@@ -180,27 +170,23 @@ class ChatDetailMessageContent extends StatelessWidget {
               await launchUrl(uri, mode: LaunchMode.externalApplication);
             }
           },
-          borderRadius: BorderRadius.circular(AppRadius.lg),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              gradient:
-                  isMine ? AppGradients.selectedPanel : AppGradients.surfacePanel,
-              borderRadius: BorderRadius.circular(AppRadius.lg),
-              border: Border.all(
-                color: isMine
-                    ? AppColors.accent.withAlpha(75)
-                    : AppColors.strokeSoft,
-              ),
-              boxShadow: AppShadows.lift,
+              color: isMine
+                  ? AppColors.surfaceHighlight
+                  : AppColors.surfaceSoft,
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              border: Border.all(color: AppColors.strokeSoft),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
                   Icons.insert_drive_file_rounded,
-                  color: AppColors.accentBright,
-                  size: 28,
+                  color: AppColors.textSecondary,
+                  size: 26,
                 ),
                 const SizedBox(width: 10),
                 Flexible(
@@ -209,7 +195,7 @@ class ChatDetailMessageContent extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        name.isEmpty ? 'Р¤Р°Р№Р»' : name,
+                        name.isEmpty ? 'Файл' : name,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -244,19 +230,73 @@ class ChatDetailMessageContent extends StatelessWidget {
     );
   }
 
-  Widget _buildMediaFrame({required Widget child}) {
-    return Container(
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        gradient: isMine ? AppGradients.selectedPanel : AppGradients.surfacePanel,
-        borderRadius: BorderRadius.circular(AppRadius.xl),
-        border: Border.all(
-          color:
-              isMine ? AppColors.accent.withAlpha(75) : AppColors.strokeSoft,
+}
+
+class _VoiceMessageBar extends StatefulWidget {
+  const _VoiceMessageBar({
+    required this.url,
+  });
+
+  final String url;
+
+  @override
+  State<_VoiceMessageBar> createState() => _VoiceMessageBarState();
+}
+
+class _VoiceMessageBarState extends State<_VoiceMessageBar> {
+  final AudioPlayer _player = AudioPlayer();
+  PlayerState _playerState = PlayerState.stopped;
+
+  @override
+  void initState() {
+    super.initState();
+    _player.onPlayerStateChanged.listen((PlayerState s) {
+      if (mounted) {
+        setState(() => _playerState = s);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _player.dispose();
+    super.dispose();
+  }
+
+  Future<void> _toggle() async {
+    if (_playerState == PlayerState.playing) {
+      await _player.stop();
+    } else {
+      await _player.play(UrlSource(widget.url));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          onPressed: _toggle,
+          icon: Icon(
+            _playerState == PlayerState.playing
+                ? Icons.stop_rounded
+                : Icons.play_arrow_rounded,
+            color: AppColors.textPrimary,
+            size: 28,
+          ),
         ),
-        boxShadow: AppShadows.lift,
-      ),
-      child: child,
+        const SizedBox(width: 4),
+        const Text(
+          'Голосовое',
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 }
+

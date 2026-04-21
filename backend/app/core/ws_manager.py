@@ -1,5 +1,6 @@
 import logging
 from collections import defaultdict
+from collections.abc import Callable
 
 from fastapi import WebSocket
 
@@ -68,6 +69,16 @@ class ConnectionManager:
         conns = list(self.active_connections.get(chat_id, []))
         for connection, _ in conns:
             await self._send_json_safe(chat_id, connection, message)
+
+    async def broadcast_personalized(
+        self,
+        chat_id: int,
+        message_builder: Callable[[int], dict],
+    ) -> None:
+        conns = list(self.active_connections.get(chat_id, []))
+        for ws, uid in conns:
+            msg = message_builder(uid)
+            await self._send_json_safe(chat_id, ws, msg)
 
     async def broadcast_to_others(
         self,

@@ -1,5 +1,9 @@
+from sqlalchemy.orm import Session
+
+from app.application.messages.reaction_service import reaction_groups_for_messages
 from app.application.realtime.ws_event_names import (
     WS_EVENT_MESSAGE_DELETED,
+    WS_EVENT_MESSAGE_REACTIONS_UPDATED,
     WS_EVENT_MESSAGE_UPDATED,
     WS_TYPE_NEW_MESSAGE,
     WS_TYPE_READ_RECEIPT,
@@ -47,3 +51,21 @@ async def publish_read_receipt(
             "last_read_message_id": last_read_message_id,
         },
     )
+
+
+async def publish_message_reactions_updated(
+    chat_id: int,
+    message_id: int,
+    db: Session,
+) -> None:
+    def build(uid: int) -> dict:
+        rmap = reaction_groups_for_messages(db, [message_id], uid)
+        groups = rmap.get(message_id, [])
+        return {
+            "event": WS_EVENT_MESSAGE_REACTIONS_UPDATED,
+            "message_id": message_id,
+            "chat_id": chat_id,
+            "reactions": [g.model_dump() for g in groups],
+        }
+
+    await manager.broadcast_personalized(chat_id, build)
