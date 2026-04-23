@@ -37,4 +37,14 @@ class AppColors {
   static const Color strokeSoft = Color(0x14FFFFFF);
   static const Color strokeMedium = Color(0x1FFFFFFF);
   static const Color strokeAccent = Color(0x4D4A2A18);
+
+  /// Боковая панель (макет десктопа): чистый чёрный, активная «таблетка».
+  static const Color navRailBackground = Color(0xFF000000);
+  static const Color navRailActivePill = Color(0xFF2C1A0A);
+  /// Синхрон с [accent]: насыщенный оранжевый, без «золотисто-жёлтого» #FF8C00.
+  static const Color navRailActiveAccent = accent;
+  static const Color navRailInactive = Color(0xFF8E8E8E);
+
+  /// Карточка чата и неактивные чипы (макет: ~#1A1A1A).
+  static const Color chatListCard = Color(0xFF1A1A1A);
 }

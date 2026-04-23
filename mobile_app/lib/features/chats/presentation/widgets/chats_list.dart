@@ -11,12 +11,14 @@ class ChatsList extends StatelessWidget {
     required this.embedded,
     required this.onRefresh,
     required this.onTap,
+    this.bottomPadding,
   });
 
   final List<ChatListItemModel> items;
   final bool embedded;
   final Future<void> Function() onRefresh;
   final ValueChanged<ChatListItemModel> onTap;
+  final double? bottomPadding;
 
   @override
   Widget build(BuildContext context) {
@@ -28,7 +30,7 @@ class ChatsList extends StatelessWidget {
           embedded ? 12 : 20,
           0,
           embedded ? 12 : 20,
-          embedded ? 96 : 110,
+          bottomPadding ?? (embedded ? 96 : 110),
         ),
         itemCount: items.length,
         separatorBuilder: (_, __) => const SizedBox(height: 10),

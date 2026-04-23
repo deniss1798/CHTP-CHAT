@@ -71,14 +71,16 @@ class AppTheme {
       highlightColor: AppColors.textPrimary.withAlpha(10),
       textTheme: baseTextTheme,
       colorScheme: colorScheme,
-      pageTransitionsTheme: PageTransitionsTheme(
+      // Мобильные: лёгкий fade (меньше лагов, чем cupertino / fade-up);
+      // десктоп: прежние плавные переходы.
+      pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
-          TargetPlatform.android: const FadeUpwardsPageTransitionsBuilder(),
-          TargetPlatform.linux: const FadeUpwardsPageTransitionsBuilder(),
-          TargetPlatform.windows: const FadeUpwardsPageTransitionsBuilder(),
-          TargetPlatform.macOS: const CupertinoPageTransitionsBuilder(),
-          TargetPlatform.iOS: const CupertinoPageTransitionsBuilder(),
-          TargetPlatform.fuchsia: const FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.android: FadeForwardsPageTransitionsBuilder(),
+          TargetPlatform.fuchsia: FadeForwardsPageTransitionsBuilder(),
+          TargetPlatform.iOS: FadeForwardsPageTransitionsBuilder(),
+          TargetPlatform.linux: FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
         },
       ),
       iconTheme: const IconThemeData(

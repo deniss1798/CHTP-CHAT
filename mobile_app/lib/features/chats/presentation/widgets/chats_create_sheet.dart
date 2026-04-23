@@ -9,73 +9,165 @@ import '../../../../app/widgets/app_surface.dart';
 class ChatsCreateSheet {
   const ChatsCreateSheet._();
 
+  static const double _wideBreakpoint = 480;
+
   static Future<String?> show(BuildContext context) {
+    final w = MediaQuery.sizeOf(context).width;
+    if (w >= _wideBreakpoint) {
+      return showDialog<String>(
+        context: context,
+        barrierColor: Colors.black.withValues(alpha: 0.6),
+        builder: (ctx) {
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: 400,
+                minWidth: 320,
+              ),
+              child: const _ChatsCreateBody(isDialog: true),
+            ),
+          );
+        },
+      );
+    }
     return showModalBottomSheet<String>(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
       ),
       builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-            child: AppSurface(
-              tone: AppSurfaceTone.elevated,
-              radius: AppRadius.xxl,
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 22),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 44,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: AppColors.textMuted.withAlpha(140),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Новый чат',
-                    style: TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  _CreateChatOption(
-                    icon: AppIcons.person,
-                    title: 'Личный',
-                    subtitle: 'С одним собеседником',
-                    onTap: () => Navigator.of(context).pop('private'),
-                  ),
-                  const SizedBox(height: 10),
-                  _CreateChatOption(
-                    icon: AppIcons.group,
-                    title: 'Группа',
-                    subtitle: 'Несколько участников',
-                    onTap: () => Navigator.of(context).pop('group'),
-                  ),
-                ],
+        return const _ChatsCreateBody(isDialog: false);
+      },
+    );
+  }
+}
+
+class _ChatsCreateBody extends StatelessWidget {
+  const _ChatsCreateBody({required this.isDialog});
+
+  final bool isDialog;
+
+  @override
+  Widget build(BuildContext context) {
+    final child = AppSurface(
+      tone: AppSurfaceTone.elevated,
+      radius: AppRadius.xxl,
+      padding: EdgeInsets.fromLTRB(
+        20,
+        isDialog ? 18 : 12,
+        20,
+        22,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (!isDialog) ...[
+            Center(
+              child: Container(
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.textMuted.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+          const _Header(),
+          const SizedBox(height: 8),
+          _CreateChatOption(
+            selected: true,
+            icon: AppIcons.person,
+            title: 'Личный',
+            subtitle: 'С одним собеседником',
+            onTap: () => Navigator.of(context).pop('private'),
+          ),
+          const SizedBox(height: 10),
+          _CreateChatOption(
+            selected: false,
+            icon: AppIcons.group,
+            title: 'Группа',
+            subtitle: 'Несколько участников',
+            onTap: () => Navigator.of(context).pop('group'),
+          ),
+        ],
+      ),
+    );
+
+    if (isDialog) {
+      return Material(
+        color: Colors.transparent,
+        child: child,
+      );
+    }
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: child,
+      ),
+    );
+  }
+}
+
+class _Header extends StatelessWidget {
+  const _Header();
+
+  @override
+  Widget build(BuildContext context) {
+    const titleStyle = TextStyle(
+      color: AppColors.textPrimary,
+      fontSize: 20,
+      fontWeight: FontWeight.w800,
+      letterSpacing: -0.2,
+    );
+    return Row(
+      children: [
+        const SizedBox(
+          width: 40,
+          height: 40,
+        ),
+        const Expanded(
+          child: Text(
+            'Новый чат',
+            textAlign: TextAlign.center,
+            style: titleStyle,
+          ),
+        ),
+        SizedBox(
+          width: 40,
+          height: 40,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => Navigator.of(context).pop(),
+              customBorder: const CircleBorder(),
+              child: const Icon(
+                AppIcons.close,
+                color: AppColors.textSecondary,
+                size: 22,
               ),
             ),
           ),
-        );
-      },
+        ),
+      ],
     );
   }
 }
 
 class _CreateChatOption extends StatelessWidget {
   const _CreateChatOption({
+    required this.selected,
     required this.icon,
     required this.title,
     required this.subtitle,
     required this.onTap,
   });
 
+  final bool selected;
   final IconData icon;
   final String title;
   final String subtitle;
@@ -90,15 +182,16 @@ class _CreateChatOption extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppRadius.xl),
         child: AppSurface(
           radius: AppRadius.xl,
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          shadow: AppShadows.lift,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          borderColor: selected ? AppColors.accent : AppColors.strokeSoft,
+          shadow: null,
           child: Row(
             children: [
               Container(
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  gradient: AppGradients.accentPanel,
+                  color: AppColors.accent,
                   borderRadius: BorderRadius.circular(AppRadius.md),
                   boxShadow: AppShadows.primaryButton,
                 ),
@@ -120,6 +213,7 @@ class _CreateChatOption extends StatelessWidget {
                         color: AppColors.textPrimary,
                         fontSize: 16,
                         fontWeight: FontWeight.w800,
+                        letterSpacing: -0.2,
                       ),
                     ),
                     const SizedBox(height: 6),

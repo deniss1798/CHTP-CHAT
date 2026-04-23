@@ -74,8 +74,9 @@ class ChatDetailReplyQuote extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color:
-                              isMine ? AppColors.accentBright : AppColors.accent,
+                          color: isMine
+                              ? Colors.white.withValues(alpha: 0.95)
+                              : AppColors.accent,
                           fontSize: 12,
                           fontWeight: FontWeight.w800,
                         ),
@@ -85,8 +86,10 @@ class ChatDetailReplyQuote extends StatelessWidget {
                         preview,
                         maxLines: 3,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.textSecondary,
+                        style: TextStyle(
+                          color: isMine
+                              ? Colors.white.withValues(alpha: 0.8)
+                              : AppColors.textSecondary,
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
                           height: 1.25,

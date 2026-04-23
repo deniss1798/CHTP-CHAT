@@ -36,8 +36,13 @@ def list_chat_messages(
     else:
         page_rows = repo.list_older_than(chat_id, before_message_id, lim + 1)
 
+    # page_rows в порядке id по возрастанию: при lim+1 строке «лишняя» — самая старая
+    # в окне (для has_more). Срез [:lim] ошибочно отбрасывал самую новую строку.
     has_more = len(page_rows) > lim
-    messages = page_rows[:lim]
+    if len(page_rows) > lim:
+        messages = page_rows[-lim:]
+    else:
+        messages = page_rows
     messages = apply_private_media_urls(messages)
 
     reply_ids = [message.reply_to_message_id for message in messages if message.reply_to_message_id]

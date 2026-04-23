@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +8,7 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_icons.dart';
 import '../../../../app/theme/app_shadows.dart';
 import '../../../../app/theme/design_tokens.dart';
+import '../../../../app/widgets/app_content_frame.dart';
 import '../../../../app/widgets/app_screen_background.dart';
 import '../../../../app/widgets/app_surface.dart';
 import '../../../../core/network/api_client.dart';
@@ -14,7 +16,18 @@ import '../../data/services/create_chat_service.dart';
 import '../../data/services/users_service.dart';
 
 class UserPickerScreen extends StatefulWidget {
-  const UserPickerScreen({super.key});
+  const UserPickerScreen({
+    super.key,
+    this.embedded = false,
+    this.onPrivateChatCreated,
+  });
+
+  /// Во вкладке «Контакты» [MessengerDesktopShell]: без кнопки «Назад».
+  final bool embedded;
+
+  /// Если [embedded], вместо [Navigator.pop] открываем чат в основной колонке.
+  final void Function({required int chatId, required String title})?
+      onPrivateChatCreated;
 
   @override
   State<UserPickerScreen> createState() => _UserPickerScreenState();
@@ -250,8 +263,16 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
 
       if (!mounted) return;
 
+      final id = chatId is int ? chatId : int.tryParse(chatId.toString());
+      if (id == null) return;
+
+      if (widget.embedded && widget.onPrivateChatCreated != null) {
+        widget.onPrivateChatCreated!(chatId: id, title: username);
+        return;
+      }
+
       Navigator.of(context).pop({
-        'chat_id': chatId,
+        'chat_id': id,
         'chat_title': username,
       });
     } catch (e) {
@@ -321,17 +342,7 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
 
     if (query.isEmpty) {
       return const Center(
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 32),
-          child: Text(
-            'Введите username, чтобы найти пользователя',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 16,
-            ),
-          ),
-        ),
+        child: _UserSearchEmptyState(),
       );
     }
 
@@ -439,19 +450,22 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
                 padding: const EdgeInsets.fromLTRB(8, 14, 16, 4),
                 child: Row(
                   children: [
-                    AppIconButtonSurface(
-                      icon: AppIcons.back,
-                      tooltip: 'Назад',
-                      onTap: () => Navigator.of(context).pop(),
-                    ),
-                    const SizedBox(width: 10),
-                    const Expanded(
+                    if (!widget.embedded) ...[
+                      AppIconButtonSurface(
+                        icon: AppIcons.back,
+                        tooltip: 'Назад',
+                        onTap: () => Navigator.of(context).pop(),
+                      ),
+                      const SizedBox(width: 10),
+                    ],
+                    Expanded(
                       child: Text(
-                        'Кому написать',
-                        style: TextStyle(
+                        widget.embedded ? 'Контакты' : 'Кому написать',
+                        style: const TextStyle(
                           color: AppColors.textPrimary,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.4,
                         ),
                       ),
                     ),
@@ -459,50 +473,241 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(
-                      maxWidth: AppBreakpoints.contentMaxWidth,
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
+                child: AppContentFrame(
+                  maxWidth: AppBreakpoints.contentMaxWidth,
+                  padding: EdgeInsets.zero,
+                  child: TextField(
+                    controller: _searchController,
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
                     ),
-                    child: AppSurface(
-                      radius: AppRadius.xl,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 4,
-                        vertical: 2,
+                    decoration: InputDecoration(
+                      hintText: 'Поиск по имени',
+                      hintStyle: TextStyle(
+                        color: AppColors.textSecondary.withValues(alpha: 0.8),
+                        fontWeight: FontWeight.w500,
                       ),
-                      shadow: AppShadows.lift,
-                      child: TextField(
-                        controller: _searchController,
-                        style: const TextStyle(color: AppColors.textPrimary),
-                        decoration: InputDecoration(
-                          hintText: 'Поиск по имени',
-                          hintStyle: const TextStyle(color: AppColors.textMuted),
-                          filled: true,
-                          fillColor: Colors.transparent,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 14,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide.none,
-                          ),
-                          prefixIcon: const Icon(
-                            AppIcons.search,
-                            color: AppColors.textMuted,
-                          ),
+                      filled: true,
+                      fillColor: AppColors.chatListCard,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 16,
+                      ),
+                      prefixIcon: const Icon(
+                        AppIcons.search,
+                        color: AppColors.textMuted,
+                        size: 22,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(28),
+                        borderSide: const BorderSide(
+                          color: AppColors.accentBorder,
+                          width: 1,
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(28),
+                        borderSide: BorderSide(
+                          color: AppColors.accent.withValues(alpha: 0.35),
+                          width: 1,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(28),
+                        borderSide: const BorderSide(
+                          color: AppColors.accent,
+                          width: 1.2,
                         ),
                       ),
                     ),
                   ),
                 ),
               ),
-              Expanded(child: _buildBody()),
+              Expanded(
+                child: AppContentFrame(
+                  maxWidth: AppBreakpoints.contentMaxWidth,
+                  child: _buildBody(),
+                ),
+              ),
             ],
           ),
         ),
       ),
     );
   }
+}
+
+class _UserSearchEmptyState extends StatelessWidget {
+  const _UserSearchEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 8),
+          SizedBox(
+            width: 260,
+            height: 220,
+            child: CustomPaint(
+              painter: const _UserSearchEmptyDecorPainter(),
+              child: const Center(
+                child: _UserSearchGlowingOrb(),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Введите username, чтобы найти пользователя',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 16.5,
+              fontWeight: FontWeight.w800,
+              height: 1.35,
+              letterSpacing: -0.2,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Начните вводить имя пользователя в строке поиска выше. Мы покажем подходящие результаты.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppColors.textSecondary.withValues(alpha: 0.95),
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              height: 1.45,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _UserSearchGlowingOrb extends StatelessWidget {
+  const _UserSearchGlowingOrb();
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      alignment: Alignment.center,
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          width: 200,
+          height: 200,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.accent.withValues(alpha: 0.32),
+                blurRadius: 60,
+                spreadRadius: 2,
+              ),
+            ],
+          ),
+        ),
+        Container(
+          width: 118,
+          height: 118,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: AppColors.accent.withValues(alpha: 0.12),
+            border: Border.all(
+              color: AppColors.accent.withValues(alpha: 0.5),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.accent.withValues(alpha: 0.2),
+                blurRadius: 18,
+                spreadRadius: 0,
+              ),
+            ],
+          ),
+          child: const Icon(
+            Icons.person_search_rounded,
+            size: 60,
+            color: AppColors.accent,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _UserSearchEmptyDecorPainter extends CustomPainter {
+  const _UserSearchEmptyDecorPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = Offset(size.width / 2, size.height / 2);
+    for (var i = 0; i < 3; i++) {
+      final r = 58.0 + i * 26.0;
+      _paintDashedRing(
+        canvas,
+        c,
+        r,
+        AppColors.textSecondary.withValues(alpha: 0.18 - i * 0.03),
+      );
+    }
+
+    final marks = [
+      (0.35, 72.0),
+      (1.25, 78.0),
+      (2.1, 68.0),
+    ];
+    for (var i = 0; i < marks.length; i++) {
+      final a = marks[i].$1;
+      final rad = marks[i].$2;
+      final col = [
+        AppColors.accent,
+        AppColors.textSecondary,
+        AppColors.textMuted,
+      ][i];
+      final p = Offset(
+        c.dx + rad * math.cos(a),
+        c.dy + rad * math.sin(a),
+      );
+      canvas.drawCircle(
+        p,
+        2.4,
+        Paint()..color = col.withValues(alpha: 0.45),
+      );
+    }
+  }
+
+  void _paintDashedRing(Canvas canvas, Offset center, double r, Color color) {
+    const dash = 5.0;
+    const gap = 4.0;
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.1
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    var distance = 0.0;
+    final circum = 2 * math.pi * r;
+    while (distance < circum) {
+      final startAngle = (distance / circum) * 2 * math.pi - math.pi / 2;
+      final endDist = math.min(distance + dash, circum);
+      final sweep = ((endDist - distance) / circum) * 2 * math.pi;
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: r),
+        startAngle,
+        sweep,
+        false,
+        paint,
+      );
+      distance = endDist + gap;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

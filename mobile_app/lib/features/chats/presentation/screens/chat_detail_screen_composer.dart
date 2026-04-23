@@ -472,7 +472,7 @@ mixin _ChatDetailComposerAndActionsLogic
       final padding = MediaQuery.paddingOf(context);
       const menuW = 300.0;
       final left = menuPosition.dx.clamp(8.0, size.width - menuW - 8);
-      final top = menuPosition.dy.clamp(padding.top + 8, size.height - 320);
+      final top = menuPosition.dy.clamp(padding.top + 8, size.height - 400);
 
       action = await showGeneralDialog<String>(
         context: context,
@@ -494,13 +494,11 @@ mixin _ChatDetailComposerAndActionsLogic
                 top: top,
                 width: menuW,
                 child: Material(
-                  color: AppColors.surface,
-                  elevation: 12,
-                  borderRadius: BorderRadius.circular(12),
-                  clipBehavior: Clip.antiAlias,
+                  color: Colors.transparent,
+                  elevation: 0,
                   child: ChatMessageActionsPanel(
                     message: message,
-                    currentUserId: _currentUserId,
+                    isMineMessage: _isMine(message),
                     onAction: (code) => Navigator.of(ctx).pop(code),
                   ),
                 ),
@@ -512,17 +510,22 @@ mixin _ChatDetailComposerAndActionsLogic
     } else {
       action = await showModalBottomSheet<String>(
         context: context,
-        backgroundColor: AppColors.surface,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
-        ),
-        builder: (ctx) => SafeArea(
-          child: ChatMessageActionsPanel(
-            message: message,
-            currentUserId: _currentUserId,
-            onAction: (code) => Navigator.of(ctx).pop(code),
-          ),
-        ),
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (ctx) {
+          return SafeArea(
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                child: ChatMessageActionsPanel(
+                  message: message,
+                  isMineMessage: _isMine(message),
+                  onAction: (code) => Navigator.of(ctx).pop(code),
+                ),
+              ),
+            ),
+          );
+        },
       );
     }
 
@@ -542,7 +545,7 @@ mixin _ChatDetailComposerAndActionsLogic
     }
 
     if (action != null && action.startsWith('react:')) {
-      final emoji = action.substring(6);
+      final emoji = action.substring('react:'.length);
       await _toggleReactionEmoji(message, emoji);
       return;
     }
@@ -604,64 +607,17 @@ mixin _ChatDetailComposerAndActionsLogic
 
     if (!mounted) return;
 
-    await showModalBottomSheet<void>(
+    final selected = await showForwardChatPickerSheet(
       context: context,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
-      ),
-      builder: (ctx) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Padding(
-                padding: EdgeInsets.fromLTRB(16, 14, 16, 8),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Переслать в…',
-                    style: TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
-              Flexible(
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: chats.length,
-                  itemBuilder: (context, index) {
-                    final chat = chats[index];
-                    final targetId = chat.id;
-                    final title = _titleForForwardChat(chat);
-                    final chatType = chat.type;
-
-                    return ListTile(
-                      title: Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      onTap: () async {
-                        Navigator.of(ctx).pop();
-                        await _forwardToChat(
-                          sourceId,
-                          targetId,
-                          title,
-                          chatType,
-                        );
-                      },
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+      chats: chats,
+      excludeChatId: widget.chatId,
+    );
+    if (selected == null) return;
+    await _forwardToChat(
+      sourceId,
+      selected.id,
+      _titleForForwardChat(selected),
+      selected.type,
     );
   }
 
@@ -725,31 +681,14 @@ mixin _ChatDetailComposerAndActionsLogic
   }
 
   Future<void> _confirmDeleteMessage(int messageId) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showMessengerConfirmDialog(
       context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          backgroundColor: AppColors.surface,
-          title: const Text('Удалить сообщение?'),
-          content: const Text('Это действие нельзя отменить.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('Отмена'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(true),
-              child: const Text(
-                'Удалить',
-                style: TextStyle(color: Colors.redAccent),
-              ),
-            ),
-          ],
-        );
-      },
+      title: 'Удалить сообщение?',
+      body: 'Это действие нельзя отменить.',
+      confirmLabel: 'Удалить',
     );
 
-    if (confirmed != true) return;
+    if (!confirmed) return;
 
     try {
       await _messagesService.deleteMessage(messageId);
@@ -863,6 +802,7 @@ mixin _ChatDetailComposerAndActionsLogic
     final messageId = ChatDetailMessageMaps.intFromDynamic(message['id']);
     if (messageId == null) return;
 
+    final emojiNorm = emoji.trim();
     var mine = false;
     final raw = message['reactions'];
     if (raw is List) {
@@ -873,12 +813,25 @@ mixin _ChatDetailComposerAndActionsLogic
         } else if (r is Map) {
           m = Map<String, dynamic>.from(r);
         }
-        if (m != null &&
-            m['emoji']?.toString() == emoji &&
-            m['reacted_by_me'] == true) {
+        if (m == null) continue;
+        if (m['emoji']?.toString().trim() != emojiNorm) continue;
+        if (m['reacted_by_me'] == true) {
           mine = true;
           break;
         }
+        final uid = _currentUserId;
+        if (uid != null) {
+          final idsRaw = m['reactor_user_ids'];
+          if (idsRaw is List) {
+            for (final x in idsRaw) {
+              if (ChatDetailMessageMaps.intFromDynamic(x) == uid) {
+                mine = true;
+                break;
+              }
+            }
+          }
+        }
+        if (mine) break;
       }
     }
 
@@ -1083,6 +1036,114 @@ mixin _ChatDetailComposerAndActionsLogic
           url: url,
           isVideoNote: isVideoNote,
         ),
+      ),
+    );
+  }
+
+  Future<void> _showDesktopComposerExtras() async {
+    if (!mounted) return;
+    if (_isUploadingChatAvatar || _isSendingDocument) return;
+
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(AppIcons.videocam, color: AppColors.accent),
+                  title: const Text('Видеосообщение'),
+                  onTap: () => Navigator.of(ctx).pop('video'),
+                ),
+                ListTile(
+                  leading: const Icon(
+                    Icons.mic_none_rounded,
+                    color: AppColors.accent,
+                  ),
+                  title: const Text('Голосовое'),
+                  onTap: () => Navigator.of(ctx).pop('voice'),
+                ),
+                const SizedBox(height: 4),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (!mounted || choice == null) return;
+    if (choice == 'video') {
+      await _openVideoNoteRecorder();
+    } else if (choice == 'voice') {
+      await _toggleVoiceRecording();
+    }
+  }
+
+  void _showInChatSearch() {
+    if (!mounted) return;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: AppColors.surfaceRaised,
+          title: const Text(
+            'Поиск в чате',
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          content: const Text(
+            'Поиск по истории сообщений появится в следующей версии.',
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Понятно'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showPrivateChatHeaderMenu() {
+    if (!mounted) return;
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        backgroundColor: AppColors.surfaceRaised,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        builder: (ctx) {
+          return SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  title: const Text('Уведомления о чате'),
+                  onTap: () => Navigator.of(ctx).pop(),
+                ),
+                ListTile(
+                  title: const Text('Пожаловаться…'),
+                  onTap: () => Navigator.of(ctx).pop(),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

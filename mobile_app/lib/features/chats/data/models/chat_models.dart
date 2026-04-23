@@ -107,6 +107,7 @@ class ChatSummary {
     this.lastMessageType,
     this.lastMessageAtRaw,
     this.lastMessageSenderId,
+    this.lastMessageSenderName,
     this.lastMessageId,
     required this.myLastReadMessageId,
     required this.unreadCount,
@@ -122,6 +123,7 @@ class ChatSummary {
   final String? lastMessageType;
   final String? lastMessageAtRaw;
   final int? lastMessageSenderId;
+  final String? lastMessageSenderName;
   final int? lastMessageId;
   final int myLastReadMessageId;
   final int unreadCount;
@@ -166,6 +168,9 @@ class ChatSummary {
       lastMessageSenderId: _asInt(
         raw['last_message_sender_id'] ?? raw['lastMessageSenderId'],
       ),
+      lastMessageSenderName: _asTrimmedString(
+        raw['last_message_sender_name'] ?? raw['lastMessageSenderName'],
+      ),
       lastMessageId: _asInt(raw['last_message_id'] ?? raw['lastMessageId']),
       myLastReadMessageId: _asInt(
             raw['my_last_read_message_id'] ?? raw['myLastReadMessageId'],
@@ -185,6 +190,7 @@ class ChatSummary {
     String? lastMessageType,
     String? lastMessageAtRaw,
     int? lastMessageSenderId,
+    String? lastMessageSenderName,
     int? lastMessageId,
     int? myLastReadMessageId,
     int? unreadCount,
@@ -200,6 +206,8 @@ class ChatSummary {
       lastMessageType: lastMessageType ?? this.lastMessageType,
       lastMessageAtRaw: lastMessageAtRaw ?? this.lastMessageAtRaw,
       lastMessageSenderId: lastMessageSenderId ?? this.lastMessageSenderId,
+      lastMessageSenderName:
+          lastMessageSenderName ?? this.lastMessageSenderName,
       lastMessageId: lastMessageId ?? this.lastMessageId,
       myLastReadMessageId: myLastReadMessageId ?? this.myLastReadMessageId,
       unreadCount: unreadCount ?? this.unreadCount,

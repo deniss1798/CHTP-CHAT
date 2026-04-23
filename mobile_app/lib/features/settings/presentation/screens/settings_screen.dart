@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_icons.dart';
-import '../../../../app/theme/app_shadows.dart';
 import '../../../../app/theme/design_tokens.dart';
 import '../../../../app/widgets/app_content_frame.dart';
 import '../../../../app/widgets/app_screen_background.dart';
@@ -15,12 +14,17 @@ import '../../../profile/data/services/profile_service.dart';
 import '../../../profile/presentation/screens/profile_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key});
+  const SettingsScreen({super.key, this.embedded = false});
+
+  /// Во вкладке [MessengerDesktopShell] без кнопки «Назад».
+  final bool embedded;
+
+  static const Color _dangerZoneIconBg = Color(0xFF3D1919);
+  static const Color _dangerText = Color(0xFFFF4B4B);
+  static const Color _dangerIcon = Color(0xFFFF4B4B);
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
     return Scaffold(
       backgroundColor: AppColors.background,
       body: AppScreenBackground(
@@ -39,125 +43,192 @@ class SettingsScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      AppIconButtonSurface(
-                        icon: AppIcons.back,
-                        tooltip: 'Назад',
-                        onTap: () => Navigator.of(context).pop(),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
+                      if (!embedded) ...[
+                        AppIconButtonSurface(
+                          icon: AppIcons.back,
+                          tooltip: 'Назад',
+                          onTap: () => Navigator.of(context).pop(),
+                        ),
+                        const SizedBox(width: 10),
+                      ],
+                      const Expanded(
                         child: Text(
                           'Настройки',
-                          style: textTheme.titleLarge?.copyWith(
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 28,
                             fontWeight: FontWeight.w800,
-                            letterSpacing: -0.3,
+                            letterSpacing: -0.4,
+                            height: 1.2,
                           ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: AppSpacing.xl),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Управляйте своим аккаунтом и безопасностью.',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  Text(
+                    'Аккаунт',
+                    style: TextStyle(
+                      color: AppColors.textSecondary.withValues(alpha: 0.9),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.4,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
                   AppSurface(
                     tone: AppSurfaceTone.elevated,
-                    radius: AppRadius.xxl,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.lg,
-                      vertical: AppSpacing.xl,
+                    radius: AppRadius.xl,
+                    padding: EdgeInsets.zero,
+                    child: _settingsTile(
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const ProfileScreen(),
+                          ),
+                        );
+                      },
+                      leading: Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: AppColors.accent,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        alignment: Alignment.center,
+                        child: const Icon(
+                          AppIcons.person,
+                          color: AppColors.textOnAccent,
+                          size: 24,
+                        ),
+                      ),
+                      title: 'Мой профиль',
+                      subtitle: 'Управление личными данными и профилем',
+                      titleColor: AppColors.textPrimary,
+                      subtitleColor: AppColors.textSecondary,
+                      trailing: Icon(
+                        AppIcons.chevronRight,
+                        color: AppColors.textSecondary.withValues(alpha: 0.6),
+                        size: 22,
+                      ),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        ListTile(
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.sm,
-                            vertical: 4,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppRadius.md),
-                          ),
-                          leading: Container(
-                            width: 42,
-                            height: 42,
-                            decoration: BoxDecoration(
-                              gradient: AppGradients.accentPanel,
-                              borderRadius:
-                                  BorderRadius.circular(AppRadius.md),
-                              boxShadow: AppShadows.lift,
-                            ),
-                            alignment: Alignment.center,
-                            child: const Icon(
-                              AppIcons.person,
-                              color: AppColors.textOnAccent,
-                            ),
-                          ),
-                          title: const Text(
-                            'Мой профиль',
-                            style: TextStyle(
-                              color: AppColors.textPrimary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          trailing: Icon(
-                            AppIcons.chevronRight,
-                            color: AppColors.textMuted.withAlpha(180),
-                          ),
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const ProfileScreen(),
-                              ),
-                            );
-                          },
+                  ),
+                  const SizedBox(height: 28),
+                  Text(
+                    'Опасная зона',
+                    style: TextStyle(
+                      color: AppColors.textSecondary.withValues(alpha: 0.9),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.4,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  AppSurface(
+                    tone: AppSurfaceTone.elevated,
+                    radius: AppRadius.xl,
+                    padding: EdgeInsets.zero,
+                    child: _settingsTile(
+                      onTap: () => _confirmDeleteAccount(context),
+                      leading: Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: _dangerZoneIconBg,
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          child: Divider(
-                            height: 1,
-                            color: AppColors.accentBorder.withAlpha(60),
-                          ),
+                        alignment: Alignment.center,
+                        child: const Icon(
+                          AppIcons.delete,
+                          color: _dangerIcon,
+                          size: 24,
                         ),
-                        ListTile(
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.sm,
-                            vertical: 4,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppRadius.md),
-                          ),
-                          leading: Container(
-                            width: 42,
-                            height: 42,
-                            decoration: BoxDecoration(
-                              color: Colors.redAccent.withAlpha(28),
-                              borderRadius:
-                                  BorderRadius.circular(AppRadius.md),
-                              border: Border.all(
-                                color: Colors.redAccent.withAlpha(70),
-                              ),
-                            ),
-                            alignment: Alignment.center,
-                            child: const Icon(
-                              AppIcons.deleteForever,
-                              color: Colors.redAccent,
-                            ),
-                          ),
-                          title: const Text(
-                            'Удалить аккаунт',
-                            style: TextStyle(
-                              color: Colors.redAccent,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          onTap: () => _confirmDeleteAccount(context),
-                        ),
-                      ],
+                      ),
+                      title: 'Удалить аккаунт',
+                      subtitle:
+                          'Безвозвратное удаление аккаунта и всех данных',
+                      titleColor: _dangerText,
+                      subtitleColor: AppColors.textSecondary,
+                      trailing: Icon(
+                        AppIcons.chevronRight,
+                        color: _dangerText.withValues(alpha: 0.9),
+                        size: 22,
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _settingsTile({
+    required Widget leading,
+    required String title,
+    String? subtitle,
+    required Color titleColor,
+    Color? subtitleColor,
+    required Widget trailing,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              leading,
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: titleColor,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        height: 1.25,
+                      ),
+                    ),
+                    if (subtitle != null && subtitle.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          color: subtitleColor ?? AppColors.textSecondary,
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w500,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              trailing,
+            ],
           ),
         ),
       ),
@@ -186,7 +257,7 @@ class SettingsScreen extends StatelessWidget {
             onPressed: () => Navigator.of(ctx).pop(true),
             child: const Text(
               'Удалить',
-              style: TextStyle(color: Colors.redAccent),
+              style: TextStyle(color: _dangerText),
             ),
           ),
         ],

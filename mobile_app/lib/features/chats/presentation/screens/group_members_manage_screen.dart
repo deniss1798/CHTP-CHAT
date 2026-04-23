@@ -5,10 +5,13 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_icons.dart';
 import '../../../../app/theme/app_shadows.dart';
 import '../../../../app/theme/design_tokens.dart';
+import '../../../../app/widgets/app_content_frame.dart';
 import '../../../../app/widgets/app_screen_background.dart';
 import '../../../../app/widgets/app_surface.dart';
 import '../../data/models/chat_models.dart';
 import '../../data/services/chats_service.dart';
+import '../widgets/chat_detail_avatar_widgets.dart';
+import '../widgets/messenger_styled_dialogs.dart';
 
 class GroupMembersManageScreen extends StatefulWidget {
   const GroupMembersManageScreen({
@@ -25,6 +28,16 @@ class GroupMembersManageScreen extends StatefulWidget {
   @override
   State<GroupMembersManageScreen> createState() =>
       _GroupMembersManageScreenState();
+}
+
+String _ruParticipantsWord(int n) {
+  final m100 = n % 100;
+  final m10 = n % 10;
+  if (m10 == 1 && m100 != 11) return 'участник';
+  if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 > 20)) {
+    return 'участника';
+  }
+  return 'участников';
 }
 
 class _GroupMembersManageScreenState extends State<GroupMembersManageScreen> {
@@ -64,33 +77,27 @@ class _GroupMembersManageScreenState extends State<GroupMembersManageScreen> {
 
   bool get _isCreator => widget.createdBy == widget.currentUserId;
 
-  Future<void> _remove(int userId, String username) async {
+  Future<void> _remove(
+    int userId,
+    String username, {
+    String? avatarUrl,
+  }) async {
     if (!_isCreator || userId == widget.currentUserId) return;
-    final ok = await showDialog<bool>(
+    final ok = await showMessengerConfirmDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        title: const Text(
-          'Удалить из группы?',
-          style: TextStyle(color: AppColors.textPrimary),
+      title: 'Удалить из группы?',
+      body: 'Удалить $username из группы?',
+      confirmLabel: 'Удалить',
+      contextHeader: Center(
+        child: ChatDetailSquareAvatar(
+          title: username,
+          avatarUrl: avatarUrl,
+          size: 48,
+          showOnlineDot: false,
         ),
-        content: Text(
-          'Удалить $username из группы?',
-          style: const TextStyle(color: AppColors.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Отмена'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Удалить'),
-          ),
-        ],
       ),
     );
-    if (ok != true || !mounted) return;
+    if (!ok || !mounted) return;
 
     setState(() => _busy = true);
     try {
@@ -124,36 +131,64 @@ class _GroupMembersManageScreenState extends State<GroupMembersManageScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final count = _members.length;
+    final sub = '$count ${_ruParticipantsWord(count)}';
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: AppScreenBackground(
         child: SafeArea(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                children: [
-                  AppIconButtonSurface(
-                    icon: AppIcons.back,
-                    tooltip: 'Назад',
-                    onTap: () => Navigator.of(context).pop(true),
-                  ),
-                  const SizedBox(width: 10),
-                  const Expanded(
-                    child: Text(
-                      'Участники',
-                      style: TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
+              AppContentFrame(
+                maxWidth: AppBreakpoints.wideLayoutMinWidth,
+                padding: const EdgeInsets.fromLTRB(8, 10, 20, 14),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    AppIconButtonSurface(
+                      icon: AppIcons.back,
+                      tooltip: 'Назад',
+                      onTap: () => Navigator.of(context).pop(true),
+                    ),
+                    const SizedBox(width: 20),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            'Участники',
+                            style: TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.35,
+                              height: 1.2,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            sub,
+                            style: TextStyle(
+                              color: AppColors.textSecondary.withValues(
+                                alpha: 0.9,
+                              ),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              height: 1.2,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
               if (!_isCreator)
                 const Padding(
-                  padding: EdgeInsets.only(left: 20, right: 20, bottom: 8),
+                  padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
                   child: Text(
                     'Только создатель группы может удалять участников.',
                     style: TextStyle(
@@ -187,67 +222,92 @@ class _GroupMembersManageScreenState extends State<GroupMembersManageScreen> {
                               ],
                             ),
                           )
-                        : ListView.separated(
-                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                            itemCount: _members.length,
-                            separatorBuilder: (context, index) =>
-                                const SizedBox(height: 8),
-                            itemBuilder: (context, index) {
-                              final member = _members[index];
-                              final username = member.username;
-                              final email = member.email ?? '';
-                              final avatar = member.avatarUrl ?? '';
-                              final canRemove = _isCreator &&
-                                  member.id != widget.currentUserId &&
-                                  !_busy;
+                        : AppContentFrame(
+                            maxWidth: AppBreakpoints.wideLayoutMinWidth,
+                            child: ListView.separated(
+                              padding: const EdgeInsets.fromLTRB(
+                                4,
+                                0,
+                                4,
+                                24,
+                              ),
+                              itemCount: _members.length,
+                              separatorBuilder: (context, index) =>
+                                  const SizedBox(height: 10),
+                              itemBuilder: (context, index) {
+                                final member = _members[index];
+                                final username = member.username;
+                                final email = member.email ?? '';
+                                final avatar = member.avatarUrl ?? '';
+                                final canRemove = _isCreator &&
+                                    member.id != widget.currentUserId &&
+                                    !_busy;
 
-                              return AppSurface(
-                                radius: AppRadius.xl,
-                                padding: const EdgeInsets.all(14),
-                                shadow: AppShadows.lift,
-                                child: Row(
-                                  children: [
-                                    _buildAvatar(avatar, username),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            username,
-                                            style: const TextStyle(
-                                              color: AppColors.textPrimary,
-                                              fontWeight: FontWeight.w700,
-                                              fontSize: 16,
-                                            ),
-                                          ),
-                                          if (email.isNotEmpty)
+                                return AppSurface(
+                                  tone: AppSurfaceTone.elevated,
+                                  radius: AppRadius.xl,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 12,
+                                  ),
+                                  shadow: AppShadows.lift,
+                                  child: Row(
+                                    children: [
+                                      _buildAvatar(avatar, username),
+                                      const SizedBox(width: 14),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
                                             Text(
-                                              email,
+                                              username,
                                               style: const TextStyle(
-                                                color: AppColors.textSecondary,
-                                                fontSize: 13,
+                                                color: AppColors.textPrimary,
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: 16,
+                                                height: 1.25,
                                               ),
                                             ),
-                                        ],
-                                      ),
-                                    ),
-                                    if (canRemove)
-                                      IconButton(
-                                        onPressed: () => _remove(
-                                          member.id,
-                                          username,
+                                            if (email.isNotEmpty) ...[
+                                              const SizedBox(height: 6),
+                                              Text(
+                                                email,
+                                                style: TextStyle(
+                                                  color: AppColors
+                                                      .textSecondary
+                                                      .withValues(
+                                                    alpha: 0.95,
+                                                  ),
+                                                  fontSize: 13.5,
+                                                  fontWeight: FontWeight.w500,
+                                                  height: 1.3,
+                                                ),
+                                              ),
+                                            ],
+                                          ],
                                         ),
-                                        icon: const Icon(
-                                          AppIcons.personRemove,
-                                          color: Colors.redAccent,
-                                        ),
                                       ),
-                                  ],
-                                ),
-                              );
-                            },
+                                      if (canRemove)
+                                        IconButton(
+                                          tooltip: 'Исключить',
+                                          onPressed: () => _remove(
+                                            member.id,
+                                            username,
+                                            avatarUrl: member.avatarUrl,
+                                          ),
+                                          icon: const Icon(
+                                            AppIcons.personRemove,
+                                            color: AppColors.accent,
+                                            size: 24,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
                           ),
               ),
             ],
@@ -263,8 +323,8 @@ class _GroupMembersManageScreenState extends State<GroupMembersManageScreen> {
         borderRadius: BorderRadius.circular(14),
         child: Image.network(
           url,
-          width: 48,
-          height: 48,
+          width: 52,
+          height: 52,
           fit: BoxFit.cover,
           errorBuilder: (context, error, stackTrace) => _fallback(title),
         ),
@@ -276,11 +336,11 @@ class _GroupMembersManageScreenState extends State<GroupMembersManageScreen> {
   Widget _fallback(String title) {
     final ch = title.isNotEmpty ? title[0].toUpperCase() : '?';
     return Container(
-      width: 48,
-      height: 48,
+      width: 52,
+      height: 52,
       decoration: BoxDecoration(
         gradient: AppGradients.accentPanel,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         boxShadow: AppShadows.primaryButton,
       ),
       alignment: Alignment.center,
@@ -288,6 +348,7 @@ class _GroupMembersManageScreenState extends State<GroupMembersManageScreen> {
         ch,
         style: const TextStyle(
           color: AppColors.textOnAccent,
+          fontSize: 20,
           fontWeight: FontWeight.w800,
         ),
       ),

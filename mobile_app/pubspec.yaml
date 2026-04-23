@@ -32,7 +32,7 @@ dependencies:
   cryptography: ^2.9.0
   audioplayers: ^6.1.0
   path_provider: ^2.1.5
-  record: ^5.2.1
+  record: ^6.2.0
   flutter_linkify: ^6.0.0
   # 19+ тянет flutter_local_notifications_windows (FFI) — gen_snapshot падает на Windows AOT.
   flutter_local_notifications: ^18.0.1

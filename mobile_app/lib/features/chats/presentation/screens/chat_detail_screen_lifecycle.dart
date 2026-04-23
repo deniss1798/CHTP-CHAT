@@ -205,39 +205,16 @@ mixin _ChatDetailLifecycleLogic on _ChatDetailScreenStateBase, _ChatDetailStateH
   }
 
   Future<void> _showRenameGroupDialog() async {
-    final controller = TextEditingController(text: _chatTitle.trim());
-    final ok = await showDialog<bool>(
+    final titleForAvatar = _chatTitle.trim().isNotEmpty
+        ? _chatTitle.trim()
+        : widget.title;
+    final t = await showMessengerGroupRenameDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        title: const Text(
-          'Название группы',
-          style: TextStyle(color: AppColors.textPrimary),
-        ),
-        content: TextField(
-          controller: controller,
-          style: const TextStyle(color: AppColors.textPrimary),
-          decoration: const InputDecoration(
-            hintText: 'Название',
-            hintStyle: TextStyle(color: AppColors.textMuted),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-
-            child: const Text('Отмена'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Сохранить'),
-          ),
-        ],
-      ),
+      initialTitle: _chatTitle.trim(),
+      groupTitleForInitials: titleForAvatar,
+      avatarUrl: _chatAvatarUrl,
     );
-    if (ok != true || !mounted) return;
-    final t = controller.text.trim();
-    if (t.isEmpty) return;
+    if (t == null || !mounted) return;
     try {
       await _chatsService.updateGroupTitle(chatId: widget.chatId, title: t);
       await _loadChatDetails();
@@ -260,35 +237,25 @@ mixin _ChatDetailLifecycleLogic on _ChatDetailScreenStateBase, _ChatDetailStateH
   }
 
   Future<void> _leaveGroup() async {
-    final ok = await showDialog<bool>(
+    final titleForAvatar = _chatTitle.trim().isNotEmpty
+        ? _chatTitle.trim()
+        : widget.title;
+    final ok = await showMessengerConfirmDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        title: const Text(
-          'Покинуть группу?',
-          style: TextStyle(color: AppColors.textPrimary),
+      title: 'Покинуть группу?',
+      body: 'Вы больше не будете получать сообщения из этой группы.',
+      confirmLabel: 'Покинуть',
+      cancelLabel: 'Отмена',
+      contextHeader: Center(
+        child: ChatDetailSquareAvatar(
+          title: titleForAvatar,
+          avatarUrl: _chatAvatarUrl,
+          size: 52,
+          showOnlineDot: false,
         ),
-        content: const Text(
-          'Вы больше не будете получать сообщения из этой группы.',
-          style: TextStyle(color: AppColors.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Отмена'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(
-
-              'Покинуть',
-              style: TextStyle(color: Colors.orange.shade300),
-            ),
-          ),
-        ],
       ),
     );
-    if (ok != true || !mounted) return;
+    if (!ok || !mounted) return;
     try {
       await _chatsService.leaveGroup(chatId: widget.chatId);
       requestChatsListRefresh();

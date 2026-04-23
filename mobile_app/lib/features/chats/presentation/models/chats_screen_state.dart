@@ -1,4 +1,5 @@
 import '../../data/models/chat_models.dart';
+import 'chats_list_filter.dart';
 
 class ChatsScreenState {
   const ChatsScreenState({
@@ -6,6 +7,7 @@ class ChatsScreenState {
     this.error,
     this.currentUserId,
     this.searchQuery = '',
+    this.listFilter = ChatsListFilter.all,
     this.allChats = const <ChatSummary>[],
     this.filteredChats = const <ChatSummary>[],
     this.typingLabelByChatId = const <int, String>{},
@@ -17,6 +19,7 @@ class ChatsScreenState {
   final String? error;
   final int? currentUserId;
   final String searchQuery;
+  final ChatsListFilter listFilter;
   final List<ChatSummary> allChats;
   final List<ChatSummary> filteredChats;
   final Map<int, String> typingLabelByChatId;
@@ -30,6 +33,7 @@ class ChatsScreenState {
     int? currentUserId,
     bool keepCurrentUserId = true,
     String? searchQuery,
+    ChatsListFilter? listFilter,
     List<ChatSummary>? allChats,
     List<ChatSummary>? filteredChats,
     Map<int, String>? typingLabelByChatId,
@@ -44,6 +48,7 @@ class ChatsScreenState {
           ? (currentUserId ?? this.currentUserId)
           : currentUserId,
       searchQuery: searchQuery ?? this.searchQuery,
+      listFilter: listFilter ?? this.listFilter,
       allChats: allChats ?? this.allChats,
       filteredChats: filteredChats ?? this.filteredChats,
       typingLabelByChatId: typingLabelByChatId ?? this.typingLabelByChatId,

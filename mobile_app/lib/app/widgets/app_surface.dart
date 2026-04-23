@@ -84,6 +84,7 @@ class AppIconButtonSurface extends StatelessWidget {
     required this.icon,
     required this.onTap,
     this.size = AppSizes.topAction,
+    this.iconSize = AppSizes.iconMd,
     this.tooltip,
     this.active = false,
     this.iconColor,
@@ -92,6 +93,7 @@ class AppIconButtonSurface extends StatelessWidget {
   final IconData icon;
   final FutureOr<void> Function()? onTap;
   final double size;
+  final double iconSize;
   final String? tooltip;
   final bool active;
   final Color? iconColor;
@@ -124,7 +126,7 @@ class AppIconButtonSurface extends StatelessWidget {
             icon,
             color: iconColor ??
                 (active ? AppColors.accentBright : AppColors.textPrimary),
-            size: AppSizes.iconMd,
+            size: iconSize,
           ),
         ),
       ),

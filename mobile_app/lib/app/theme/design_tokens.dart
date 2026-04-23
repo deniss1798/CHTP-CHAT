@@ -46,6 +46,9 @@ abstract final class AppBreakpoints {
   static const double settingsPanelMaxWidth = 440;
 
   static const double wideLayoutMinWidth = 720;
+
+  /// Два столбца на экране входа: форма слева, визуал справа.
+  static const double authSplitLayoutMinWidth = 900;
 }
 
 /// Почти плоский фон: лёгкий градиент вниз, без «цветных» полос.

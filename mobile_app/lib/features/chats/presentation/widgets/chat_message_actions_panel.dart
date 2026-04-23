@@ -1,22 +1,32 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+    show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_icons.dart';
-import '../chat_detail_message_maps.dart';
-
-/// Быстрые реакции — верхняя полоса как в Telegram.
-const List<String> kDefaultQuickReactionEmojis = [
-  '👍',
+/// Быстрые реакции: первый ряд как в макете, остальные — в развёрнутой сетке.
+const List<String> kReactionEmojiPalette = [
   '❤️',
+  '🤝',
+  '😊',
   '🔥',
+  '👍',
+  '🤯',
   '😁',
   '😢',
+  '👎',
   '🙏',
   '💯',
+  '🫡',
 ];
 
-/// Один тап по сообщению на телефоне / узком вебе открывает меню; на десктопе — только ПКМ.
+const List<String> kDefaultQuickReactionEmojis = kReactionEmojiPalette;
+
+const int kCollapsedReactionSlots = 5;
+
+const double _menuRadius = 22;
+const double _reactionCellRadius = 12;
+
 bool primaryTapOpensMessageMenu(BuildContext context) {
   if (kIsWeb) {
     return MediaQuery.sizeOf(context).shortestSide < 600;
@@ -25,119 +35,287 @@ bool primaryTapOpensMessageMenu(BuildContext context) {
       defaultTargetPlatform == TargetPlatform.iOS;
 }
 
-/// Панель действий: полоса реакций + разделитель + пункты меню (как в Telegram).
-class ChatMessageActionsPanel extends StatelessWidget {
+class ChatMessageActionsPanel extends StatefulWidget {
   const ChatMessageActionsPanel({
     super.key,
     required this.message,
-    required this.currentUserId,
+    required this.isMineMessage,
     required this.onAction,
   });
 
   final Map<String, dynamic> message;
-  final int? currentUserId;
+  final bool isMineMessage;
   final ValueChanged<String> onAction;
 
   @override
+  State<ChatMessageActionsPanel> createState() =>
+      _ChatMessageActionsPanelState();
+}
+
+class _ChatMessageActionsPanelState extends State<ChatMessageActionsPanel> {
+  bool _reactionsExpanded = false;
+
+  static const Color _reactionKeyBg = AppColors.chatListCard;
+
+  @override
   Widget build(BuildContext context) {
-    final senderId = ChatDetailMessageMaps.intFromDynamic(message['sender_id']);
-    final isMine =
-        currentUserId != null && senderId != null && senderId == currentUserId;
+    final messageType = (widget.message['message_type'] ?? 'text').toString();
+    final text = (widget.message['text'] ?? '').toString().trim();
+    final mt = messageType.toLowerCase().trim();
 
-    final messageType = (message['message_type'] ?? 'text').toString();
-    final text = (message['text'] ?? '').toString().trim();
+    final items = <Widget>[];
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    void addTile(
+      IconData icon,
+      String label,
+      String code, {
+      bool isDestructive = false,
+    }) {
+      items.add(
+        _actionTile(
+          icon: icon,
+          label: label,
+          onTap: () => widget.onAction(code),
+          isDestructive: isDestructive,
+        ),
+      );
+    }
+
+    items.add(
+      Padding(
+        padding: const EdgeInsets.fromLTRB(10, 12, 10, 10),
+        child: _reactionSection(),
+      ),
+    );
+    items.add(_menuLine());
+    addTile(AppIcons.reply, 'Ответить', 'reply');
+    items.add(_menuLine());
+    addTile(Icons.forward_rounded, 'Переслать', 'forward');
+    if (text.isNotEmpty) {
+      items.add(_menuLine());
+      addTile(AppIcons.copy, 'Копировать', 'copy');
+    }
+    if (widget.isMineMessage && text.isNotEmpty && mt == 'text') {
+      items.add(_menuLine());
+      addTile(AppIcons.edit, 'Изменить', 'edit');
+    }
+    if (widget.isMineMessage) {
+      items.add(_menuLine());
+      addTile(
+        AppIcons.delete,
+        'Удалить',
+        'delete',
+        isDestructive: true,
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0D0D0D),
+        borderRadius: BorderRadius.circular(_menuRadius),
+        border: Border.all(
+          color: AppColors.accent.withValues(alpha: 0.5),
+          width: 1.1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.accent.withValues(alpha: 0.22),
+            blurRadius: 20,
+            spreadRadius: 0,
+            offset: const Offset(0, 4),
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.5),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+            spreadRadius: -4,
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ...items,
+          const SizedBox(height: 4),
+        ],
+      ),
+    );
+  }
+
+  /// Реакции (без обёртки-контейнера: она в [build]).
+  Widget _reactionSection() {
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 150),
+      curve: Curves.easeOutCubic,
+      alignment: Alignment.topCenter,
+      child: _reactionsExpanded ? _reactionsWrap() : _reactionsCollapsedRow(),
+    );
+  }
+
+  Widget _reactionsCollapsedRow() {
+    final palette = kReactionEmojiPalette;
+    final n = palette.length;
+    final showToggle = n > kCollapsedReactionSlots;
+    final visible = showToggle ? kCollapsedReactionSlots : n;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(10, 12, 10, 10),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                for (final e in kDefaultQuickReactionEmojis) ...[
-                  Material(
-                    color: AppColors.surfaceSoft,
-                    borderRadius: BorderRadius.circular(22),
-                    child: InkWell(
-                      onTap: () => onAction('react:$e'),
-                      borderRadius: BorderRadius.circular(22),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        child: Text(e, style: const TextStyle(fontSize: 22)),
-                      ),
+        for (var i = 0; i < visible; i++)
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: Center(
+                child: _reactionCell(
+                  onTap: () => widget.onAction('react:${palette[i]}'),
+                  child: Center(
+                    child: Text(
+                      palette[i],
+                      style: const TextStyle(fontSize: 21, height: 1.1),
                     ),
                   ),
-                  const SizedBox(width: 6),
-                ],
-              ],
+                ),
+              ),
             ),
           ),
-        ),
-        const Divider(height: 1),
-        _tile(
-          icon: AppIcons.reply,
-          label: 'Ответить',
-          onTap: () => onAction('reply'),
-        ),
-        _tile(
-          icon: Icons.forward_rounded,
-          label: 'Переслать',
-          onTap: () => onAction('forward'),
-        ),
-        if (text.isNotEmpty)
-          _tile(
-            icon: AppIcons.copy,
-            label: 'Копировать',
-            onTap: () => onAction('copy'),
-          ),
-        if (isMine && messageType == 'text' && text.isNotEmpty)
-          _tile(
-            icon: AppIcons.edit,
-            label: 'Изменить',
-            onTap: () => onAction('edit'),
-          ),
-        if (isMine)
-          _tile(
-            icon: AppIcons.delete,
-            label: 'Удалить',
-            danger: true,
-            onTap: () => onAction('delete'),
-          ),
-        const SizedBox(height: 6),
+        if (showToggle) ...[
+          const SizedBox(width: 2),
+          _expandCell(),
+        ],
       ],
     );
   }
 
-  Widget _tile({
+  Widget _reactionsWrap() {
+    return Wrap(
+      spacing: 6,
+      runSpacing: 8,
+      alignment: WrapAlignment.start,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      // Явно по горизонтали — внутри [Wrap] [Material] иначе тянулся на ширину строки.
+      direction: Axis.horizontal,
+      children: [
+        for (final e in kReactionEmojiPalette) ...[
+          _reactionCell(
+            onTap: () => widget.onAction('react:$e'),
+            child: Center(
+              child: Text(
+                e,
+                style: const TextStyle(fontSize: 22, height: 1.1),
+              ),
+            ),
+          ),
+        ],
+        _expandCell(),
+      ],
+    );
+  }
+
+  static const double _kReactionCellExtent = 44;
+
+  /// Фиксированный квадрат: в [Wrap] иначе [Material] получает maxWidth по строке и
+  /// растягивается на всю ширину, из‑за чего смайлики встают в один столбец.
+  Widget _reactionCell({
+    required VoidCallback onTap,
+    required Widget child,
+  }) {
+    return SizedBox(
+      width: _kReactionCellExtent,
+      height: _kReactionCellExtent,
+      child: Material(
+        color: _reactionKeyBg,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(_reactionCellRadius),
+          side: BorderSide(
+            color: AppColors.textPrimary.withValues(alpha: 0.06),
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(_reactionCellRadius),
+          child: child,
+        ),
+      ),
+    );
+  }
+
+  Widget _expandCell() {
+    // Жёстко 44×44: иначе в [Wrap] [Material] получает maxWidth по строке и
+    // [InkWell] теряет нажатия к красной зоне / жесту «свернуть».
+    return SizedBox(
+      width: _kReactionCellExtent,
+      height: _kReactionCellExtent,
+      child: IconButton(
+        padding: EdgeInsets.zero,
+        tooltip:
+            _reactionsExpanded ? 'Свернуть' : 'Ещё реакции',
+        style: IconButton.styleFrom(
+          backgroundColor: _reactionKeyBg,
+          side: BorderSide(
+            color: AppColors.textPrimary.withValues(alpha: 0.06),
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(_reactionCellRadius),
+          ),
+          minimumSize: const Size(44, 44),
+          fixedSize: const Size(44, 44),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        onPressed: () {
+          setState(() {
+            _reactionsExpanded = !_reactionsExpanded;
+          });
+        },
+        icon: Icon(
+          _reactionsExpanded ? Icons.expand_less : Icons.expand_more,
+          color: AppColors.textSecondary,
+          size: 22,
+        ),
+      ),
+    );
+  }
+
+  static Widget _menuLine() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      child: Divider(
+        height: 1,
+        thickness: 0.5,
+        color: AppColors.textPrimary.withValues(alpha: 0.1),
+      ),
+    );
+  }
+
+  Widget _actionTile({
     required IconData icon,
     required String label,
     required VoidCallback onTap,
-    bool danger = false,
+    bool isDestructive = false,
   }) {
-    final color = danger ? Colors.redAccent : AppColors.textSecondary;
+    final destructive = isDestructive;
+    final textColor = destructive ? AppColors.accent : AppColors.textPrimary;
+    final iconColor = destructive ? AppColors.accent : AppColors.textPrimary;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
           child: Row(
             children: [
-              Icon(icon, size: 22, color: color),
+              Icon(icon, size: 22, color: iconColor),
               const SizedBox(width: 14),
               Expanded(
                 child: Text(
                   label,
                   style: TextStyle(
-                    color: danger ? Colors.redAccent : AppColors.textPrimary,
+                    color: textColor,
                     fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: destructive ? FontWeight.w800 : FontWeight.w600,
                   ),
                 ),
               ),

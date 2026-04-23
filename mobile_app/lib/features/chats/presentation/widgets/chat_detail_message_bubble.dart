@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart'
+    show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_colors.dart';
@@ -42,11 +44,125 @@ class ChatDetailMessageBubble extends StatelessWidget {
   final void Function(int userId) onOpenSenderProfile;
   final void Function(String emoji)? onReactionEmojiTap;
 
-  Widget _reactionStrip() {
+  List<int> _reactorUserIds(Map<String, dynamic> m) {
+    final raw = m['reactor_user_ids'];
+    if (raw is! List) return [];
+    final out = <int>[];
+    for (final x in raw) {
+      final id = ChatDetailMessageMaps.intFromDynamic(x);
+      if (id != null) out.add(id);
+    }
+    return out;
+  }
+
+  bool _isPhoneStyle(BuildContext context) {
+    if (kIsWeb) {
+      return MediaQuery.sizeOf(context).shortestSide < 600;
+    }
+    return defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS;
+  }
+
+  void _showGroupReactionReactors(
+    BuildContext context,
+    String emoji,
+    List<int> userIds,
+  ) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Text(
+                  'Реакция $emoji',
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              for (final id in userIds)
+                ListTile(
+                  title: Text(
+                    senderNameForUserId(id),
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _reactionChip(
+    BuildContext context,
+    Map<String, dynamic> m,
+    bool phoneStyle,
+  ) {
+    final e = m['emoji']?.toString() ?? '';
+    if (e.isEmpty) return const SizedBox.shrink();
+    final count = m['count'];
+    final countLabel = count is num
+        ? count.toInt().toString()
+        : (count?.toString() ?? '0');
+    final userIds = _reactorUserIds(m);
+    final namesLine = userIds.map(senderNameForUserId).join(', ');
+
+    Widget tile = Material(
+      color: AppColors.surfaceSoft,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onReactionEmojiTap != null ? () => onReactionEmojiTap!(e) : null,
+        onLongPress: isGroupChat && userIds.isNotEmpty && phoneStyle
+            ? () => _showGroupReactionReactors(context, e, userIds)
+            : null,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: Text(
+            '$e $countLabel',
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    if (isGroupChat && userIds.isNotEmpty && !phoneStyle) {
+      tile = Tooltip(
+        message: namesLine,
+        preferBelow: true,
+        waitDuration: const Duration(milliseconds: 350),
+        child: tile,
+      );
+    }
+
+    return tile;
+  }
+
+  Widget _reactionStrip(BuildContext context) {
     final raw = message['reactions'];
     if (raw is! List || raw.isEmpty) {
       return const SizedBox.shrink();
     }
+    final phoneStyle = _isPhoneStyle(context);
     return Padding(
       padding: const EdgeInsets.only(top: 4),
       child: Wrap(
@@ -56,30 +172,12 @@ class ChatDetailMessageBubble extends StatelessWidget {
         children: [
           for (final r in raw)
             if (r is Map)
-              Material(
-                color: AppColors.surfaceSoft,
-                borderRadius: BorderRadius.circular(12),
-                child: InkWell(
-                  onTap: onReactionEmojiTap != null
-                      ? () {
-                          final e = r['emoji']?.toString() ?? '';
-                          if (e.isEmpty) return;
-                          onReactionEmojiTap!(e);
-                        }
-                      : null,
-                  borderRadius: BorderRadius.circular(12),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    child: Text(
-                      '${r['emoji']} ${r['count']}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ),
-                ),
+              _reactionChip(
+                context,
+                r is Map<String, dynamic>
+                    ? r
+                    : Map<String, dynamic>.from(r),
+                phoneStyle,
               ),
         ],
       ),
@@ -91,6 +189,8 @@ class ChatDetailMessageBubble extends StatelessWidget {
     final time = chatDetailFormatTime(message['created_at']?.toString());
     final isUpdated = message['is_updated'] == true;
     final mediaOnly = chatDetailIsMediaOnlyMessage(message);
+    final useTimeOnMediaPreview =
+        chatDetailPutsTimeOverMediaPreview(message);
     final messageType = (message['message_type'] ?? 'text').toString();
     final isVideoNote = messageType == 'video_note';
     final hasReplyPreview = message['reply_to'] is Map;
@@ -103,7 +203,7 @@ class ChatDetailMessageBubble extends StatelessWidget {
       onOpenFullscreenImage: onOpenFullscreenImage,
       onOpenFullscreenVideo: onOpenFullscreenVideo,
     );
-    if (mediaOnly) {
+    if (useTimeOnMediaPreview) {
       mainContent = ClipRRect(
         borderRadius: BorderRadius.circular(
           isVideoNote ? 999 : 12,
@@ -143,8 +243,8 @@ class ChatDetailMessageBubble extends StatelessWidget {
                             : AppIcons.done,
                         size: 14,
                         color: (message['delivery_status']?.toString() == 'read')
-                            ? const Color(0xFF5EB8FF)
-                            : Colors.white.withAlpha(210),
+                            ? const Color(0xFFB8E0FF)
+                            : Colors.white.withValues(alpha: 0.5),
                       ),
                       const SizedBox(width: 4),
                     ],
@@ -178,8 +278,10 @@ class ChatDetailMessageBubble extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         borderRadius: bubbleShape,
-        splashColor: mediaOnly ? Colors.transparent : Colors.white.withAlpha(28),
-        highlightColor: mediaOnly ? Colors.transparent : null,
+        splashColor: useTimeOnMediaPreview
+            ? Colors.transparent
+            : Colors.white.withAlpha(28),
+        highlightColor: useTimeOnMediaPreview ? Colors.transparent : null,
         onTap: primaryTapOpensMessageMenu(context)
             ? () => onOpenActions(null)
             : null,
@@ -190,21 +292,21 @@ class ChatDetailMessageBubble extends StatelessWidget {
             maxWidth: MediaQuery.of(context).size.width * 0.72,
           ),
           margin: const EdgeInsets.symmetric(vertical: 2),
-          padding: mediaOnly
+          padding: useTimeOnMediaPreview
               ? EdgeInsets.zero
               : const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
           decoration: BoxDecoration(
-            gradient: mediaOnly
+            gradient: useTimeOnMediaPreview
                 ? null
                 : (isMine ? AppGradients.bubbleMine : AppGradients.bubbleOther),
             borderRadius: bubbleShape,
-            border: mediaOnly || !isMine
+            border: useTimeOnMediaPreview || !isMine
                 ? null
                 : Border.all(
-                    color: AppColors.accentBorder.withAlpha(110),
+                    color: AppColors.navRailActiveAccent,
                     width: 1,
                   ),
-            boxShadow: mediaOnly
+            boxShadow: useTimeOnMediaPreview
                 ? null
                 : (isMine ? AppShadows.accentStroke : AppShadows.lift),
           ),
@@ -250,8 +352,8 @@ class ChatDetailMessageBubble extends StatelessWidget {
                 senderNameForUserId: senderNameForUserId,
               ),
               mainContent,
-              if (!mediaOnly) const SizedBox(height: 8),
-              if (!mediaOnly)
+              if (!useTimeOnMediaPreview) const SizedBox(height: 8),
+              if (!useTimeOnMediaPreview)
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -274,15 +376,17 @@ class ChatDetailMessageBubble extends StatelessWidget {
                             : AppIcons.done,
                         size: 15,
                         color: (message['delivery_status']?.toString() == 'read')
-                            ? AppColors.accentBright
-                            : AppColors.textMuted,
+                            ? const Color(0xFFB8E0FF)
+                            : Colors.white.withValues(alpha: 0.5),
                       ),
                       const SizedBox(width: 5),
                     ],
                     Text(
                       time,
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
+                      style: TextStyle(
+                        color: isMine
+                            ? Colors.white.withValues(alpha: 0.92)
+                            : AppColors.textSecondary,
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                       ),
@@ -303,7 +407,7 @@ class ChatDetailMessageBubble extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             bubble,
-            _reactionStrip(),
+            _reactionStrip(context),
           ],
         ),
       );
@@ -341,7 +445,7 @@ class ChatDetailMessageBubble extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 bubble,
-                _reactionStrip(),
+                _reactionStrip(context),
               ],
             ),
           ),

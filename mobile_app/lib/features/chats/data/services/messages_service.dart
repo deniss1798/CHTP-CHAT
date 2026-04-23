@@ -186,10 +186,16 @@ class MessagesService {
     required int messageId,
     required String emoji,
   }) async {
+    final auth = await _authorizedOptions();
     final response = await _dio.post(
       '/messages/$messageId/reactions',
-      data: {'emoji': emoji},
-      options: await _authorizedOptions(),
+      data: <String, dynamic>{'emoji': emoji},
+      options: Options(
+        headers: {
+          ...?auth.headers,
+          Headers.contentTypeHeader: Headers.jsonContentType,
+        },
+      ),
     );
     return _responseMap(response);
   }

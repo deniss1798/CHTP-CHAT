@@ -7,7 +7,6 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_shadows.dart';
 import '../../../../app/theme/design_tokens.dart';
 import '../../../../app/widgets/app_screen_background.dart';
-import '../../../auth/presentation/screens/auth_screen.dart';
 import '../../../settings/presentation/screens/settings_screen.dart';
 import '../../../calls/voice_call_ring.dart';
 import '../controller/chats_controller.dart';
@@ -18,6 +17,7 @@ import '../widgets/chats_create_sheet.dart';
 import '../widgets/chats_empty_state.dart';
 import '../widgets/chats_error_state.dart';
 import '../widgets/chats_incoming_call_dialogs.dart';
+import '../widgets/chats_list_filter_chips.dart';
 import '../widgets/chats_list.dart';
 import '../widgets/chats_loading_state.dart';
 import '../widgets/chats_search_field.dart';
@@ -29,11 +29,14 @@ class ChatsScreen extends StatefulWidget {
   const ChatsScreen({
     super.key,
     this.embedded = false,
+    this.shellListMode = false,
     this.selectedChatId,
     this.onChatSelected,
   });
 
   final bool embedded;
+  /// См. [DesktopChatsShell.shellListMode] — левая колонка внутри [MessengerDesktopShell].
+  final bool shellListMode;
   final int? selectedChatId;
   final void Function({
     required int chatId,
@@ -53,6 +56,8 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
     isChatOpen: (chatId) => widget.embedded && widget.selectedChatId == chatId,
   );
 
+  final FocusNode _searchFocus = FocusNode();
+
   @override
   void initState() {
     super.initState();
@@ -62,6 +67,7 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _searchFocus.dispose();
     WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
     super.dispose();
@@ -81,16 +87,6 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
 
     if (!mounted) return;
     await _controller.refresh(silent: true);
-  }
-
-  Future<void> _logout() async {
-    await _controller.logout();
-    if (!mounted) return;
-
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const AuthScreen()),
-      (route) => false,
-    );
   }
 
   Future<void> _openChatFromItem(ChatListItemModel item) async {
@@ -144,7 +140,10 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
           chatType: 'private',
           title: chatTitle,
           avatarUrl: null,
+          lastMessageType: null,
           subtitle: '',
+          subtitleGroupAuthor: null,
+          subtitleGroupMessageBody: null,
           timeLabel: '',
           unreadCount: 0,
           isOnline: false,
@@ -172,7 +171,10 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
           chatType: 'group',
           title: chatTitle,
           avatarUrl: null,
+          lastMessageType: null,
           subtitle: '',
+          subtitleGroupAuthor: null,
+          subtitleGroupMessageBody: null,
           timeLabel: '',
           unreadCount: 0,
           isOnline: false,
@@ -279,6 +281,7 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
       child: ChatsList(
         items: items,
         embedded: widget.embedded,
+        bottomPadding: widget.shellListMode ? 12 : null,
         onRefresh: () => _controller.refresh(),
         onTap: _openChatFromItem,
       ),
@@ -293,6 +296,8 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
         final state = _controller.state;
         final items =
             _controller.buildVisibleItems(selectedChatId: widget.selectedChatId);
+
+        final useDesktopListChrome = widget.embedded && widget.shellListMode;
 
         return Scaffold(
           backgroundColor: AppColors.background,
@@ -313,55 +318,119 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             ChatsAppBar(
-                              onOpenSettings: _openSettings,
-                              onLogout: _logout,
+                              shellListMode: widget.shellListMode,
+                              onOpenSettings: widget.shellListMode
+                                  ? null
+                                  : _openSettings,
                             ),
-                            const SizedBox(height: 18),
+                            const SizedBox(height: 16),
                             ChatsSearchField(
+                              focusNode: _searchFocus,
+                              showShortcutHint: useDesktopListChrome,
                               onChanged: _controller.setSearchQuery,
                             ),
+                            if (useDesktopListChrome) ...[
+                              const SizedBox(height: 14),
+                              ChatsListFilterChips(
+                                value: state.listFilter,
+                                onChanged: _controller.setListFilter,
+                              ),
+                            ],
                           ],
                         ),
                       ),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 14),
                       Expanded(
                         child: _buildBody(state, items),
                       ),
+                      if (useDesktopListChrome)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                          child: _ChatsNewChatBar(
+                            onTap: _openCreateChatSheet,
+                          ),
+                        ),
                     ],
                   ),
-                  Positioned(
-                    right: widget.embedded ? 12 : 20,
-                    bottom: widget.embedded ? 16 : 20,
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: _openCreateChatSheet,
-                        borderRadius: BorderRadius.circular(AppRadius.pill),
-                        child: Ink(
-                          width: AppSizes.fab,
-                          height: AppSizes.fab,
-                          decoration: BoxDecoration(
-                            gradient: AppGradients.accentPanel,
-                            shape: BoxShape.circle,
-                            boxShadow: AppShadows.accentFab(),
-                          ),
-                          child: const Center(
-                            child: Icon(
-                              Icons.add_rounded,
-                              color: AppColors.textOnAccent,
-                              size: 24,
+                  if (!useDesktopListChrome)
+                    Positioned(
+                      right: widget.embedded ? 12 : 20,
+                      bottom: widget.embedded ? 16 : 20,
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: _openCreateChatSheet,
+                          borderRadius: BorderRadius.circular(AppRadius.pill),
+                          child: Ink(
+                            width: AppSizes.fab,
+                            height: AppSizes.fab,
+                            decoration: BoxDecoration(
+                              gradient: AppGradients.accentPanel,
+                              shape: BoxShape.circle,
+                              boxShadow: AppShadows.accentFab(),
+                            ),
+                            child: const Center(
+                              child: Icon(
+                                Icons.add_rounded,
+                                color: AppColors.textOnAccent,
+                                size: 24,
+                              ),
                             ),
                           ),
                         ),
                       ),
                     ),
-                  ),
                 ],
               ),
             ),
           ),
         );
       },
+    );
+  }
+}
+
+class _ChatsNewChatBar extends StatelessWidget {
+  const _ChatsNewChatBar({required this.onTap});
+
+  final Future<void> Function() onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => onTap(),
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          height: 48,
+          decoration: BoxDecoration(
+            color: AppColors.navRailActiveAccent,
+            borderRadius: BorderRadius.circular(999),
+            boxShadow: AppShadows.accentFab(),
+          ),
+          child: const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.add,
+                color: Colors.black,
+                size: 24,
+              ),
+              SizedBox(width: 8),
+              Text(
+                'Новый чат',
+                style: TextStyle(
+                  color: Colors.black,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.15,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

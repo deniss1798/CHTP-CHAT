@@ -3,9 +3,40 @@ import 'package:flutter/material.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_shadows.dart';
 import '../../../../app/theme/design_tokens.dart';
-import '../../../../app/widgets/app_surface.dart';
 import '../../domain/chat_list_rules.dart';
 import '../models/chat_list_item_model.dart';
+
+IconData? _listPreviewIcon(ChatListItemModel item) {
+  if (item.isTyping) return null;
+  final sub = item.subtitle.toLowerCase();
+  // «Вызов отменён» и т.п. — без отдельной иконки, только строка (избегаем «двух трубок»).
+  if (sub.contains('отмен') ||
+      sub.contains('пропущ') ||
+      sub.contains('вызов отмен')) {
+    return null;
+  }
+  if (item.chatType == 'group' && item.subtitleGroupAuthor != null) {
+    return null;
+  }
+  if (item.chatType == 'group') {
+    return Icons.group_outlined;
+  }
+  final t = (item.lastMessageType ?? '').trim().toLowerCase();
+  switch (t) {
+    case 'voice':
+      return Icons.mic_none_rounded;
+    case 'video':
+    case 'video_note':
+      return Icons.videocam_outlined;
+    case 'image':
+      return Icons.image_outlined;
+    case 'document':
+    case 'file':
+      return Icons.insert_drive_file_outlined;
+    default:
+      return null;
+  }
+}
 
 class ChatListItem extends StatelessWidget {
   const ChatListItem({
@@ -19,6 +50,7 @@ class ChatListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final previewIcon = _listPreviewIcon(item);
     final isUnread = item.unreadCount > 0;
     final selected = item.isSelected;
     final subtitleColor = item.isTyping
@@ -29,20 +61,18 @@ class ChatListItem extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadius.xl),
-        child: AppSurface(
-          radius: AppRadius.xl,
-          tone: selected
-              ? AppSurfaceTone.selected
-              : (isUnread ? AppSurfaceTone.elevated : AppSurfaceTone.base),
-          borderColor: selected
-              ? AppColors.accent.withAlpha(140)
-              : (isUnread
-                  ? AppColors.accentBorder.withAlpha(120)
-                  : AppColors.strokeSoft),
-          shadow: selected
-              ? [...AppShadows.lift, ...AppShadows.accentStroke]
-              : AppShadows.lift,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          decoration: BoxDecoration(
+            color: selected ? AppColors.navRailActivePill : AppColors.chatListCard,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: selected
+                  ? AppColors.navRailActiveAccent
+                  : AppColors.strokeSoft,
+            ),
+            boxShadow: AppShadows.lift,
+          ),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
             child: Row(
@@ -90,22 +120,72 @@ class ChatListItem extends StatelessWidget {
                       const SizedBox(height: 9),
                       Row(
                         children: [
-                          Expanded(
-                            child: Text(
-                              item.subtitle,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: subtitleColor,
-                                fontSize: 13.5,
-                                fontStyle:
-                                    item.isTyping ? FontStyle.italic : FontStyle.normal,
-                                fontWeight: item.isTyping || isUnread
-                                    ? FontWeight.w700
-                                    : FontWeight.w600,
-                                height: 1.25,
-                              ),
+                          if (previewIcon != null) ...[
+                            Icon(
+                              previewIcon,
+                              size: 17,
+                              color: isUnread
+                                  ? AppColors.textSecondary
+                                  : AppColors.navRailInactive,
                             ),
+                            const SizedBox(width: 6),
+                          ],
+                          Expanded(
+                            child: item.subtitleGroupAuthor != null &&
+                                    item.subtitleGroupMessageBody != null
+                                ? Text.rich(
+                                    TextSpan(
+                                      style: const TextStyle(
+                                        fontSize: 13.5,
+                                        height: 1.25,
+                                      ),
+                                      children: [
+                                        TextSpan(
+                                          text:
+                                              '${item.subtitleGroupAuthor}: ',
+                                          style: TextStyle(
+                                            color: item.isTyping
+                                                ? AppColors.accentBright
+                                                : AppColors.textPrimary,
+                                            fontStyle: item.isTyping
+                                                ? FontStyle.italic
+                                                : FontStyle.normal,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                        ),
+                                        TextSpan(
+                                          text: item.subtitleGroupMessageBody!,
+                                          style: TextStyle(
+                                            color: item.isTyping
+                                                ? AppColors.accentBright
+                                                : AppColors.textSecondary,
+                                            fontStyle: item.isTyping
+                                                ? FontStyle.italic
+                                                : FontStyle.normal,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  )
+                                : Text(
+                                    item.subtitle,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: subtitleColor,
+                                      fontSize: 13.5,
+                                      fontStyle: item.isTyping
+                                          ? FontStyle.italic
+                                          : FontStyle.normal,
+                                      fontWeight: item.isTyping || isUnread
+                                          ? FontWeight.w700
+                                          : FontWeight.w600,
+                                      height: 1.25,
+                                    ),
+                                  ),
                           ),
                           if (item.unreadCount > 0) ...[
                             const SizedBox(width: 12),
@@ -115,15 +195,14 @@ class ChatListItem extends StatelessWidget {
                                 vertical: 6,
                               ),
                               decoration: BoxDecoration(
-                                gradient: AppGradients.accentPanel,
+                                color: AppColors.navRailActiveAccent,
                                 borderRadius:
                                     BorderRadius.circular(AppRadius.pill),
-                                boxShadow: AppShadows.lift,
                               ),
                               child: Text(
                                 item.unreadCount > 99 ? '99+' : item.unreadCount.toString(),
                                 style: const TextStyle(
-                                  color: AppColors.textOnAccent,
+                                  color: Colors.white,
                                   fontSize: 11,
                                   fontWeight: FontWeight.w900,
                                 ),
@@ -170,7 +249,9 @@ class _ChatListAvatar extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: isSelected ? AppColors.accent.withAlpha(110) : AppColors.strokeSoft,
+              color: isSelected
+                  ? AppColors.navRailActiveAccent.withAlpha(160)
+                  : AppColors.strokeSoft,
             ),
           ),
           child: Image.network(
@@ -198,16 +279,16 @@ class _ChatListAvatar extends StatelessWidget {
           right: 0,
           bottom: 0,
           child: Container(
-            width: 13,
-            height: 13,
+            width: 12,
+            height: 12,
             decoration: BoxDecoration(
-              color: AppColors.accent,
+              color: const Color(0xFF2ECC71),
               shape: BoxShape.circle,
               border: Border.all(color: AppColors.background, width: 2.2),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.accent.withAlpha(120),
-                  blurRadius: 12,
+                  color: const Color(0xFF2ECC71).withAlpha(100),
+                  blurRadius: 8,
                 ),
               ],
             ),

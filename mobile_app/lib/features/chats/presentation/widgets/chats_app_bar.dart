@@ -8,16 +8,18 @@ import '../../../../app/widgets/app_surface.dart';
 class ChatsAppBar extends StatelessWidget {
   const ChatsAppBar({
     super.key,
-    required this.onOpenSettings,
-    required this.onLogout,
+    this.onOpenSettings,
+    this.shellListMode = false,
   });
 
-  final Future<void> Function() onOpenSettings;
-  final Future<void> Function() onLogout;
+  final Future<void> Function()? onOpenSettings;
+  final bool shellListMode;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+
+    final hasHeaderActions = onOpenSettings != null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -29,44 +31,48 @@ class ChatsAppBar extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: AppColors.accent,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.accent.withAlpha(120),
-                              blurRadius: 14,
-                            ),
-                          ],
+                  if (!shellListMode) ...[
+                    Row(
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: AppColors.accent,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.accent.withAlpha(120),
+                                blurRadius: 14,
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      const Text(
-                        'ЧТП ЧАТ',
-                        style: TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.6,
+                        const SizedBox(width: 10),
+                        const Text(
+                          'ЧТП ЧАТ',
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.6,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                   Text(
                     'Сообщения',
                     style: textTheme.headlineLarge?.copyWith(
-                      fontSize: 36,
+                      color: AppColors.textPrimary,
+                      fontSize: shellListMode ? 28 : 36,
+                      fontWeight: FontWeight.w800,
                       height: 1.02,
                       letterSpacing: -0.9,
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                   Text(
                     'Все переписки и звонки в одном месте.',
                     style: TextStyle(
@@ -80,18 +86,14 @@ class ChatsAppBar extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(width: AppSpacing.md),
-            AppIconButtonSurface(
-              icon: AppIcons.settings,
-              tooltip: 'Настройки',
-              onTap: onOpenSettings,
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            AppIconButtonSurface(
-              icon: AppIcons.logout,
-              tooltip: 'Выйти',
-              onTap: onLogout,
-            ),
+            if (hasHeaderActions) ...[
+              const SizedBox(width: AppSpacing.md),
+              AppIconButtonSurface(
+                icon: AppIcons.settings,
+                tooltip: 'Настройки',
+                onTap: onOpenSettings!,
+              ),
+            ],
           ],
         ),
       ],

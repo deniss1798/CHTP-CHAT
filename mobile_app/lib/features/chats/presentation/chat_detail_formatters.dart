@@ -138,6 +138,14 @@ bool chatDetailIsMediaOnlyMessage(Map<String, dynamic> message) {
   return (message['text'] ?? '').toString().trim().isEmpty;
 }
 
+/// Время/галочки поверх превью — только у фото и видеокружка; у голоса, видео-файла
+/// и вложения показываем метку отдельной строкой, чтобы не наезжать на контролы/текст.
+bool chatDetailPutsTimeOverMediaPreview(Map<String, dynamic> message) {
+  if (!chatDetailIsMediaOnlyMessage(message)) return false;
+  final type = (message['message_type'] ?? 'text').toString();
+  return type == 'image' || type == 'video_note';
+}
+
 bool chatDetailShouldShowDateDivider(
   List<Map<String, dynamic>> messages,
   int index,

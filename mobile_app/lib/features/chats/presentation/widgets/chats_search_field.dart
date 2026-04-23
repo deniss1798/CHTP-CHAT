@@ -1,26 +1,39 @@
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_icons.dart';
-import '../../../../app/theme/app_shadows.dart';
 import '../../../../app/theme/design_tokens.dart';
-import '../../../../app/widgets/app_surface.dart';
 
 class ChatsSearchField extends StatelessWidget {
   const ChatsSearchField({
     super.key,
     required this.onChanged,
+    this.focusNode,
+    this.showShortcutHint = false,
   });
 
   final ValueChanged<String> onChanged;
+  final FocusNode? focusNode;
+  final bool showShortcutHint;
+
+  String _shortcutLabel() {
+    if (kIsWeb) return 'Ctrl+K';
+    return defaultTargetPlatform == TargetPlatform.macOS ? '⌘K' : 'Ctrl+K';
+  }
 
   @override
   Widget build(BuildContext context) {
-    return AppSurface(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-      radius: AppRadius.xxl,
-      shadow: AppShadows.lift,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.chatListCard,
+        borderRadius: BorderRadius.circular(AppRadius.xxl),
+        border: Border.all(color: AppColors.strokeSoft),
+      ),
       child: TextField(
+        focusNode: focusNode,
         onChanged: onChanged,
         style: const TextStyle(
           color: AppColors.textPrimary,
@@ -33,7 +46,7 @@ class ChatsSearchField extends StatelessWidget {
           fillColor: Colors.transparent,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 18,
-            vertical: 16,
+            vertical: 14,
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(AppRadius.xl),
@@ -50,7 +63,25 @@ class ChatsSearchField extends StatelessWidget {
           prefixIcon: const Icon(
             AppIcons.search,
             color: AppColors.textMuted,
+            size: 22,
           ),
+          suffix: showShortcutHint
+              ? Padding(
+                  padding: const EdgeInsets.only(right: 12),
+                  child: Center(
+                    widthFactor: 1,
+                    child: Text(
+                      _shortcutLabel(),
+                      style: const TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ),
+                )
+              : null,
         ),
       ),
     );

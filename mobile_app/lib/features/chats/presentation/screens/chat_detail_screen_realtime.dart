@@ -113,7 +113,9 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
       }
       if (!mounted) return;
       setState(() {
-        final idx = _messages.indexWhere((m) => m['id'] == mid);
+        final idx = _messages.indexWhere(
+          (m) => ChatDetailMessageMaps.intFromDynamic(m['id']) == mid,
+        );
         if (idx >= 0) {
           final copy = Map<String, dynamic>.from(_messages[idx]);
           copy['reactions'] = reactions;
@@ -141,7 +143,12 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
       if (!mounted) return;
 
       setState(() {
-        final idx = _messages.indexWhere((m) => m['id'] == incomingId);
+        final incId = ChatDetailMessageMaps.intFromDynamic(incomingId);
+        final idx = incId == null
+            ? -1
+            : _messages.indexWhere(
+                (m) => ChatDetailMessageMaps.intFromDynamic(m['id']) == incId,
+              );
         if (idx >= 0) {
           final prev = _messages[idx];
           var merged = normalized;

@@ -4,7 +4,10 @@ class ChatListItemModel {
     required this.chatType,
     required this.title,
     required this.avatarUrl,
+    this.lastMessageType,
     required this.subtitle,
+    this.subtitleGroupAuthor,
+    this.subtitleGroupMessageBody,
     required this.timeLabel,
     required this.unreadCount,
     required this.isOnline,
@@ -16,7 +19,10 @@ class ChatListItemModel {
   final String chatType;
   final String title;
   final String? avatarUrl;
+  final String? lastMessageType;
   final String subtitle;
+  final String? subtitleGroupAuthor;
+  final String? subtitleGroupMessageBody;
   final String timeLabel;
   final int unreadCount;
   final bool isOnline;

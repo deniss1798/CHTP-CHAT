@@ -127,8 +127,8 @@ class ChatDetailMessageContent extends StatelessWidget {
     }
 
     final plain = (message['text'] ?? '').toString();
-    final baseStyle = const TextStyle(
-      color: AppColors.textPrimary,
+    final baseStyle = TextStyle(
+      color: isMine ? Colors.white : AppColors.textPrimary,
       fontSize: 15,
       fontWeight: FontWeight.w600,
       height: 1.35,
@@ -145,10 +145,15 @@ class ChatDetailMessageContent extends StatelessWidget {
         text: plain,
         style: baseStyle,
         linkStyle: baseStyle.copyWith(
-          color: AppColors.accentBright,
+          color: isMine
+              ? const Color(0xFFB8E0FF)
+              : AppColors.accentBright,
           fontWeight: FontWeight.w700,
           decoration: TextDecoration.underline,
-          decorationColor: AppColors.accentBright.withAlpha(200),
+          decorationColor: (isMine
+                  ? const Color(0xFFB8E0FF)
+                  : AppColors.accentBright)
+              .withAlpha(200),
         ),
       ),
     );
@@ -273,29 +278,38 @@ class _VoiceMessageBarState extends State<_VoiceMessageBar> {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        IconButton(
-          onPressed: _toggle,
-          icon: Icon(
-            _playerState == PlayerState.playing
-                ? Icons.stop_rounded
-                : Icons.play_arrow_rounded,
-            color: AppColors.textPrimary,
-            size: 28,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 220),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            onPressed: _toggle,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+            icon: Icon(
+              _playerState == PlayerState.playing
+                  ? Icons.stop_rounded
+                  : Icons.play_arrow_rounded,
+              color: AppColors.textPrimary,
+              size: 28,
+            ),
           ),
-        ),
-        const SizedBox(width: 4),
-        const Text(
-          'Голосовое',
-          style: TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
+          const SizedBox(width: 2),
+          Flexible(
+            child: Text(
+              'Голосовое',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

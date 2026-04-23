@@ -20,6 +20,7 @@ import '../../data/services/local_chat_state_service.dart';
 import '../../data/services/presence_service.dart';
 import '../../domain/chat_list_rules.dart';
 import '../models/chat_list_item_model.dart';
+import '../models/chats_list_filter.dart';
 import '../models/chats_screen_state.dart';
 
 typedef ChatsInviteHandler = Future<void> Function(Map<String, dynamic> invite);
@@ -138,8 +139,34 @@ class ChatsController extends ChangeNotifier {
     );
   }
 
+  void setListFilter(ChatsListFilter filter) {
+    if (_state.listFilter == filter) return;
+    _setState(_state.copyWith(listFilter: filter));
+  }
+
+  bool _chatMatchesListFilter(ChatSummary c) {
+    switch (_state.listFilter) {
+      case ChatsListFilter.all:
+        return true;
+      case ChatsListFilter.unread:
+        return resolveUnreadCount(
+              serverUnreadCount: c.unreadCount,
+              currentUserId: _state.currentUserId,
+              lastMessageId: c.lastMessageId,
+              lastMessageSenderId: c.lastMessageSenderId,
+              myLastReadMessageId: c.myLastReadMessageId,
+            ) >
+            0;
+      case ChatsListFilter.groups:
+        return c.type == 'group';
+    }
+  }
+
   List<ChatListItemModel> buildVisibleItems({int? selectedChatId}) {
-    return _state.filteredChats.map((chat) {
+    final afterTab = _state.filteredChats
+        .where(_chatMatchesListFilter)
+        .toList();
+    return afterTab.map((chat) {
       final title = resolveChatListTitle(title: chat.title, chatId: chat.id);
       final typingLabel = _state.typingLabelByChatId[chat.id];
       final unreadCount = resolveUnreadCount(
@@ -150,17 +177,25 @@ class ChatsController extends ChangeNotifier {
         myLastReadMessageId: chat.myLastReadMessageId,
       );
 
+      final sub = buildChatListSubtitleParts(
+        typingLabel: typingLabel,
+        chatType: chat.type,
+        lastMessage: chat.lastMessage,
+        lastMessageType: chat.lastMessageType,
+        lastMessageSenderName: chat.lastMessageSenderName,
+        lastMessageSenderId: chat.lastMessageSenderId,
+        currentUserId: _state.currentUserId,
+      );
+
       return ChatListItemModel(
         chatId: chat.id,
         chatType: chat.type,
         title: title,
         avatarUrl: chat.avatarUrl,
-        subtitle: typingLabel ??
-            resolveChatListSubtitle(
-              chatType: chat.type,
-              lastMessage: chat.lastMessage,
-              lastMessageType: chat.lastMessageType,
-            ),
+        lastMessageType: chat.lastMessageType,
+        subtitle: sub.line,
+        subtitleGroupAuthor: sub.groupAuthor,
+        subtitleGroupMessageBody: sub.groupMessageBody,
         timeLabel: resolveChatTimeLabel(chat.lastMessageAtRaw),
         unreadCount: unreadCount,
         isOnline: chat.type == 'private' &&
@@ -406,11 +441,15 @@ class ChatsController extends ChangeNotifier {
     return chats.where((chat) {
       final title = resolveChatListTitle(title: chat.title, chatId: chat.id)
           .toLowerCase();
-      final subtitle = resolveChatListSubtitle(
+      final subtitle = buildChatListSubtitleParts(
+        typingLabel: null,
         chatType: chat.type,
         lastMessage: chat.lastMessage,
         lastMessageType: chat.lastMessageType,
-      ).toLowerCase();
+        lastMessageSenderName: chat.lastMessageSenderName,
+        lastMessageSenderId: chat.lastMessageSenderId,
+        currentUserId: _state.currentUserId,
+      ).line.toLowerCase();
       return title.contains(query) || subtitle.contains(query);
     }).toList();
   }

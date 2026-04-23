@@ -53,6 +53,7 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
   late ChatSocketService _socket;
   bool _ownsSocket = false;
   GroupCallSession? _session;
+  String _status = 'Соединение…';
   bool _micOn = true;
   bool _camOn = false;
   bool _allowRoutePop = false;
@@ -124,7 +125,9 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
       startedByUserId: widget.startedByUserId,
       send: (m) => _socket.sendJson(m),
       socketStream: _socket.messagesStream,
-      onStatus: (_) {},
+      onStatus: (s) {
+        if (mounted) setState(() => _status = s);
+      },
       onParticipantCount: (_) {},
       onEnded: () {
         if (!mounted) return;
@@ -196,34 +199,69 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 10, 16, 6),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
+                  padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      AppIconButtonSurface(
-                        icon: AppIcons.close,
-                        tooltip: 'Выйти',
-                        onTap: () => session?.leave(),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
+                      const Align(
+                        alignment: Alignment.centerLeft,
                         child: Text(
-                          widget.chatTitle,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: AppColors.textPrimary,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            height: 1.25,
-                            letterSpacing: -0.35,
+                          'ЧТП ЧАТ',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.2,
                           ),
                         ),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          AppIconButtonSurface(
+                            icon: AppIcons.back,
+                            tooltip: 'Назад',
+                            onTap: () => session?.leave(),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              children: [
+                                Text(
+                                  widget.chatTitle,
+                                  textAlign: TextAlign.center,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: AppColors.textPrimary,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                    height: 1.25,
+                                    letterSpacing: -0.35,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _status,
+                                  textAlign: TextAlign.center,
+                                  maxLines: 2,
+                                  style: const TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 48),
+                        ],
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 Expanded(
                   child: session == null
                       ? const Center(
@@ -336,7 +374,7 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
                               colors: [Color(0xFFE34B3F), Color(0xFFB7201B)],
                             ),
                             shape: BoxShape.circle,
-                            boxShadow: AppShadows.lift,
+                            boxShadow: AppShadows.primaryButton,
                           ),
                           child: IconButton(
                             onPressed:

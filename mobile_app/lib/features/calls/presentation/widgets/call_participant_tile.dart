@@ -15,6 +15,7 @@ class CallParticipantTile extends StatelessWidget {
     this.showVideo = false,
     this.mirror = false,
     this.attachHiddenVideoSurface = false,
+    this.accentFrame = true,
   });
 
   final String label;
@@ -22,6 +23,9 @@ class CallParticipantTile extends StatelessWidget {
   final String? avatarUrl;
   final bool showVideo;
   final bool mirror;
+
+  /// Тонкая оранжевая обводка и лёгкое свечение, как в макете «плиток» эфира.
+  final bool accentFrame;
 
   /// На части платформ без скрытого [RTCVideoView] не воспроизводится удалённое аудио.
   final bool attachHiddenVideoSurface;
@@ -65,8 +69,23 @@ class CallParticipantTile extends StatelessWidget {
             decoration: BoxDecoration(
               gradient: AppGradients.heroPanel,
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: AppColors.strokeSoft),
-              boxShadow: AppShadows.card,
+              border: Border.all(
+                color: accentFrame
+                    ? AppColors.accent.withValues(alpha: 0.42)
+                    : AppColors.strokeSoft,
+                width: accentFrame ? 1.1 : 1,
+              ),
+              boxShadow: accentFrame
+                  ? <BoxShadow>[
+                      BoxShadow(
+                        color: AppColors.accent.withValues(alpha: 0.2),
+                        blurRadius: 16,
+                        spreadRadius: 0,
+                        offset: const Offset(0, 2),
+                      ),
+                      ...AppShadows.card,
+                    ]
+                  : AppShadows.card,
             ),
             child: Stack(
               fit: StackFit.expand,

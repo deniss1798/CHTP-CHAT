@@ -61,6 +61,15 @@ def _build_chat_response(
         .first()
     )
 
+    last_message_sender_name: str | None = None
+    if last_message and last_message.sender_id is not None:
+        s_user = next(
+            (u for u in users if u.id == int(last_message.sender_id)),
+            None,
+        )
+        if s_user and str(s_user.username or "").strip():
+            last_message_sender_name = str(s_user.username).strip()
+
     membership = (
         db.query(ChatMember)
         .filter(
@@ -81,6 +90,7 @@ def _build_chat_response(
         last_message_type=message_type_for_chat_list(last_message),
         last_message_at=last_message.created_at if last_message else None,
         last_message_sender_id=last_message.sender_id if last_message else None,
+        last_message_sender_name=last_message_sender_name,
         last_message_id=last_message.id if last_message else None,
         my_last_read_message_id=my_last_read,
         unread_count=unread_count_for_user(db, chat.id, current_user.id),

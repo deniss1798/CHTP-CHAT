@@ -5,12 +5,14 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_icons.dart';
 import '../../../../app/theme/app_shadows.dart';
 import '../../../../app/theme/design_tokens.dart';
-import '../../../../app/widgets/app_screen_background.dart';
 import '../../../../app/widgets/app_surface.dart';
+import '../widgets/auth_hero_panel.dart';
+import '../widgets/auth_screen_background.dart';
 import '../../../../app/home_chats_route.dart';
 import '../../../../app/widgets/desktop_constrained_content.dart';
 import '../../data/services/auth_service.dart';
 import 'email_code_screen.dart';
+import 'privacy_policy_screen.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -27,6 +29,7 @@ class _AuthScreenState extends State<AuthScreen> {
   bool obscurePassword = true;
   bool obscureConfirmPassword = true;
   bool isLoading = false;
+  bool rememberMe = false;
 
   final usernameController = TextEditingController();
   final emailController = TextEditingController();
@@ -179,216 +182,384 @@ class _AuthScreenState extends State<AuthScreen> {
     final textTheme = Theme.of(context).textTheme;
     final size = MediaQuery.sizeOf(context);
     final wide = size.width >= AppBreakpoints.wideLayoutMinWidth;
+    // Справа герой только на планшетах/десктопе — в ландшафте телефона не жмём экран.
+    final splitLayout = size.width >= AppBreakpoints.authSplitLayoutMinWidth &&
+        size.shortestSide >= 560;
 
     return Scaffold(
-      body: AppScreenBackground(
+      backgroundColor: AppColors.background,
+      body: AuthScreenBackground(
+        strengthenRightGlow: splitLayout,
         child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.xxl,
-              vertical: AppSpacing.lg,
-            ),
-            child: DesktopConstrainedContent(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight: size.height - 60,
-                ),
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: AppSpacing.xl),
-                      Text(
-                        'Добро пожаловать',
-                        style: wide
-                            ? textTheme.headlineMedium?.copyWith(
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.textPrimary,
-                              )
-                            : textTheme.headlineLarge,
-                      ),
-                      const SizedBox(height: 14),
-                      Text(
-                        isLoginMode
-                            ? 'Войдите, чтобы продолжить'
-                            : 'Укажите данные — отправим код на почту',
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: AppColors.textSecondary,
-                          height: 1.4,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.xxxl),
-                      AppSurface(
-                        tone: AppSurfaceTone.elevated,
-                        radius: AppRadius.xxl,
-                        padding: const EdgeInsets.all(AppSpacing.xl),
-                        child: Column(
-                          children: [
-                            Container(
-                              width: 108,
-                              height: 80,
-                              decoration: BoxDecoration(
-                                gradient: AppGradients.accentPanel,
-                                borderRadius: BorderRadius.circular(AppRadius.lg),
-                                boxShadow: AppShadows.primaryButton,
-                              ),
-                              alignment: Alignment.center,
-                              child: const Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 6),
-                                child: FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  child: Text(
-                                    'ЧТП ЧАТ',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w800,
-                                      color: AppColors.textOnAccent,
-                                      letterSpacing: 0.3,
-                                    ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: splitLayout
+                    ? Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            flex: 12,
+                            child: SingleChildScrollView(
+                              padding:
+                                  const EdgeInsets.fromLTRB(28, 8, 12, 20),
+                              child: Align(
+                                alignment: Alignment.topCenter,
+                                child: ConstrainedBox(
+                                  constraints: const BoxConstraints(
+                                    maxWidth: 440,
+                                  ),
+                                  child: _buildAuthColumn(
+                                    context,
+                                    textTheme,
+                                    wide,
+                                    showInlineHero: !splitLayout,
                                   ),
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 22),
-                            _AuthSegmentedSwitch(
-                              isLoginMode: isLoginMode,
-                              onChanged: toggleMode,
-                            ),
-                            const SizedBox(height: 24),
-                            Form(
-                              key: _formKey,
-                              child: Column(
-                                children: [
-                                  if (!isLoginMode) ...[
-                                    TextFormField(
-                                      controller: usernameController,
-                                      validator: validateUsername,
-                                      style: const TextStyle(
-                                        color: AppColors.textPrimary,
-                                      ),
-                                      decoration: const InputDecoration(
-                                        hintText: 'Имя пользователя',
-                                        prefixIcon: Icon(
-                                          AppIcons.person,
-                                          color: AppColors.textMuted,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 14),
-                                  ],
-                                  TextFormField(
-                                    controller: emailController,
-                                    validator: validateEmail,
-                                    keyboardType: TextInputType.emailAddress,
-                                    style: const TextStyle(
-                                      color: AppColors.textPrimary,
-                                    ),
-                                    decoration: const InputDecoration(
-                                      hintText: 'Электронная почта',
-                                      prefixIcon: Icon(
-                                        AppIcons.email,
-                                        color: AppColors.textMuted,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 14),
-                                  TextFormField(
-                                    controller: passwordController,
-                                    validator: validatePassword,
-                                    obscureText: obscurePassword,
-                                    style: const TextStyle(
-                                      color: AppColors.textPrimary,
-                                    ),
-                                    decoration: InputDecoration(
-                                      hintText: 'Пароль',
-                                      prefixIcon: const Icon(
-                                        AppIcons.lock,
-                                        color: AppColors.textMuted,
-                                      ),
-                                      suffixIcon: IconButton(
-                                        onPressed: () {
-                                          setState(() {
-                                            obscurePassword = !obscurePassword;
-                                          });
-                                        },
-                                        icon: Icon(
-                                          obscurePassword
-                                              ? AppIcons.visibilityOff
-                                              : AppIcons.visibilityOn,
-                                          color: AppColors.textMuted,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  if (!isLoginMode) ...[
-                                    const SizedBox(height: 14),
-                                    TextFormField(
-                                      controller: confirmPasswordController,
-                                      validator: validateConfirmPassword,
-                                      obscureText: obscureConfirmPassword,
-                                      style: const TextStyle(
-                                        color: AppColors.textPrimary,
-                                      ),
-                                      decoration: InputDecoration(
-                                        hintText: 'Подтвердите пароль',
-                                        prefixIcon: const Icon(
-                                          AppIcons.lockReset,
-                                          color: AppColors.textMuted,
-                                        ),
-                                        suffixIcon: IconButton(
-                                          onPressed: () {
-                                            setState(() {
-                                              obscureConfirmPassword =
-                                                  !obscureConfirmPassword;
-                                            });
-                                          },
-                                          icon: Icon(
-                                            obscureConfirmPassword
-                                                ? AppIcons.visibilityOff
-                                                : AppIcons.visibilityOn,
-                                            color: AppColors.textMuted,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                  const SizedBox(height: 20),
-                                  SizedBox(
-                                    width: double.infinity,
-                                    child: ElevatedButton(
-                                      onPressed: isLoading ? null : submit,
-                                      child: isLoading
-                                          ? const SizedBox(
-                                              width: 20,
-                                              height: 20,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                                valueColor:
-                                                    AlwaysStoppedAnimation(
-                                                  Colors.black,
-                                                ),
-                                              ),
-                                            )
-                                          : Text(
-                                              isLoginMode
-                                                  ? 'Войти'
-                                                  : 'Продолжить',
-                                            ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                          ),
+                          const Expanded(
+                            flex: 11,
+                            child: AuthHeroPanel(),
+                          ),
+                        ],
+                      )
+                    : SingleChildScrollView(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.xxl,
+                          vertical: AppSpacing.lg,
+                        ),
+                        child: DesktopConstrainedContent(
+                          child: _buildAuthColumn(
+                            context,
+                            textTheme,
+                            wide,
+                            showInlineHero: !splitLayout,
+                          ),
                         ),
                       ),
-                    ],
+              ),
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: AppSpacing.xxl),
+                child: Center(
+                  child: Text(
+                    '© 2026 ЧТП ЧАТ. Все права защищены.',
+                    textAlign: TextAlign.center,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: AppColors.textMuted,
+                      fontSize: 11,
+                    ),
                   ),
                 ),
               ),
-            ),
+              const SizedBox(height: AppSpacing.md),
+            ],
           ),
         ),
+      ),
+    );
+  }
+
+  /// Секция 1: только «Добро пожаловать» и подстрока (всегда выше бренда и формы).
+  Widget _buildAuthWelcomeBlock(TextTheme textTheme, bool wide) {
+    return Column(
+      key: const ValueKey('auth_welcome'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'Добро пожаловать',
+          style: (wide
+                  ? textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                    )
+                  : textTheme.headlineLarge)
+              ?.copyWith(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w800,
+                height: 1.1,
+                letterSpacing: -0.3,
+              ),
+        ),
+        const SizedBox(height: 14),
+        Text(
+          isLoginMode
+              ? 'Войдите, чтобы продолжить'
+              : 'Укажите данные — отправим код на почту',
+          style: textTheme.bodyMedium?.copyWith(
+            color: AppColors.textSecondary,
+            height: 1.4,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAuthColumn(
+    BuildContext context,
+    TextTheme textTheme,
+    bool wide, {
+    required bool showInlineHero,
+  }) {
+    final heroScale = (MediaQuery.sizeOf(context).width / 520.0)
+        .clamp(0.36, 0.48)
+        .toDouble();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildAuthWelcomeBlock(textTheme, wide),
+        if (showInlineHero) ...[
+          const SizedBox(height: AppSpacing.xl),
+          Divider(
+            height: 1,
+            thickness: 1,
+            color: AppColors.accent.withValues(alpha: 0.2),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Center(
+            child: Semantics(
+              label: 'ЧТП ЧАТ, сообщения и звонки',
+              child: AuthHeroBrandingContent(
+                scale: heroScale,
+                compact: true,
+                showTopAccentLine: false,
+              ),
+            ),
+          ),
+        ],
+        const SizedBox(height: AppSpacing.xxxl),
+        AppSurface(
+          tone: AppSurfaceTone.elevated,
+          radius: AppRadius.xxl,
+          borderColor: AppColors.accent.withValues(alpha: 0.28),
+          padding: const EdgeInsets.all(AppSpacing.xl),
+          child: Column(
+            children: [
+              _AuthSegmentedSwitch(
+                isLoginMode: isLoginMode,
+                onChanged: toggleMode,
+              ),
+              const SizedBox(height: 24),
+              Form(
+                key: _formKey,
+                child: Column(
+                  children: [
+                    if (!isLoginMode) ...[
+                      TextFormField(
+                        controller: usernameController,
+                        validator: validateUsername,
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                        ),
+                        decoration: const InputDecoration(
+                          hintText: 'Имя пользователя',
+                          prefixIcon: Icon(
+                            AppIcons.person,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                    ],
+                    TextFormField(
+                      controller: emailController,
+                      validator: validateEmail,
+                      keyboardType: TextInputType.emailAddress,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                      ),
+                      decoration: const InputDecoration(
+                        hintText: 'Электронная почта',
+                        prefixIcon: Icon(
+                          AppIcons.email,
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    TextFormField(
+                      controller: passwordController,
+                      validator: validatePassword,
+                      obscureText: obscurePassword,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: 'Пароль',
+                        prefixIcon: const Icon(
+                          AppIcons.lock,
+                          color: AppColors.textMuted,
+                        ),
+                        suffixIcon: IconButton(
+                          onPressed: () {
+                            setState(() {
+                              obscurePassword = !obscurePassword;
+                            });
+                          },
+                          icon: Icon(
+                            obscurePassword
+                                ? AppIcons.visibilityOff
+                                : AppIcons.visibilityOn,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (!isLoginMode) ...[
+                      const SizedBox(height: 14),
+                      TextFormField(
+                        controller: confirmPasswordController,
+                        validator: validateConfirmPassword,
+                        obscureText: obscureConfirmPassword,
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: 'Подтвердите пароль',
+                          prefixIcon: const Icon(
+                            AppIcons.lockReset,
+                            color: AppColors.textMuted,
+                          ),
+                          suffixIcon: IconButton(
+                            onPressed: () {
+                              setState(() {
+                                obscureConfirmPassword =
+                                    !obscureConfirmPassword;
+                              });
+                            },
+                            icon: Icon(
+                              obscureConfirmPassword
+                                  ? AppIcons.visibilityOff
+                                  : AppIcons.visibilityOn,
+                              color: AppColors.textMuted,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                    if (isLoginMode) ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Checkbox(
+                            value: rememberMe,
+                            onChanged: (v) {
+                              setState(() => rememberMe = v ?? false);
+                            },
+                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.only(top: 10),
+                              child: Text(
+                                'Запомнить меня',
+                                style: textTheme.bodyMedium?.copyWith(
+                                  color: AppColors.textSecondary,
+                                  height: 1.35,
+                                ),
+                              ),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              // Восстановление пароля — позже.
+                            },
+                            child: const Text('Забыли пароль?'),
+                          ),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: isLoading ? null : submit,
+                        child: isLoading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.black,
+                                  ),
+                                ),
+                              )
+                            : Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    isLoginMode ? 'Войти' : 'Продолжить',
+                                  ),
+                                  if (isLoginMode) ...[
+                                    const SizedBox(width: 8),
+                                    const Icon(
+                                      Icons.arrow_forward_rounded,
+                                      size: 20,
+                                      color: AppColors.textOnAccent,
+                                    ),
+                                  ],
+                                ],
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                runSpacing: 4,
+                children: [
+                  Text(
+                    'Продолжая, вы соглашаетесь с ',
+                    textAlign: TextAlign.center,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: AppColors.textSecondary,
+                      height: 1.5,
+                      fontSize: 12,
+                    ),
+                  ),
+                  MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: GestureDetector(
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const PrivacyPolicyScreen(),
+                          ),
+                        );
+                      },
+                      child: Text(
+                        'Политикой конфиденциальности',
+                        textAlign: TextAlign.center,
+                        style: textTheme.bodySmall?.copyWith(
+                          color: AppColors.accent,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 12,
+                          height: 1.5,
+                          decoration: TextDecoration.underline,
+                          decorationColor:
+                              AppColors.accent.withValues(alpha: 0.6),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

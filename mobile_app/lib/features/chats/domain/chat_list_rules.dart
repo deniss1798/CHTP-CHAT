@@ -1,5 +1,54 @@
 import '../../../core/formatting/server_time.dart';
 
+/// Строка подписи в списке + опциональное разбиение «автор: текст» для групп.
+class ChatListSubtitleParts {
+  const ChatListSubtitleParts({
+    required this.line,
+    this.groupAuthor,
+    this.groupMessageBody,
+  });
+
+  final String line;
+  final String? groupAuthor;
+  final String? groupMessageBody;
+}
+
+ChatListSubtitleParts buildChatListSubtitleParts({
+  String? typingLabel,
+  required String chatType,
+  String? lastMessage,
+  String? lastMessageType,
+  String? lastMessageSenderName,
+  int? lastMessageSenderId,
+  int? currentUserId,
+}) {
+  if (typingLabel != null) {
+    return ChatListSubtitleParts(line: typingLabel);
+  }
+  final text = lastMessage?.trim();
+  if (text != null && text.isNotEmpty) {
+    final name = lastMessageSenderName?.trim() ?? '';
+    if (chatType == 'group' && name.isNotEmpty) {
+      final isMe = currentUserId != null && lastMessageSenderId == currentUserId;
+      final who = isMe ? 'Вы' : name;
+      return ChatListSubtitleParts(
+        line: '$who: $text',
+        groupAuthor: who,
+        groupMessageBody: text,
+      );
+    }
+  }
+  final line = resolveChatListSubtitle(
+    chatType: chatType,
+    lastMessage: lastMessage,
+    lastMessageType: lastMessageType,
+    lastMessageSenderName: lastMessageSenderName,
+    lastMessageSenderId: lastMessageSenderId,
+    currentUserId: currentUserId,
+  );
+  return ChatListSubtitleParts(line: line);
+}
+
 String resolveChatListTitle({
   required String title,
   required int chatId,
@@ -37,9 +86,20 @@ String resolveChatListSubtitle({
   required String chatType,
   String? lastMessage,
   String? lastMessageType,
+  String? lastMessageSenderName,
+  int? lastMessageSenderId,
+  int? currentUserId,
 }) {
   final text = lastMessage?.trim();
   if (text != null && text.isNotEmpty) {
+    if (chatType == 'group') {
+      final name = lastMessageSenderName?.trim() ?? '';
+      if (name.isNotEmpty) {
+        final isMe = currentUserId != null && lastMessageSenderId == currentUserId;
+        final who = isMe ? 'Вы' : name;
+        return '$who: $text';
+      }
+    }
     return text;
   }
 
@@ -62,14 +122,17 @@ String resolveChatTimeLabel(String? raw) {
   if (local == null) return normalized;
 
   final now = DateTime.now();
-  final sameDay = now.year == local.year &&
-      now.month == local.month &&
-      now.day == local.day;
+  final today = DateTime(now.year, now.month, now.day);
+  final localDay = DateTime(local.year, local.month, local.day);
+  final diffDays = today.difference(localDay).inDays;
 
-  if (sameDay) {
+  if (diffDays == 0) {
     final hours = local.hour.toString().padLeft(2, '0');
     final minutes = local.minute.toString().padLeft(2, '0');
     return '$hours:$minutes';
+  }
+  if (diffDays == 1) {
+    return 'Вчера';
   }
 
   final day = local.day.toString().padLeft(2, '0');

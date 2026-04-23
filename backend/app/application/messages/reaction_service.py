@@ -20,19 +20,21 @@ def reaction_groups_for_messages(
     )
     acc: dict[int, dict[str, list[int]]] = defaultdict(dict)
     for r in rows:
-        bucket = acc[r.message_id].setdefault(r.emoji, [0, 0])
-        bucket[0] += 1
-        if r.user_id == viewer_user_id:
-            bucket[1] = 1
+        users = acc[r.message_id].setdefault(r.emoji, [])
+        users.append(r.user_id)
 
     out: dict[int, list[ReactionGroup]] = {}
     for mid, emojis in acc.items():
-        out[mid] = [
-            ReactionGroup(
-                emoji=emoji,
-                count=data[0],
-                reacted_by_me=bool(data[1]),
+        groups: list[ReactionGroup] = []
+        for emoji in sorted(emojis.keys()):
+            user_ids = sorted(set(emojis[emoji]))
+            groups.append(
+                ReactionGroup(
+                    emoji=emoji,
+                    count=len(user_ids),
+                    reacted_by_me=viewer_user_id in user_ids,
+                    reactor_user_ids=user_ids,
+                )
             )
-            for emoji, data in sorted(emojis.items())
-        ]
+        out[mid] = groups
     return out

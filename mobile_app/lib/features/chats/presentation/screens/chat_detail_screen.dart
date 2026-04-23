@@ -3,7 +3,8 @@ import 'dart:io' show File;
 
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -44,6 +45,7 @@ import '../widgets/chat_detail_avatar_widgets.dart';
 import '../widgets/chat_detail_fullscreen_image_viewer.dart';
 import '../widgets/chat_detail_fullscreen_video_page.dart';
 import '../widgets/chat_detail_messages_list.dart';
+import '../widgets/messenger_styled_dialogs.dart';
 import '../widgets/chat_message_actions_panel.dart';
 import '../widgets/message_input_bar.dart';
 
@@ -288,6 +290,7 @@ class _ChatDetailScreenState extends _ChatDetailScreenStateBase
           onVoiceRecordTap: _toggleVoiceRecording,
           onVoicePickFile: _pickAndSendVoiceFile,
           onSend: _sendMessage,
+          onDesktopExtras: _showDesktopComposerExtras,
         ),
       ],
     );
@@ -314,9 +317,9 @@ class _ChatDetailScreenState extends _ChatDetailScreenStateBase
     final peerSubtitle = !_isGroupChat
         ? (peerOnline
             ? 'в сети'
-            : LastSeenLabel.formatOffline(
+            : 'был(а) в сети ${LastSeenLabel.formatOffline(
                 peerId != null ? _memberLastSeen[peerId] : null,
-              ))
+              )}')
         : '';
 
     return Scaffold(
@@ -357,7 +360,7 @@ class _ChatDetailScreenState extends _ChatDetailScreenStateBase
                     title: visibleTitle,
                     avatarUrl: _chatAvatarUrl,
                     size: 42,
-                    showOnlineDot: peerOnline,
+                    showOnlineDot: false,
                   ),
                 ),
                 onVoiceCall: _startVoiceCall,
@@ -377,6 +380,13 @@ class _ChatDetailScreenState extends _ChatDetailScreenStateBase
                 menuShowMembersItem: _groupCreatedBy != null &&
                     _currentUserId != null &&
                     _groupCreatedBy == _currentUserId,
+                onSearchInChat: isDesktopMessengerLayout ? _showInChatSearch : null,
+                onVideoCall: isDesktopMessengerLayout && !_isGroupChat
+                    ? _startVoiceCall
+                    : null,
+                onMorePrivate: isDesktopMessengerLayout && !_isGroupChat
+                    ? _showPrivateChatHeaderMenu
+                    : null,
               ),
               Expanded(child: _buildBody()),
             ],

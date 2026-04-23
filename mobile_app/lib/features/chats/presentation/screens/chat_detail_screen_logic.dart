@@ -90,10 +90,15 @@ mixin _ChatDetailStateHelpers on _ChatDetailScreenStateBase {
       return;
     }
 
+    final quickScroll = !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.android ||
+            defaultTargetPlatform == TargetPlatform.iOS);
     _scrollController.animateTo(
       offset,
-      duration: const Duration(milliseconds: 250),
-      curve: Curves.easeOut,
+      duration: quickScroll
+          ? const Duration(milliseconds: 120)
+          : const Duration(milliseconds: 250),
+      curve: quickScroll ? Curves.easeOutCubic : Curves.easeOut,
     );
   }
 

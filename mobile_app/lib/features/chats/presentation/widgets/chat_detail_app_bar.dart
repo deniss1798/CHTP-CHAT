@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_icons.dart';
 import '../../../../app/widgets/app_surface.dart';
+import '../../../../core/platform/desktop_layout.dart';
 
 /// Шапка экрана чата (назад, аватар, заголовок, звонки, меню группы).
 class ChatDetailAppBar extends StatelessWidget {
@@ -21,6 +22,9 @@ class ChatDetailAppBar extends StatelessWidget {
     required this.onAddMember,
     required this.onMenuSelected,
     required this.menuShowMembersItem,
+    this.onSearchInChat,
+    this.onVideoCall,
+    this.onMorePrivate,
   });
 
   final String visibleTitle;
@@ -37,11 +41,16 @@ class ChatDetailAppBar extends StatelessWidget {
   final VoidCallback onAddMember;
   final void Function(String value) onMenuSelected;
   final bool menuShowMembersItem;
+  final VoidCallback? onSearchInChat;
+  final VoidCallback? onVideoCall;
+  final VoidCallback? onMorePrivate;
 
   @override
   Widget build(BuildContext context) {
+    final isDesktop = isDesktopMessengerLayout;
+
     return Container(
-      padding: const EdgeInsets.fromLTRB(10, 10, 12, 10),
+      padding: const EdgeInsets.fromLTRB(8, 10, 10, 10),
       decoration: BoxDecoration(
         color: AppColors.background.withAlpha(220),
         border: const Border(
@@ -55,12 +64,12 @@ class ChatDetailAppBar extends StatelessWidget {
             tooltip: 'Назад',
             onTap: onBack,
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           Expanded(
             child: Row(
               children: [
                 avatarLeading,
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -77,19 +86,36 @@ class ChatDetailAppBar extends StatelessWidget {
                           letterSpacing: -0.3,
                         ),
                       ),
-                      const SizedBox(height: 2),
+                      if (!isGroupChat) const SizedBox(height: 2),
                       if (!isGroupChat)
-                        Text(
-                          peerSubtitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: peerOnline
-                                ? AppColors.accentBright
-                                : AppColors.textSecondary,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
+                        Row(
+                          children: [
+                            if (peerOnline) ...[
+                              Container(
+                                width: 7,
+                                height: 7,
+                                margin: const EdgeInsets.only(right: 6, top: 1),
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF2ECC71),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ],
+                            Expanded(
+                              child: Text(
+                                peerSubtitle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: peerOnline
+                                      ? const Color(0xFF2ECC71)
+                                      : AppColors.textSecondary,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                     ],
                   ),
@@ -97,64 +123,148 @@ class ChatDetailAppBar extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          if (!isGroupChat)
-            AppIconButtonSurface(
-              icon: AppIcons.call,
-              tooltip: 'Голосовой звонок',
-              onTap: onVoiceCall,
-              active: true,
-            ),
-          if (isGroupChat)
-            AppIconButtonSurface(
-              icon: Icons.groups_rounded,
-              tooltip: 'Групповой звонок',
-              onTap: onGroupCall,
-              active: true,
-            ),
-          if (isGroupChat) ...[
-            const SizedBox(width: 8),
-            AppIconButtonSurface(
-              icon: AppIcons.photoCamera,
-              tooltip: 'Изменить аватар группы',
-              onTap: isUploadingChatAvatar ? null : onPickGroupAvatar,
-              iconColor: isUploadingChatAvatar
-                  ? AppColors.textMuted
-                  : AppColors.accentBright,
-            ),
-            const SizedBox(width: 8),
-            AppIconButtonSurface(
-              icon: AppIcons.personAdd,
-              tooltip: 'Добавить участника',
-              onTap: onAddMember,
-            ),
-            const SizedBox(width: 4),
-            PopupMenuButton<String>(
-              tooltip: 'Меню группы',
-              color: AppColors.surfaceRaised,
-              icon: const Icon(
-                AppIcons.moreVert,
-                color: AppColors.textPrimary,
+          if (isDesktop) ...[
+            if (onSearchInChat != null) ...[
+              AppIconButtonSurface(
+                icon: AppIcons.search,
+                tooltip: 'Поиск в чате',
+                onTap: onSearchInChat!,
               ),
-              onSelected: onMenuSelected,
-              itemBuilder: (context) {
-                return [
-                  const PopupMenuItem(
-                    value: 'rename',
-                    child: Text('Переименовать группу'),
-                  ),
-                  if (menuShowMembersItem)
+              const SizedBox(width: 4),
+            ],
+            if (isGroupChat) ...[
+              AppIconButtonSurface(
+                icon: Icons.groups_rounded,
+                tooltip: 'Групповой звонок',
+                onTap: onGroupCall,
+                active: true,
+              ),
+              const SizedBox(width: 4),
+              AppIconButtonSurface(
+                icon: AppIcons.photoCamera,
+                tooltip: 'Изменить аватар группы',
+                onTap: isUploadingChatAvatar ? null : onPickGroupAvatar,
+                iconColor: isUploadingChatAvatar
+                    ? AppColors.textMuted
+                    : AppColors.navRailActiveAccent,
+              ),
+              const SizedBox(width: 4),
+              AppIconButtonSurface(
+                icon: AppIcons.personAdd,
+                tooltip: 'Добавить участника',
+                onTap: onAddMember,
+              ),
+              const SizedBox(width: 2),
+              PopupMenuButton<String>(
+                tooltip: 'Меню группы',
+                color: AppColors.surfaceRaised,
+                icon: const Icon(
+                  AppIcons.moreVert,
+                  color: AppColors.textPrimary,
+                ),
+                onSelected: onMenuSelected,
+                itemBuilder: (context) {
+                  return [
                     const PopupMenuItem(
-                      value: 'members',
-                      child: Text('Участники'),
+                      value: 'rename',
+                      child: Text('Переименовать группу'),
                     ),
-                  const PopupMenuItem(
-                    value: 'leave',
-                    child: Text('Покинуть группу'),
-                  ),
-                ];
-              },
-            ),
+                    if (menuShowMembersItem)
+                      const PopupMenuItem(
+                        value: 'members',
+                        child: Text('Участники'),
+                      ),
+                    const PopupMenuItem(
+                      value: 'leave',
+                      child: Text('Покинуть группу'),
+                    ),
+                  ];
+                },
+              ),
+            ] else ...[
+              AppIconButtonSurface(
+                icon: AppIcons.call,
+                tooltip: 'Голосовой звонок',
+                onTap: onVoiceCall,
+                active: true,
+              ),
+              if (onVideoCall != null) ...[
+                const SizedBox(width: 4),
+                AppIconButtonSurface(
+                  icon: AppIcons.videocam,
+                  tooltip: 'Видеозвонок',
+                  onTap: onVideoCall!,
+                  active: true,
+                ),
+              ],
+              if (onMorePrivate != null) ...[
+                const SizedBox(width: 2),
+                AppIconButtonSurface(
+                  icon: AppIcons.moreVert,
+                  tooltip: 'Ещё',
+                  onTap: onMorePrivate!,
+                ),
+              ],
+            ],
+          ] else ...[
+            if (!isGroupChat)
+              AppIconButtonSurface(
+                icon: AppIcons.call,
+                tooltip: 'Голосовой звонок',
+                onTap: onVoiceCall,
+                active: true,
+              ),
+            if (isGroupChat) ...[
+              const SizedBox(width: 8),
+              AppIconButtonSurface(
+                icon: Icons.groups_rounded,
+                tooltip: 'Групповой звонок',
+                onTap: onGroupCall,
+                active: true,
+              ),
+              const SizedBox(width: 8),
+              AppIconButtonSurface(
+                icon: AppIcons.photoCamera,
+                tooltip: 'Изменить аватар группы',
+                onTap: isUploadingChatAvatar ? null : onPickGroupAvatar,
+                iconColor: isUploadingChatAvatar
+                    ? AppColors.textMuted
+                    : AppColors.accentBright,
+              ),
+              const SizedBox(width: 8),
+              AppIconButtonSurface(
+                icon: AppIcons.personAdd,
+                tooltip: 'Добавить участника',
+                onTap: onAddMember,
+              ),
+              const SizedBox(width: 4),
+              PopupMenuButton<String>(
+                tooltip: 'Меню группы',
+                color: AppColors.surfaceRaised,
+                icon: const Icon(
+                  AppIcons.moreVert,
+                  color: AppColors.textPrimary,
+                ),
+                onSelected: onMenuSelected,
+                itemBuilder: (context) {
+                  return [
+                    const PopupMenuItem(
+                      value: 'rename',
+                      child: Text('Переименовать группу'),
+                    ),
+                    if (menuShowMembersItem)
+                      const PopupMenuItem(
+                        value: 'members',
+                        child: Text('Участники'),
+                      ),
+                    const PopupMenuItem(
+                      value: 'leave',
+                      child: Text('Покинуть группу'),
+                    ),
+                  ];
+                },
+              ),
+            ],
           ],
         ],
       ),

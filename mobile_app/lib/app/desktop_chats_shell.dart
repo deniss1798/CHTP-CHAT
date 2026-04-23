@@ -10,7 +10,10 @@ const String _kPrefsLeftWidth = 'desktop_chats_left_width';
 
 /// Слева список чатов, справа открытый чат; ширина левой колонки перетаскивается.
 class DesktopChatsShell extends StatefulWidget {
-  const DesktopChatsShell({super.key});
+  const DesktopChatsShell({super.key, this.shellListMode = false});
+
+  /// `true` — список чатов вложен в [MessengerDesktopShell] (без дублей в шапке).
+  final bool shellListMode;
 
   @override
   State<DesktopChatsShell> createState() => _DesktopChatsShellState();
@@ -99,6 +102,7 @@ class _DesktopChatsShellState extends State<DesktopChatsShell> {
                 width: left,
                 child: ChatsScreen(
                   embedded: true,
+                  shellListMode: widget.shellListMode,
                   selectedChatId: _selectedChatId,
                   onChatSelected: _onChatSelected,
                 ),
@@ -144,9 +148,9 @@ class _DesktopEmptyChatPane extends StatelessWidget {
             'Выберите чат в списке слева',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: AppColors.textMuted.withAlpha(200),
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
+              color: AppColors.textMuted.withAlpha(220),
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
               height: 1.4,
             ),
           ),

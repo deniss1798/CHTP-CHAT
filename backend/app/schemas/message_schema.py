@@ -19,6 +19,10 @@ class ReactionGroup(BaseModel):
     emoji: str
     count: int
     reacted_by_me: bool
+    reactor_user_ids: list[int] = Field(
+        default_factory=list,
+        description="User ids who reacted with this emoji (for group tooltips).",
+    )
 
 
 class MessageReplyPreview(BaseModel):
