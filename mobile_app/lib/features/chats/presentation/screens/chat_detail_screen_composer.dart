@@ -33,7 +33,11 @@ mixin _ChatDetailComposerAndActionsLogic
 
       _messageController.clear();
 
-      final exists = _messages.any((m) => m['id'] == createdMessage['id']);
+      final createdId = ChatDetailMessageMaps.intFromDynamic(createdMessage['id']);
+      final exists = createdId != null &&
+          _messages.any(
+            (m) => ChatDetailMessageMaps.intFromDynamic(m['id']) == createdId,
+          );
 
       setState(() {
         if (!exists) {
@@ -178,7 +182,11 @@ mixin _ChatDetailComposerAndActionsLogic
 
       if (!mounted) return;
 
-      final exists = _messages.any((m) => m['id'] == createdMessage['id']);
+      final createdId = ChatDetailMessageMaps.intFromDynamic(createdMessage['id']);
+      final exists = createdId != null &&
+          _messages.any(
+            (m) => ChatDetailMessageMaps.intFromDynamic(m['id']) == createdId,
+          );
 
       setState(() {
         if (!exists) {
@@ -280,7 +288,11 @@ mixin _ChatDetailComposerAndActionsLogic
 
       if (!mounted) return;
 
-      final exists = _messages.any((m) => m['id'] == createdMessage['id']);
+      final createdId = ChatDetailMessageMaps.intFromDynamic(createdMessage['id']);
+      final exists = createdId != null &&
+          _messages.any(
+            (m) => ChatDetailMessageMaps.intFromDynamic(m['id']) == createdId,
+          );
 
       setState(() {
         if (!exists) {
@@ -344,7 +356,11 @@ mixin _ChatDetailComposerAndActionsLogic
 
       if (!mounted) return;
 
-      final exists = _messages.any((m) => m['id'] == createdMessage['id']);
+      final createdId = ChatDetailMessageMaps.intFromDynamic(createdMessage['id']);
+      final exists = createdId != null &&
+          _messages.any(
+            (m) => ChatDetailMessageMaps.intFromDynamic(m['id']) == createdId,
+          );
 
       setState(() {
         if (!exists) {
@@ -421,7 +437,11 @@ mixin _ChatDetailComposerAndActionsLogic
 
       if (!mounted) return;
 
-      final exists = _messages.any((m) => m['id'] == createdMessage['id']);
+      final createdId = ChatDetailMessageMaps.intFromDynamic(createdMessage['id']);
+      final exists = createdId != null &&
+          _messages.any(
+            (m) => ChatDetailMessageMaps.intFromDynamic(m['id']) == createdId,
+          );
 
       setState(() {
         if (!exists) {

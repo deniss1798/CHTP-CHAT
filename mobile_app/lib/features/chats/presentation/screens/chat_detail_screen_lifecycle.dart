@@ -367,7 +367,15 @@ mixin _ChatDetailLifecycleLogic on _ChatDetailScreenStateBase, _ChatDetailStateH
     }
   }
 
-  Future<void> _loadMessages() async {
+  void _onOpenChatSyncRequest() {
+    final req = openChatSyncNotifier.value;
+    if (req == null) return;
+    if (req.chatId != widget.chatId) return;
+    unawaited(_loadMessages(silentError: true));
+  }
+
+  /// [silentError] — при догрузке по inbox не затирать экран ошибкой сети.
+  Future<void> _loadMessages({bool silentError = false}) async {
     try {
       final page = await _messagesService.getMessagesPage(
         widget.chatId,
@@ -423,6 +431,7 @@ mixin _ChatDetailLifecycleLogic on _ChatDetailScreenStateBase, _ChatDetailStateH
       });
     } catch (e) {
       if (!mounted) return;
+      if (silentError) return;
 
       setState(() {
         _error = chatDetailExtractErrorMessage(

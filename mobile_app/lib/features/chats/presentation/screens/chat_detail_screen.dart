@@ -18,6 +18,7 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/platform/desktop_layout.dart';
 import '../../../../core/realtime/chat_ws_contract.dart';
 import '../../../../core/notifiers/chats_list_refresh_notifier.dart';
+import '../../../../core/notifiers/open_chat_sync_notifier.dart';
 import '../../../auth/data/services/auth_service.dart';
 import '../../../calls/incoming_call_ringtone.dart';
 import '../../../calls/presentation/screens/group_call_screen.dart';
@@ -166,10 +167,12 @@ class _ChatDetailScreenState extends _ChatDetailScreenStateBase
       });
     }
     _initChat();
+    openChatSyncNotifier.addListener(_onOpenChatSyncRequest);
   }
 
   @override
   void dispose() {
+    openChatSyncNotifier.removeListener(_onOpenChatSyncRequest);
     _socketReconnectTimer?.cancel();
     _lastSeenSubtitleTimer?.cancel();
     _presenceTimer?.cancel();

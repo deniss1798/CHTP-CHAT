@@ -273,13 +273,14 @@ class VoiceCallSession {
         _hadP2PConnected = true;
         _connectedAt ??= DateTime.now();
         onStatus('В эфире');
-        // На desktop переключение «динамик» может обрубить вывод; только Android/iOS.
+        // Режим громкой связи (true) даёт на другом конце «как с динамика» и другой профиль микрофона.
+        // По умолчанию — слуховой динамик / гарнитура (как обычный звонок). Только Android/iOS.
         if (!kIsWeb &&
             (defaultTargetPlatform == TargetPlatform.android ||
                 defaultTargetPlatform == TargetPlatform.iOS)) {
           unawaited(() async {
             try {
-              await Helper.setSpeakerphoneOn(true);
+              await Helper.setSpeakerphoneOn(false);
             } catch (_) {}
           }());
         }

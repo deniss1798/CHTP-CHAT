@@ -11,15 +11,15 @@ class ChatDetailMessageMaps {
   }
 
   static Map<String, dynamic>? extractMessagePayload(Map<String, dynamic> raw) {
+    final message = raw['message'];
+    if (message is Map<String, dynamic>) return message;
+    if (message is Map) return Map<String, dynamic>.from(message);
+
     if (raw.containsKey('chat_id') &&
         raw.containsKey('sender_id') &&
         raw.containsKey('text')) {
       return Map<String, dynamic>.from(raw);
     }
-
-    final message = raw['message'];
-    if (message is Map<String, dynamic>) return message;
-    if (message is Map) return Map<String, dynamic>.from(message);
 
     final data = raw['data'];
     if (data is Map<String, dynamic>) return data;

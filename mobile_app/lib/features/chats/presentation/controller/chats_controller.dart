@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart';
 import '../../../../core/formatting/server_time.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/notifiers/chats_list_refresh_notifier.dart';
+import '../../../../core/notifiers/open_chat_sync_notifier.dart';
 import '../../../../core/push/local_notifications_service.dart';
 import '../../../../core/realtime/chat_ws_contract.dart';
 import '../../../../core/storage/secure_storage_service.dart';
@@ -380,6 +381,9 @@ class ChatsController extends ChangeNotifier {
     final chatId = _parseInt(message['chat_id']);
     if (chatId != null) {
       final viewingThis = isChatOpen?.call(chatId) ?? false;
+      if (viewingThis) {
+        requestOpenChatMessagesSync(chatId);
+      }
       if (!viewingThis && LocalNotificationsService.supported) {
         final sender = (message['sender_name'] ?? '').toString().trim();
         final preview = (message['preview'] ?? '').toString().trim();

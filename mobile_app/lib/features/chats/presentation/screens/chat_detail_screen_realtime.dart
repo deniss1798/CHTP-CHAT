@@ -444,7 +444,7 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
     if (payload == null) return;
 
     var normalized = ChatDetailMessageMaps.normalizeMessageMap(payload);
-    final incomingId = normalized['id'];
+    final incomingId = ChatDetailMessageMaps.intFromDynamic(normalized['id']);
     final senderId = ChatDetailMessageMaps.intFromDynamic(normalized['sender_id']);
     if (_isMine(normalized)) {
       final mid = ChatDetailMessageMaps.intFromDynamic(normalized['id']);
@@ -453,7 +453,10 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
         normalized['delivery_status'] = _computeDeliveryForOutgoing(mid);
       }
     }
-    final exists = _messages.any((m) => m['id'] == incomingId);
+    final exists = incomingId != null &&
+        _messages.any(
+          (m) => ChatDetailMessageMaps.intFromDynamic(m['id']) == incomingId,
+        );
 
     if (exists) return;
     if (!mounted) return;
