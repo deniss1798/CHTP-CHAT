@@ -1,31 +1,8 @@
 # Messanger
 
-Кроссплатформенный мессенджер с Flutter-клиентом и FastAPI backend.
+Кроссплатформенный мессенджер: Flutter-клиент (`mobile_app/`) и FastAPI backend (`backend/`) с чатами, WebSocket realtime, медиа, push и звонками.
 
-## Состав проекта
-
-- `backend/` — API, WebSocket realtime, media, auth, calls signaling, PostgreSQL, Docker.
-- `mobile_app/` — Flutter-клиент для Android, Windows и других платформ Flutter.
-- `docs/` — архитектура, realtime, media, calls, data model, testing rules.
-
-## Технологии
-
-- Backend: `FastAPI`, `SQLAlchemy`, `Alembic`, `PostgreSQL`, `WebSocket`
-- Mobile: `Flutter`, `Dio`, `Firebase Messaging`, `flutter_webrtc`
-- Infra: `Docker`, `S3-compatible storage`, `TURN / WebRTC`
-
-## Быстрый старт
-
-### Backend
-
-1. Перейти в `backend/`
-2. Создать локальный `.env` на основе `.env.example`
-3. Поднять PostgreSQL
-4. Установить зависимости
-5. Применить миграции
-6. Запустить приложение
-
-Пример:
+## Backend
 
 ```powershell
 cd backend
@@ -36,73 +13,37 @@ alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
-### Mobile
+Основные env: `DATABASE_URL`, `SECRET_KEY`, `CORS_ORIGINS`, SMTP-переменные для email, `S3_ENDPOINT_URL`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_PRIVATE_BUCKET`, `S3_PUBLIC_BUCKET`, TURN/WebRTC переменные.
 
-1. Перейти в `mobile_app/`
-2. Установить Flutter-зависимости
-3. Передать нужные `--dart-define` для TURN/WebRTC
-4. Запустить или собрать нужную платформу
-
-Пример:
+## Flutter
 
 ```powershell
 cd mobile_app
 flutter pub get
-flutter run
+flutter run --dart-define=API_BASE_URL=http://127.0.0.1:8000/api
 ```
 
-Для release-сборок есть батник:
+Для production укажи реальный `API_BASE_URL`. Release-сборка Windows запускается через `build_flutter_release.bat`.
 
-```powershell
-build_flutter_release.bat
-```
-
-## Архитектура
-
-### Backend
-
-- `api/` — только транспортный слой и тонкие роутеры
-- `application/` — use cases и orchestration
-- `domain/` — политики и бизнес-правила
-- `repositories/` — доступ к данным
-- `infrastructure/` — S3, TURN, media processing
-- `core/` — config, security, DI, shared runtime helpers
-
-### Mobile
-
-- `presentation/` — экраны и UI-виджеты
-- `data/` — API, sockets, storage
-- `domain/` — правила, сущности, вычисления
-- `controllers/state` — orchestration между UI и data/domain
-
-Подробности:
-
-- [docs/architecture.md](C:/Users/User/Desktop/Messanger/docs/architecture.md)
-- [docs/architecture-rules.md](C:/Users/User/Desktop/Messanger/docs/architecture-rules.md)
-- [docs/contracts.md](C:/Users/User/Desktop/Messanger/docs/contracts.md)
-- [docs/realtime.md](C:/Users/User/Desktop/Messanger/docs/realtime.md)
-- [docs/testing.md](C:/Users/User/Desktop/Messanger/docs/testing.md)
-
-## Правила репозитория
-
-- Реальные секреты не хранятся в git
-- В репо лежат только примеры конфигов, например `.env.example`
-- Build-артефакты, `__pycache__`, логи и локальные IDE-файлы в git не коммитятся
-- Архитектурные правила для слоёв зафиксированы в `docs/architecture-rules.md`
-
-## Проверка качества
-
-Backend:
+## Tests
 
 ```powershell
 cd backend
-pytest
+python -m pytest tests/ -q
 ```
-
-Mobile:
 
 ```powershell
 cd mobile_app
-flutter analyze
 flutter test
+flutter analyze
 ```
+
+## Docs
+
+- [Architecture](docs/architecture.md)
+- [Architecture Rules](docs/architecture-rules.md)
+- [Contracts](docs/contracts.md)
+- [Realtime](docs/realtime.md)
+- [Media](docs/media.md)
+- [Calls](docs/calls.md)
+- [Testing](docs/testing.md)

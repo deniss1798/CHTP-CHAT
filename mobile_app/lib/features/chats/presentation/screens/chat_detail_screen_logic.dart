@@ -103,11 +103,7 @@ mixin _ChatDetailStateHelpers on _ChatDetailScreenStateBase {
   }
 
   bool _isMine(Map<String, dynamic> message) {
-    final senderId = message['sender_id'];
-
-    if (_currentUserId == null || senderId == null) return false;
-    if (senderId is int) return senderId == _currentUserId;
-    return int.tryParse(senderId.toString()) == _currentUserId;
+    return _messageActionController.isMine(message, _currentUserId);
   }
 
   String _senderName(Map<String, dynamic> message) {

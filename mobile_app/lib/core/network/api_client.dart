@@ -130,7 +130,7 @@ class ApiClient {
     ),
   )..interceptors.addAll([
           _MultipartContentTypeInterceptor(),
-          ApiLoggerInterceptor(),
+          if (kDebugMode) ApiLoggerInterceptor(),
         ]);
 
   /// Отдельный клиент для multipart: без `baseUrl`, запросы только через [Dio.postUri].
@@ -145,7 +145,7 @@ class ApiClient {
       ),
     )..interceptors.addAll([
           _MultipartContentTypeInterceptor(),
-          ApiLoggerInterceptor(),
+          if (kDebugMode) ApiLoggerInterceptor(),
         ]);
   }
 }

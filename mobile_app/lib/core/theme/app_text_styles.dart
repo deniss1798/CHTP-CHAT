@@ -26,11 +26,32 @@ abstract final class AppTextStyles {
     height: 1.4,
   );
 
+  static const TextStyle bodyStrong = TextStyle(
+    color: AppColors.textPrimary,
+    fontSize: 15,
+    fontWeight: FontWeight.w700,
+    height: 1.35,
+  );
+
   static const TextStyle secondary = TextStyle(
     color: AppColors.textSecondary,
     fontSize: 14,
     fontWeight: FontWeight.w500,
     height: 1.4,
+  );
+
+  static const TextStyle input = TextStyle(
+    color: AppColors.textPrimary,
+    fontSize: 15,
+    fontWeight: FontWeight.w600,
+    height: 1.35,
+  );
+
+  static const TextStyle inputHint = TextStyle(
+    color: AppColors.textMuted,
+    fontSize: 15,
+    fontWeight: FontWeight.w500,
+    height: 1.35,
   );
 
   static const TextStyle caption = TextStyle(

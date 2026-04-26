@@ -18,4 +18,4 @@
 
 После отправки сообщения вызывается `notify_inbox_new_message` (`application/messages/inbox_delivery.py`) для пользователей, не являющихся отправителем.
 
-Подробный канонический контракт см. в [contracts.md](C:/Users/User/Desktop/Messanger/docs/contracts.md).
+Подробный канонический контракт см. в [contracts.md](contracts.md).

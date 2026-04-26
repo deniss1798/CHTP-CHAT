@@ -42,6 +42,7 @@ import 'group_members_manage_screen.dart';
 import '../../../profile/presentation/screens/user_profile_screen.dart';
 import '../chat_detail_formatters.dart';
 import '../chat_detail_message_maps.dart';
+import '../controllers/chat_detail_controller.dart';
 import '../widgets/chat_detail_app_bar.dart';
 import '../widgets/chat_detail_avatar_widgets.dart';
 import '../widgets/chat_detail_conversation_view.dart';
@@ -87,6 +88,11 @@ abstract class _ChatDetailScreenStateBase extends State<ChatDetailScreen> {
   final ImagePicker _imagePicker = ImagePicker();
   final PresenceService _presenceService = PresenceService();
   final AudioRecorder _voiceRecorder = AudioRecorder();
+  final MessageListController _messageListController = MessageListController();
+  final ComposerController _composerController = ComposerController();
+  final MediaUploadController _mediaUploadController = MediaUploadController();
+  final ChatSocketController _chatSocketController = ChatSocketController();
+  final MessageActionController _messageActionController = MessageActionController();
 
   bool _recordingVoice = false;
   bool _isUploadingChatAvatar = false;

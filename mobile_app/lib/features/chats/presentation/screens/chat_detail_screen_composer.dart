@@ -11,8 +11,13 @@ mixin _ChatDetailComposerAndActionsLogic
       return;
     }
 
-    final text = _messageController.text.trim();
-    if (text.isEmpty || _isSending) return;
+    if (!_composerController.canSendText(
+      controller: _messageController,
+      isSending: _isSending,
+    )) {
+      return;
+    }
+    final text = _composerController.normalizedText(_messageController);
 
     setState(() {
       _isSending = true;
@@ -33,16 +38,8 @@ mixin _ChatDetailComposerAndActionsLogic
 
       _messageController.clear();
 
-      final createdId = ChatDetailMessageMaps.intFromDynamic(createdMessage['id']);
-      final exists = createdId != null &&
-          _messages.any(
-            (m) => ChatDetailMessageMaps.intFromDynamic(m['id']) == createdId,
-          );
-
       setState(() {
-        if (!exists) {
-          _messages.add(createdMessage);
-        }
+        _messageListController.appendIfMissing(_messages, createdMessage);
         _replyingTo = null;
         _isSending = false;
       });
@@ -143,24 +140,14 @@ mixin _ChatDetailComposerAndActionsLogic
   }) async {
     if (_isSendingDocument) return;
 
-    final file = File(path);
-    if (!await file.exists()) return;
-
-    final len = await file.length();
-    if (len > kMaxDocumentBytes) {
+    final validation = await _mediaUploadController.validateDocumentPath(
+      path: path,
+      displayName: displayName,
+    );
+    if (!validation.isOk) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('File is larger than 50 MB')),
-      );
-      return;
-    }
-
-    if (!isAllowedDocumentFileName(displayName)) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Unsupported file type. Allowed: PDF, Office, ODF, RTF, TXT'),
-        ),
+        SnackBar(content: Text(validation.errorMessage!)),
       );
       return;
     }
@@ -182,16 +169,8 @@ mixin _ChatDetailComposerAndActionsLogic
 
       if (!mounted) return;
 
-      final createdId = ChatDetailMessageMaps.intFromDynamic(createdMessage['id']);
-      final exists = createdId != null &&
-          _messages.any(
-            (m) => ChatDetailMessageMaps.intFromDynamic(m['id']) == createdId,
-          );
-
       setState(() {
-        if (!exists) {
-          _messages.add(createdMessage);
-        }
+        _messageListController.appendIfMissing(_messages, createdMessage);
         _replyingTo = null;
         _isSendingDocument = false;
       });
@@ -288,16 +267,8 @@ mixin _ChatDetailComposerAndActionsLogic
 
       if (!mounted) return;
 
-      final createdId = ChatDetailMessageMaps.intFromDynamic(createdMessage['id']);
-      final exists = createdId != null &&
-          _messages.any(
-            (m) => ChatDetailMessageMaps.intFromDynamic(m['id']) == createdId,
-          );
-
       setState(() {
-        if (!exists) {
-          _messages.add(createdMessage);
-        }
+        _messageListController.appendIfMissing(_messages, createdMessage);
         _replyingTo = null;
         _isSendingImage = false;
       });
@@ -356,16 +327,8 @@ mixin _ChatDetailComposerAndActionsLogic
 
       if (!mounted) return;
 
-      final createdId = ChatDetailMessageMaps.intFromDynamic(createdMessage['id']);
-      final exists = createdId != null &&
-          _messages.any(
-            (m) => ChatDetailMessageMaps.intFromDynamic(m['id']) == createdId,
-          );
-
       setState(() {
-        if (!exists) {
-          _messages.add(createdMessage);
-        }
+        _messageListController.appendIfMissing(_messages, createdMessage);
         _replyingTo = null;
         _isSendingVideo = false;
       });
@@ -437,16 +400,8 @@ mixin _ChatDetailComposerAndActionsLogic
 
       if (!mounted) return;
 
-      final createdId = ChatDetailMessageMaps.intFromDynamic(createdMessage['id']);
-      final exists = createdId != null &&
-          _messages.any(
-            (m) => ChatDetailMessageMaps.intFromDynamic(m['id']) == createdId,
-          );
-
       setState(() {
-        if (!exists) {
-          _messages.add(createdMessage);
-        }
+        _messageListController.appendIfMissing(_messages, createdMessage);
         _replyingTo = null;
         _isSendingVideo = false;
       });

@@ -4,24 +4,12 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
   @override
   Future<void> _connectSocket() async {
     await _socketSubscription?.cancel();
-
-    for (var attempt = 0; attempt < 3; attempt++) {
-      try {
-        await _chatSocketService.connect(
-          chatId: widget.chatId,
-          baseHttpUrl: ApiClient.baseUrl,
-        );
-
-        _socketSubscription = _chatSocketService.messagesStream.listen((message) {
-          _handleSocketEvent(message);
-        });
-        return;
-      } catch (_) {
-        if (attempt < 2) {
-          await Future<void>.delayed(const Duration(milliseconds: 500));
-        }
-      }
-    }
+    _socketSubscription = await _chatSocketController.connect(
+      service: _chatSocketService,
+      chatId: widget.chatId,
+      baseHttpUrl: ApiClient.baseUrl,
+      onMessage: _handleSocketEvent,
+    );
   }
 
   void _handleSocketEvent(Map<String, dynamic> incoming) {
@@ -87,21 +75,7 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
       if (!mounted) return;
 
       setState(() {
-        final idx = _messages.indexWhere(
-          (m) => ChatDetailMessageMaps.intFromDynamic(m['id']) == id,
-        );
-        if (idx >= 0) {
-          final copy = Map<String, dynamic>.from(_messages[idx]);
-          copy['text'] = 'Сообщение удалено';
-          copy['message_type'] = 'deleted';
-          copy['media_key'] = null;
-          copy['media_url'] = null;
-          copy['media_mime_type'] = null;
-          copy['media_size'] = null;
-          copy['is_deleted'] = true;
-          copy['reactions'] = const [];
-          _messages[idx] = copy;
-        }
+        _messageListController.markDeleted(_messages, id!);
         if (_editingMessage != null && _editingMessage!['id'] == id) {
           _editingMessage = null;
           _messageController.clear();
@@ -127,14 +101,11 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
       }
       if (!mounted) return;
       setState(() {
-        final idx = _messages.indexWhere(
-          (m) => ChatDetailMessageMaps.intFromDynamic(m['id']) == mid,
+        _messageListController.applyReactions(
+          _messages,
+          messageId: mid,
+          reactions: reactions,
         );
-        if (idx >= 0) {
-          final copy = Map<String, dynamic>.from(_messages[idx]);
-          copy['reactions'] = reactions;
-          _messages[idx] = copy;
-        }
       });
       return;
     }
@@ -145,7 +116,6 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
 
       var normalized =
           ChatDetailMessageMaps.normalizeMessageMap(Map<String, dynamic>.from(msg));
-      final incomingId = normalized['id'];
       if (_isMine(normalized)) {
         final mid = ChatDetailMessageMaps.intFromDynamic(normalized['id']);
         if (mid != null) {
@@ -157,25 +127,7 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
       if (!mounted) return;
 
       setState(() {
-        final incId = ChatDetailMessageMaps.intFromDynamic(incomingId);
-        final idx = incId == null
-            ? -1
-            : _messages.indexWhere(
-                (m) => ChatDetailMessageMaps.intFromDynamic(m['id']) == incId,
-              );
-        if (idx >= 0) {
-          final prev = _messages[idx];
-          var merged = normalized;
-          final nr = merged['reactions'];
-          if (nr is! List || nr.isEmpty) {
-            final pr = prev['reactions'];
-            if (pr is List && pr.isNotEmpty) {
-              merged = Map<String, dynamic>.from(merged);
-              merged['reactions'] = pr;
-            }
-          }
-          _messages[idx] = merged;
-        }
+        _messageListController.replaceUpdated(_messages, normalized);
       });
 
       return;
@@ -486,7 +438,7 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
           !_isGroupChat) {
         _memberLastSeen[senderId] = DateTime.now().toUtc();
       }
-      _messages.add(normalized);
+      _messageListController.appendIfMissing(_messages, normalized);
       _messages.sort((a, b) {
         final am = serverInstantMillis(a['created_at']?.toString());
         final bm = serverInstantMillis(b['created_at']?.toString());

@@ -4,6 +4,20 @@
 
 ## REST
 
+### Auth
+
+`POST /auth/request-email-code`
+
+Создаёт pending registration и отправляет email-код.
+
+`POST /auth/verify-email-code`
+
+Проверяет код, создаёт пользователя и возвращает `TokenResponse`.
+
+`POST /auth/login`
+
+Проверяет email/password и возвращает `TokenResponse`.
+
 ### `GET /chats/`
 
 Возвращает список `ChatResponse[]`:
@@ -61,6 +75,30 @@
 - `user_id`
 - `last_read_message_id`
 
+### `POST /chats/`
+
+Создаёт чат. Тело:
+
+- `type`: `private | group`
+- `title` optional для private, required для group
+- `member_ids`
+
+### `POST /chats/{chat_id}/members`
+
+Добавляет участника в группу. Требуется `role=owner`.
+
+Тело:
+
+- `user_id`
+
+### `POST /chats/{chat_id}/leave`
+
+Текущий пользователь выходит из группы.
+
+### `DELETE /chats/{chat_id}/members/{member_user_id}`
+
+Удаляет участника из группы. Требуется `role=owner`.
+
 ### `POST /messages/`
 
 Отправка текста или системной строки звонка. Ответ: `MessageResponse`.
@@ -73,6 +111,35 @@
 - `message_type`: optional, `text | call_event`; по умолчанию `text`
 
 `call_event` используется для строк истории звонков (`Вызов завершён`, `Нет ответа`, `Вызов отменён`) и не поддерживает reply.
+
+### `GET /messages/{chat_id}`
+
+Возвращает страницу истории сообщений. Доступ есть только у участников чата.
+
+Query:
+
+- `before_message_id` optional
+- `limit` optional, максимум 100
+
+### `PATCH /messages/{message_id}`
+
+Редактирует текстовое сообщение отправителя.
+
+### `DELETE /messages/{message_id}`
+
+Мягко удаляет сообщение отправителя: в истории остаётся tombstone `Сообщение удалено`.
+
+### `POST /messages/forward`
+
+Пересылает сообщение в другой чат, где текущий пользователь является участником.
+
+### `POST /messages/{message_id}/reactions`
+
+Добавляет реакцию текущего пользователя.
+
+### `DELETE /messages/{message_id}/reactions`
+
+Удаляет реакцию текущего пользователя.
 
 ### `POST /messages/photo|video|video-note|video_note|voice|document|file`
 
