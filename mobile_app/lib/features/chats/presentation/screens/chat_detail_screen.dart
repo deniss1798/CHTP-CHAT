@@ -17,7 +17,6 @@ import '../../../../core/formatting/server_time.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/notifiers/open_chat_state_notifier.dart';
 import '../../../../core/platform/desktop_layout.dart';
-import '../../../../core/realtime/chat_ws_contract.dart';
 import '../../../../core/notifiers/chats_list_refresh_notifier.dart';
 import '../../../../core/notifiers/open_chat_sync_notifier.dart';
 import '../../../auth/data/services/auth_service.dart';
@@ -89,9 +88,12 @@ abstract class _ChatDetailScreenStateBase extends State<ChatDetailScreen> {
   final PresenceService _presenceService = PresenceService();
   final AudioRecorder _voiceRecorder = AudioRecorder();
   final MessageListController _messageListController = MessageListController();
+  final MessageSendController _messageSendController = MessageSendController();
   final ComposerController _composerController = ComposerController();
   final MediaUploadController _mediaUploadController = MediaUploadController();
   final ChatSocketController _chatSocketController = ChatSocketController();
+  final ChatSocketEventController _chatSocketEventController =
+      ChatSocketEventController();
   final MessageActionController _messageActionController = MessageActionController();
 
   bool _recordingVoice = false;

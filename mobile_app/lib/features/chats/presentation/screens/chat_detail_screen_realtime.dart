@@ -13,38 +13,37 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
   }
 
   void _handleSocketEvent(Map<String, dynamic> incoming) {
-    if (incoming['type'] == 'group_call_invite') {
+    if (_chatSocketEventController.isGroupCallInvite(incoming)) {
       _handleGroupCallInvite(incoming);
       return;
     }
-    if (incoming['type'] == 'call_e2e_hangup') {
+    if (_chatSocketEventController.isIncomingCallHangup(incoming)) {
       _handleIncomingCallHangup(incoming);
       return;
     }
-    if (incoming['type'] == 'call_e2e_init') {
+    if (_chatSocketEventController.isIncomingCallInit(incoming)) {
       _handleIncomingCallSignal(incoming);
       return;
     }
-    if (incoming['type'] == ChatWsContract.payloadTypeTyping) {
-      final uid = ChatDetailMessageMaps.intFromDynamic(incoming['user_id']);
-      if (uid == null || uid == _currentUserId) return;
-      final typing = incoming['typing'] != false;
-      if (!typing) {
-        if (_typingUserId == uid) {
+    final typingEvent = _chatSocketEventController.typingEvent(incoming);
+    if (typingEvent != null) {
+      if (typingEvent.userId == _currentUserId) return;
+      if (!typingEvent.typing) {
+        if (_typingUserId == typingEvent.userId) {
           setState(() => _typingUserId = null);
         }
 
         return;
       }
       setState(() {
-        _typingUserId = uid;
-        _memberLastSeen[uid] = DateTime.now().toUtc();
+        _typingUserId = typingEvent.userId;
+        _memberLastSeen[typingEvent.userId] = DateTime.now().toUtc();
       });
       _remoteTypingHideTimer?.cancel();
       _remoteTypingHideTimer = Timer(const Duration(seconds: 3), () {
         if (!mounted) return;
         setState(() {
-          if (_typingUserId == uid) {
+          if (_typingUserId == typingEvent.userId) {
             _typingUserId = null;
           }
         });
@@ -52,31 +51,23 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
       return;
     }
 
-    if (incoming['type'] == ChatWsContract.payloadTypeReadReceipt) {
-      final uid = ChatDetailMessageMaps.intFromDynamic(incoming['user_id']);
-      final lr = ChatDetailMessageMaps.intFromDynamic(incoming['last_read_message_id']);
-      if (uid == null || lr == null) return;
-      if (uid == _currentUserId) return;
-      _applyReadReceiptToMessages(uid, lr);
+    final readReceipt = _chatSocketEventController.readReceiptEvent(incoming);
+    if (readReceipt != null) {
+      if (readReceipt.userId == _currentUserId) return;
+      _applyReadReceiptToMessages(
+        readReceipt.userId,
+        readReceipt.lastReadMessageId,
+      );
       return;
     }
 
-    if (incoming['event'] == ChatWsContract.eventMessageDeleted) {
-      final rawId = incoming['id'];
-      int? id;
-      if (rawId is int) {
-        id = rawId;
-      } else {
-        id = int.tryParse(rawId.toString());
-      }
-
-      if (id == null) return;
-
+    final deletedMessageId = _chatSocketEventController.deletedMessageId(incoming);
+    if (deletedMessageId != null) {
       if (!mounted) return;
 
       setState(() {
-        _messageListController.markDeleted(_messages, id!);
-        if (_editingMessage != null && _editingMessage!['id'] == id) {
+        _messageListController.markDeleted(_messages, deletedMessageId);
+        if (_editingMessage != null && _editingMessage!['id'] == deletedMessageId) {
           _editingMessage = null;
           _messageController.clear();
         }
@@ -85,37 +76,21 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
       return;
     }
 
-    if (incoming['event'] == ChatWsContract.eventMessageReactionsUpdated) {
-      final mid = ChatDetailMessageMaps.intFromDynamic(incoming['message_id']);
-      if (mid == null) return;
-      final raw = incoming['reactions'];
-      final reactions = <Map<String, dynamic>>[];
-      if (raw is List) {
-        for (final r in raw) {
-          if (r is Map<String, dynamic>) {
-            reactions.add(r);
-          } else if (r is Map) {
-            reactions.add(Map<String, dynamic>.from(r));
-          }
-        }
-      }
+    final reactionUpdate = _chatSocketEventController.reactionUpdateEvent(incoming);
+    if (reactionUpdate != null) {
       if (!mounted) return;
       setState(() {
         _messageListController.applyReactions(
           _messages,
-          messageId: mid,
-          reactions: reactions,
+          messageId: reactionUpdate.messageId,
+          reactions: reactionUpdate.reactions,
         );
       });
       return;
     }
 
-    if (incoming['event'] == ChatWsContract.eventMessageUpdated) {
-      final msg = incoming['message'];
-      if (msg is! Map) return;
-
-      var normalized =
-          ChatDetailMessageMaps.normalizeMessageMap(Map<String, dynamic>.from(msg));
+    var normalized = _chatSocketEventController.updatedMessage(incoming);
+    if (normalized != null) {
       if (_isMine(normalized)) {
         final mid = ChatDetailMessageMaps.intFromDynamic(normalized['id']);
         if (mid != null) {
@@ -133,8 +108,7 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
       return;
     }
 
-    if (incoming['type'] == ChatWsContract.payloadTypeNewMessage ||
-        incoming.containsKey('message')) {
+    if (_chatSocketEventController.newMessage(incoming) != null) {
       _handleNewMessage(incoming);
     }
   }
@@ -406,10 +380,8 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
   }
 
   Future<void> _handleNewMessage(Map<String, dynamic> incoming) async {
-    final payload = ChatDetailMessageMaps.extractMessagePayload(incoming);
-    if (payload == null) return;
-
-    var normalized = ChatDetailMessageMaps.normalizeMessageMap(payload);
+    var normalized = _chatSocketEventController.newMessage(incoming);
+    if (normalized == null) return;
     final incomingId = ChatDetailMessageMaps.intFromDynamic(normalized['id']);
     final senderId = ChatDetailMessageMaps.intFromDynamic(normalized['sender_id']);
     if (_isMine(normalized)) {

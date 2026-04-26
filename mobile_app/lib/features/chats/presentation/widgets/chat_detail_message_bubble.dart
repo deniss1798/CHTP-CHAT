@@ -2,10 +2,13 @@ import 'package:flutter/foundation.dart'
     show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 
-import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_icons.dart';
 import '../../../../app/theme/app_shadows.dart';
-import '../../../../app/theme/design_tokens.dart';
+import '../../../../app/theme/design_tokens.dart' show AppGradients;
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/app_text_styles.dart';
 import '../chat_detail_formatters.dart';
 import '../chat_detail_message_maps.dart';
 import 'chat_detail_avatar_widgets.dart';
@@ -72,7 +75,7 @@ class ChatDetailMessageBubble extends StatelessWidget {
       context: context,
       backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
       ),
       builder: (ctx) {
         return SafeArea(
@@ -80,27 +83,25 @@ class ChatDetailMessageBubble extends StatelessWidget {
             shrinkWrap: true,
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  AppSpacing.md,
+                  AppSpacing.md,
+                  AppSpacing.xs,
+                ),
                 child: Text(
                   'Реакция $emoji',
-                  style: const TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: AppTextStyles.title,
                 ),
               ),
               for (final id in userIds)
                 ListTile(
                   title: Text(
                     senderNameForUserId(id),
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: AppTextStyles.bodyStrong,
                   ),
                 ),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.xs),
             ],
           ),
         );
@@ -124,21 +125,23 @@ class ChatDetailMessageBubble extends StatelessWidget {
 
     Widget tile = Material(
       color: AppColors.surfaceSoft,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(AppRadius.md),
       child: InkWell(
         onTap: onReactionEmojiTap != null ? () => onReactionEmojiTap!(e) : null,
         onLongPress: isGroupChat && userIds.isNotEmpty && phoneStyle
             ? () => _showGroupReactionReactors(context, e, userIds)
             : null,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm,
+            vertical: AppSpacing.xs,
+          ),
           child: Text(
             '$e $countLabel',
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
+            style: AppTextStyles.caption.copyWith(
               color: AppColors.textSecondary,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),
@@ -164,10 +167,10 @@ class ChatDetailMessageBubble extends StatelessWidget {
     }
     final phoneStyle = _isPhoneStyle(context);
     return Padding(
-      padding: const EdgeInsets.only(top: 4),
+      padding: const EdgeInsets.only(top: AppSpacing.xs),
       child: Wrap(
-        spacing: 6,
-        runSpacing: 4,
+        spacing: AppSpacing.xs,
+        runSpacing: AppSpacing.xs,
         alignment: isMine ? WrapAlignment.end : WrapAlignment.start,
         children: [
           for (final r in raw)
@@ -268,10 +271,10 @@ class ChatDetailMessageBubble extends StatelessWidget {
     final bubbleShape = videoNoteCircleLayout
         ? BorderRadius.circular(110)
         : BorderRadius.only(
-            topLeft: const Radius.circular(22),
-            topRight: const Radius.circular(22),
-            bottomLeft: Radius.circular(isMine ? 22 : 10),
-            bottomRight: Radius.circular(isMine ? 10 : 22),
+            topLeft: const Radius.circular(AppRadius.xl),
+            topRight: const Radius.circular(AppRadius.xl),
+            bottomLeft: Radius.circular(isMine ? AppRadius.xl : AppRadius.sm),
+            bottomRight: Radius.circular(isMine ? AppRadius.sm : AppRadius.xl),
           );
 
     final bubble = Material(
@@ -291,10 +294,13 @@ class ChatDetailMessageBubble extends StatelessWidget {
           constraints: BoxConstraints(
             maxWidth: MediaQuery.of(context).size.width * 0.76,
           ),
-          margin: const EdgeInsets.symmetric(vertical: 5),
+          margin: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
           padding: useTimeOnMediaPreview
               ? EdgeInsets.zero
-              : const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              : const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.sm,
+                ),
           decoration: BoxDecoration(
             gradient: useTimeOnMediaPreview
                 ? null
@@ -318,12 +324,11 @@ class ChatDetailMessageBubble extends StatelessWidget {
             children: [
               if (isGroupChat && !isMine)
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
+                  padding: const EdgeInsets.only(bottom: AppSpacing.xs),
                   child: Text(
                     senderName,
-                    style: const TextStyle(
+                    style: AppTextStyles.caption.copyWith(
                       color: AppColors.accentGlow,
-                      fontSize: 12,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
@@ -333,17 +338,16 @@ class ChatDetailMessageBubble extends StatelessWidget {
                   ) !=
                   null)
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
+                  padding: const EdgeInsets.only(bottom: AppSpacing.xs),
                   child: SizedBox(
                     width: double.infinity,
                     child: Text(
                       'Переслано от ${senderNameForUserId(ChatDetailMessageMaps.intFromDynamic(message['forwarded_from_user_id'])!)}',
                       textAlign: TextAlign.left,
-                        style: const TextStyle(
+                      style: AppTextStyles.caption.copyWith(
                           color: AppColors.textSecondary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          fontStyle: FontStyle.italic,
+                        fontWeight: FontWeight.w600,
+                        fontStyle: FontStyle.italic,
                       ),
                     ),
                   ),
@@ -354,19 +358,18 @@ class ChatDetailMessageBubble extends StatelessWidget {
                 senderNameForUserId: senderNameForUserId,
               ),
               mainContent,
-              if (!useTimeOnMediaPreview) const SizedBox(height: 8),
+              if (!useTimeOnMediaPreview) const SizedBox(height: AppSpacing.xs),
               if (!useTimeOnMediaPreview)
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (isUpdated)
                       Padding(
-                        padding: const EdgeInsets.only(right: 6),
+                        padding: const EdgeInsets.only(right: AppSpacing.xs),
                         child: Text(
                           'изменено',
-                      style: const TextStyle(
+                          style: AppTextStyles.caption.copyWith(
                             color: AppColors.textSecondary,
-                            fontSize: 11,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -381,15 +384,14 @@ class ChatDetailMessageBubble extends StatelessWidget {
                             ? const Color(0xFFB8E0FF)
                             : Colors.white.withValues(alpha: 0.5),
                       ),
-                      const SizedBox(width: 5),
+                      const SizedBox(width: AppSpacing.xs),
                     ],
                     Text(
                       time,
-                      style: TextStyle(
+                      style: AppTextStyles.caption.copyWith(
                         color: isMine
                             ? Colors.white.withValues(alpha: 0.92)
                             : AppColors.textSecondary,
-                        fontSize: 11,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -417,7 +419,10 @@ class ChatDetailMessageBubble extends StatelessWidget {
 
     final senderId = ChatDetailMessageMaps.intFromDynamic(message['sender_id']);
     final avatarChild = Padding(
-      padding: const EdgeInsets.only(right: 8, bottom: 6),
+      padding: const EdgeInsets.only(
+        right: AppSpacing.xs,
+        bottom: AppSpacing.xs,
+      ),
       child: ChatDetailCircleAvatar(
         title: senderName,
         avatarUrl: senderAvatarUrl,

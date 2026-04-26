@@ -26,12 +26,10 @@ mixin _ChatDetailComposerAndActionsLogic
     try {
       final replyId = _pendingReplyToMessageId();
 
-      final createdMessage = ChatDetailMessageMaps.normalizeMessageMap(
-        await _messagesService.sendMessage(
-          chatId: widget.chatId,
-          text: text,
-          replyToMessageId: replyId,
-        ),
+      final createdMessage = await _messageSendController.sendText(
+        chatId: widget.chatId,
+        text: text,
+        replyToMessageId: replyId,
       );
 
       if (!mounted) return;
@@ -158,13 +156,11 @@ mixin _ChatDetailComposerAndActionsLogic
 
     try {
       final replyId = _pendingReplyToMessageId();
-      final createdMessage = ChatDetailMessageMaps.normalizeMessageMap(
-        await _messagesService.sendDocumentMessage(
-          chatId: widget.chatId,
-          filePath: path,
-          fileName: displayName,
-          replyToMessageId: replyId,
-        ),
+      final createdMessage = await _messageSendController.sendDocument(
+        chatId: widget.chatId,
+        filePath: path,
+        fileName: displayName,
+        replyToMessageId: replyId,
       );
 
       if (!mounted) return;
@@ -256,13 +252,11 @@ mixin _ChatDetailComposerAndActionsLogic
 
       final replyId = _pendingReplyToMessageId();
 
-      final createdMessage = ChatDetailMessageMaps.normalizeMessageMap(
-        await _messagesService.sendPhotoMessage(
-          chatId: widget.chatId,
-          imagePath: picked.path,
-          fileName: picked.name,
-          replyToMessageId: replyId,
-        ),
+      final createdMessage = await _messageSendController.sendImage(
+        chatId: widget.chatId,
+        imagePath: picked.path,
+        fileName: picked.name,
+        replyToMessageId: replyId,
       );
 
       if (!mounted) return;
@@ -316,13 +310,11 @@ mixin _ChatDetailComposerAndActionsLogic
 
       final replyId = _pendingReplyToMessageId();
 
-      final createdMessage = ChatDetailMessageMaps.normalizeMessageMap(
-        await _messagesService.sendVideoMessage(
-          chatId: widget.chatId,
-          videoPath: picked.path,
-          fileName: picked.name,
-          replyToMessageId: replyId,
-        ),
+      final createdMessage = await _messageSendController.sendVideo(
+        chatId: widget.chatId,
+        videoPath: picked.path,
+        fileName: picked.name,
+        replyToMessageId: replyId,
       );
 
       if (!mounted) return;
@@ -389,13 +381,11 @@ mixin _ChatDetailComposerAndActionsLogic
     try {
       final replyId = _pendingReplyToMessageId();
 
-      final createdMessage = ChatDetailMessageMaps.normalizeMessageMap(
-        await _messagesService.sendVideoNoteMessage(
-          chatId: widget.chatId,
-          videoPath: videoPath,
-          fileName: _basenameFromPath(videoPath),
-          replyToMessageId: replyId,
-        ),
+      final createdMessage = await _messageSendController.sendVideoNote(
+        chatId: widget.chatId,
+        videoPath: videoPath,
+        fileName: _basenameFromPath(videoPath),
+        replyToMessageId: replyId,
       );
 
       if (!mounted) return;
@@ -932,13 +922,11 @@ mixin _ChatDetailComposerAndActionsLogic
 
     try {
       final replyId = _pendingReplyToMessageId();
-      final created = ChatDetailMessageMaps.normalizeMessageMap(
-        await _messagesService.sendVoiceMessage(
-          chatId: widget.chatId,
-          filePath: path,
-          fileName: fileName,
-          replyToMessageId: replyId,
-        ),
+      final created = await _messageSendController.sendVoice(
+        chatId: widget.chatId,
+        filePath: path,
+        fileName: fileName,
+        replyToMessageId: replyId,
       );
       if (!mounted) return;
       setState(() {

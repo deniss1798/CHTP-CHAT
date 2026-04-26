@@ -49,6 +49,12 @@ mobile_app/windows/flutter/ephemeral/
 *.bak
 *.orig
 mobile_app/build_win_verbose.txt
+mobile_app/Get
+mobile_app/Process
+mobile_app/Run
+mobile_app/flutter
+mobile_app/*.stackdump
+mobile_app/hs_err_pid*
 
 ## IDE
 .idea/
