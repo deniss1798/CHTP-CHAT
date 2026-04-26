@@ -36,3 +36,4 @@ class Message(Base):
     created_at = Column(DateTime(timezone=False), server_default=func.now())
     updated_at = Column(DateTime(timezone=False), server_default=func.now(), onupdate=func.now())
     is_updated = Column(Boolean, default=False)
+    is_deleted = Column(Boolean, nullable=False, default=False)

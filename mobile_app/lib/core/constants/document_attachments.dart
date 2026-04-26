@@ -1,5 +1,5 @@
 /// Соответствует allowlist на сервере (`/messages/document`).
-const int kMaxDocumentBytes = 50 * 1024 * 1024;
+const int kMaxDocumentBytes = 100 * 1024 * 1024;
 
 const List<String> kAllowedDocumentExtensions = [
   'pdf',

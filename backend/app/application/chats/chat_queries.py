@@ -12,6 +12,8 @@ from app.schemas.chat_schema import ChatDetailResponse, UserShort
 def message_type_for_chat_list(message: Message | None) -> str | None:
     if message is None:
         return None
+    if bool(getattr(message, "is_deleted", False)):
+        return "deleted"
     mt = message.message_type
     if mt is None or (isinstance(mt, str) and not mt.strip()):
         return "text"

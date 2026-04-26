@@ -267,11 +267,12 @@ class _AuthScreenState extends State<AuthScreen> {
   Widget _buildAuthWelcomeBlock(TextTheme textTheme, bool wide) {
     return Column(
       key: const ValueKey('auth_welcome'),
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
           'Добро пожаловать',
+          textAlign: TextAlign.center,
           style: (wide
                   ? textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.w800,
@@ -288,8 +289,9 @@ class _AuthScreenState extends State<AuthScreen> {
         const SizedBox(height: 14),
         Text(
           isLoginMode
-              ? 'Войдите, чтобы продолжить'
+              ? 'Общайтесь, объединяйтесь, оставайтесь на связи'
               : 'Укажите данные — отправим код на почту',
+          textAlign: TextAlign.center,
           style: textTheme.bodyMedium?.copyWith(
             color: AppColors.textSecondary,
             height: 1.4,
@@ -306,21 +308,13 @@ class _AuthScreenState extends State<AuthScreen> {
     required bool showInlineHero,
   }) {
     final heroScale = (MediaQuery.sizeOf(context).width / 520.0)
-        .clamp(0.36, 0.48)
+        .clamp(0.54, 0.68)
         .toDouble();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _buildAuthWelcomeBlock(textTheme, wide),
         if (showInlineHero) ...[
-          const SizedBox(height: AppSpacing.xl),
-          Divider(
-            height: 1,
-            thickness: 1,
-            color: AppColors.accent.withValues(alpha: 0.2),
-          ),
-          const SizedBox(height: AppSpacing.lg),
           Center(
             child: Semantics(
               label: 'ЧТП ЧАТ, сообщения и звонки',
@@ -331,7 +325,9 @@ class _AuthScreenState extends State<AuthScreen> {
               ),
             ),
           ),
+          const SizedBox(height: AppSpacing.xl),
         ],
+        _buildAuthWelcomeBlock(textTheme, wide),
         const SizedBox(height: AppSpacing.xxxl),
         AppSurface(
           tone: AppSurfaceTone.elevated,
@@ -556,6 +552,8 @@ class _AuthScreenState extends State<AuthScreen> {
                   ),
                 ],
               ),
+              const SizedBox(height: 22),
+              const _AuthTrustFeatures(),
             ],
           ),
         ),
@@ -596,6 +594,53 @@ class _AuthSegmentedSwitch extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _AuthTrustFeatures extends StatelessWidget {
+  const _AuthTrustFeatures();
+
+  @override
+  Widget build(BuildContext context) {
+    Widget item(IconData icon, String text) {
+      return Expanded(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 20, color: AppColors.accentBright),
+            const SizedBox(height: 8),
+            Text(
+              text,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                height: 1.25,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        item(Icons.chat_bubble_outline_rounded, 'Быстрые\nсообщения'),
+        Container(
+          width: 1,
+          height: 42,
+          color: AppColors.strokeSoft,
+        ),
+        item(Icons.shield_outlined, 'Безопасность\nданных'),
+        Container(
+          width: 1,
+          height: 42,
+          color: AppColors.strokeSoft,
+        ),
+        item(Icons.groups_2_outlined, 'Группы и\nсообщества'),
+      ],
     );
   }
 }

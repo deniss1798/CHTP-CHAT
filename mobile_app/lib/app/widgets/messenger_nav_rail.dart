@@ -5,6 +5,7 @@ import '../../core/session/current_user_store.dart';
 import '../../features/chats/domain/chat_list_rules.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../theme/app_colors.dart';
+import '../theme/app_shadows.dart';
 import 'authorized_network_image.dart';
 
 /// Левая навигация 1-в-1 с макетом: чёрный фон, активный пункт с оранжевой
@@ -24,7 +25,7 @@ class MessengerNavRail extends StatelessWidget {
   static const int contactsIndex = 1;
   static const int settingsIndex = 2;
 
-  static const double _width = 86;
+  static const double _width = 80;
 
   /// Ширина рейла — для оболочки ([MessengerDesktopShell]).
   static const double railWidth = _width;
@@ -48,7 +49,7 @@ class MessengerNavRail extends StatelessWidget {
         decoration: const BoxDecoration(
           color: AppColors.navRailBackground,
           border: Border(
-            right: BorderSide(color: Color(0xFF141414), width: 1),
+            right: BorderSide(color: AppColors.strokeSoft, width: 1),
           ),
         ),
         child: SingleChildScrollView(
@@ -57,9 +58,9 @@ class MessengerNavRail extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 20),
+              const SizedBox(height: 12),
               _brandHeader(),
-              const SizedBox(height: 28),
+              const SizedBox(height: 20),
               _navItems(),
               const SizedBox(height: 12),
               const _NavProfileFooter(),
@@ -76,7 +77,7 @@ class MessengerNavRail extends StatelessWidget {
       decoration: const BoxDecoration(
         color: AppColors.navRailBackground,
         border: Border(
-          right: BorderSide(color: Color(0xFF141414), width: 1),
+          right: BorderSide(color: AppColors.strokeSoft, width: 1),
         ),
       ),
       child: Stack(
@@ -91,9 +92,9 @@ class MessengerNavRail extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(height: 20),
+                const SizedBox(height: 12),
                 _brandHeader(),
-                const SizedBox(height: 28),
+                const SizedBox(height: 20),
                 _navItems(),
               ],
             ),
@@ -141,7 +142,7 @@ class MessengerNavRail extends StatelessWidget {
 
   Widget _brandHeader() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 4),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
@@ -153,7 +154,7 @@ class MessengerNavRail extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
             decoration: BoxDecoration(
               color: AppColors.navRailActiveAccent,
               borderRadius: BorderRadius.circular(5),
@@ -162,7 +163,7 @@ class MessengerNavRail extends StatelessWidget {
               'ЧТП',
               style: TextStyle(
                 color: Color(0xFF1A0A00),
-                fontSize: 10,
+              fontSize: 9.5,
                 fontWeight: FontWeight.w900,
                 height: 1,
               ),
@@ -173,7 +174,7 @@ class MessengerNavRail extends StatelessWidget {
             'ЧАТ',
             style: TextStyle(
               color: AppColors.textPrimary,
-              fontSize: 10.5,
+              fontSize: 10,
               fontWeight: FontWeight.w800,
               height: 1,
             ),
@@ -372,14 +373,10 @@ class _NavItem extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: AppColors.navRailActivePill,
                     borderRadius: BorderRadius.circular(radius),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Color(0x33FF6A2A),
-                        offset: Offset(0, 0),
-                        blurRadius: 14,
-                        spreadRadius: -8,
-                      ),
-                    ],
+                    border: Border.all(
+                      color: AppColors.navRailActiveAccent.withValues(alpha: 0.7),
+                    ),
+                    boxShadow: AppShadows.accentStroke,
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,

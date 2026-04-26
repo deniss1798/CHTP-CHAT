@@ -14,15 +14,58 @@ class _MultipartContentTypeInterceptor extends Interceptor {
 }
 
 class ApiLoggerInterceptor extends Interceptor {
+  static const _sensitiveKeys = {
+    'authorization',
+    'access_token',
+    'refresh_token',
+    'token',
+    'password',
+    'verification_code',
+    'code',
+    'media_url',
+    'avatar_url',
+  };
+
+  Object? _redact(Object? value) {
+    if (value is Map) {
+      return value.map((key, item) {
+        final normalizedKey = key.toString().toLowerCase();
+        return MapEntry(
+          key,
+          _sensitiveKeys.contains(normalizedKey) ? '***' : _redact(item),
+        );
+      });
+    }
+
+    if (value is Iterable && value is! String) {
+      return value.map(_redact).toList();
+    }
+
+    if (value is String) {
+      return value
+          .replaceAll(RegExp(r'Bearer\s+[A-Za-z0-9._~+/=-]+'), 'Bearer ***')
+          .replaceAllMapped(
+            RegExp(r'([?&](?:token|access_token|refresh_token|password|code)=)[^&\s]+'),
+            (match) => '${match.group(1)}***',
+          )
+          .replaceAll(
+            RegExp(r'https?://[^\s]+(?:X-Amz-Signature|Signature|token|access_token)=[^\s]+'),
+            '***',
+          );
+    }
+
+    return value;
+  }
+
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     options.extra['start_time'] = DateTime.now().millisecondsSinceEpoch;
 
     debugPrint(
       '[API START] ${options.method} ${options.uri}\n'
-      'Headers: ${options.headers}\n'
-      'Query: ${options.queryParameters}\n'
-      'Data: ${options.data}',
+      'Headers: ${_redact(options.headers)}\n'
+      'Query: ${_redact(options.queryParameters)}\n'
+      'Data: ${_redact(options.data)}',
     );
 
     handler.next(options);
@@ -39,7 +82,7 @@ class ApiLoggerInterceptor extends Interceptor {
       '[API END] ${response.requestOptions.method} ${response.requestOptions.uri}\n'
       'Status: ${response.statusCode}\n'
       'Duration: $duration\n'
-      'Response: ${response.data}',
+      'Response: ${_redact(response.data)}',
     );
 
     handler.next(response);
@@ -56,7 +99,7 @@ class ApiLoggerInterceptor extends Interceptor {
       '[API ERROR] ${err.requestOptions.method} ${err.requestOptions.uri}\n'
       'Duration: $duration\n'
       'Message: ${err.message}\n'
-      'Response: ${err.response?.data}',
+      'Response: ${_redact(err.response?.data)}',
     );
 
     handler.next(err);
@@ -70,7 +113,7 @@ class ApiClient {
     const env = String.fromEnvironment('API_BASE_URL');
     // Бэкенд дублирует роуты с префиксом /api (см. main.py). За nginx без /api часто 404.
     final raw =
-        env.trim().isNotEmpty ? env.trim() : 'http://83.217.201.40/api';
+        env.trim().isNotEmpty ? env.trim() : 'http://127.0.0.1:8000/api';
     if (raw.endsWith('/')) {
       return raw.substring(0, raw.length - 1);
     }

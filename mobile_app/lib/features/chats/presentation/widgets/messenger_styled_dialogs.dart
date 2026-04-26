@@ -24,30 +24,32 @@ class _DialogActions extends StatelessWidget {
   Widget build(BuildContext context) {
     return Align(
       alignment: Alignment.centerRight,
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 4,
-        alignment: WrapAlignment.end,
+      child: Row(
         children: [
-          TextButton(
-            onPressed: onCancel,
-            child: Text(
-              cancelLabel,
-              style: const TextStyle(
-                color: AppColors.accent,
-                fontWeight: FontWeight.w800,
-                fontSize: 14,
+          Expanded(
+            child: OutlinedButton(
+              onPressed: onCancel,
+              child: Text(
+                cancelLabel,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                ),
               ),
             ),
           ),
-          TextButton(
-            onPressed: onConfirm,
-            child: Text(
-              confirmLabel,
-              style: const TextStyle(
-                color: AppColors.accent,
-                fontWeight: FontWeight.w800,
-                fontSize: 14,
+          const SizedBox(width: 10),
+          Expanded(
+            child: FilledButton(
+              onPressed: onConfirm,
+              child: Text(
+                confirmLabel,
+                style: const TextStyle(
+                  color: AppColors.textOnAccent,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 15,
+                ),
               ),
             ),
           ),
@@ -76,9 +78,9 @@ Future<bool> showMessengerConfirmDialog({
           constraints: const BoxConstraints(maxWidth: 400),
           child: AppSurface(
             tone: AppSurfaceTone.elevated,
-            radius: AppRadius.xxl,
-            padding: const EdgeInsets.fromLTRB(22, 22, 18, 16),
-            borderColor: AppColors.accent.withValues(alpha: 0.2),
+            radius: AppRadius.xl,
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+            borderColor: AppColors.strokeSoft,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -91,7 +93,7 @@ Future<bool> showMessengerConfirmDialog({
                   title,
                   style: const TextStyle(
                     color: AppColors.textPrimary,
-                    fontSize: 17,
+                    fontSize: 16,
                     fontWeight: FontWeight.w800,
                     letterSpacing: -0.3,
                     height: 1.2,
@@ -109,7 +111,7 @@ Future<bool> showMessengerConfirmDialog({
                     ),
                   ),
                 ],
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
                 _DialogActions(
                   cancelLabel: cancelLabel,
                   confirmLabel: confirmLabel,

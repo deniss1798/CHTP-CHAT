@@ -5,8 +5,10 @@ from app.domain.policies.group_chat_policy import (
     require_chat_exists,
     require_group_chat,
     require_group_creator,
+    require_group_owner,
 )
 from app.models.chat import Chat
+from app.models.chat_member import ChatMember
 from app.models.user import User
 
 
@@ -52,3 +54,21 @@ def test_require_group_creator_rejects_non_creator() -> None:
 
     assert exc_info.value.status_code == 403
     assert exc_info.value.detail == "Only group creator can remove members"
+
+
+def test_require_group_owner_accepts_owner_membership() -> None:
+    chat = Chat(id=10, type="group", created_by=1)
+    membership = ChatMember(chat_id=10, user_id=1, role="owner")
+
+    assert require_group_owner(chat, membership) is membership
+
+
+def test_require_group_owner_rejects_member_role() -> None:
+    chat = Chat(id=10, type="group", created_by=1)
+    membership = ChatMember(chat_id=10, user_id=1, role="member")
+
+    with pytest.raises(HTTPException) as exc_info:
+        require_group_owner(chat, membership)
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail == "Only group owner can manage this group"

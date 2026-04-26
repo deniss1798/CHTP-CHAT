@@ -8,7 +8,9 @@ import 'package:flutter/material.dart';
 
 import 'app/app.dart';
 import 'core/notifiers/chats_list_refresh_notifier.dart';
+import 'core/notifiers/open_chat_state_notifier.dart';
 import 'core/push/local_notifications_service.dart';
+import 'core/push/notification_preferences.dart';
 import 'core/push/open_chat_from_push.dart';
 import 'firebase_options.dart';
 
@@ -28,6 +30,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  await NotificationPreferences.load();
   print('Background message: ${message.messageId}');
 }
 
@@ -66,8 +69,6 @@ Future<void> _initPush() async {
     sound: true,
   );
 
-  print('Permission status: ${settings.authorizationStatus}');
-
   if (defaultTargetPlatform == TargetPlatform.iOS) {
     await messaging.setForegroundNotificationPresentationOptions(
       alert: true,
@@ -76,18 +77,20 @@ Future<void> _initPush() async {
     );
   }
 
-  final token = await messaging.getToken();
-  print('FCM token: $token');
+  await messaging.getToken();
 
-  FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-    print('Foreground message title: ${message.notification?.title}');
-    print('Foreground message body: ${message.notification?.body}');
-    print('Foreground message data: ${message.data}');
+  FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
     requestChatsListRefresh();
     if (defaultTargetPlatform == TargetPlatform.android) {
+      if (!await NotificationPreferences.areEnabled()) {
+        return;
+      }
       final data = message.data;
       final chatId = _extractChatId(data);
       if (chatId != null) {
+        if (isChatOpenNow(chatId)) {
+          return;
+        }
         final n = message.notification;
         final titleRaw = (n?.title ?? '').trim();
         final bodyRaw = (n?.body ?? '').trim();
@@ -112,7 +115,6 @@ Future<void> _initPush() async {
   });
 
   FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-    print('Opened from push: ${message.data}');
     final payload = _pendingPushFromMessageData(message.data);
     if (payload != null) {
       openChatFromPushPayload(payload);

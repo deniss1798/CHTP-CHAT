@@ -7,8 +7,10 @@ import 'package:flutter/widgets.dart';
 import '../../../../core/formatting/server_time.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/notifiers/chats_list_refresh_notifier.dart';
+import '../../../../core/notifiers/open_chat_state_notifier.dart';
 import '../../../../core/notifiers/open_chat_sync_notifier.dart';
 import '../../../../core/push/local_notifications_service.dart';
+import '../../../../core/push/notification_preferences.dart';
 import '../../../../core/realtime/chat_ws_contract.dart';
 import '../../../../core/storage/secure_storage_service.dart';
 import '../../../auth/data/services/auth_service.dart';
@@ -346,7 +348,7 @@ class ChatsController extends ChangeNotifier {
     final type = message['type']?.toString();
 
     if (type == 'inbox_new_message') {
-      _handleInboxNewMessage(message);
+      unawaited(_handleInboxNewMessage(message));
       return;
     }
 
@@ -377,14 +379,15 @@ class ChatsController extends ChangeNotifier {
     }
   }
 
-  void _handleInboxNewMessage(Map<String, dynamic> message) {
+  Future<void> _handleInboxNewMessage(Map<String, dynamic> message) async {
     final chatId = _parseInt(message['chat_id']);
     if (chatId != null) {
-      final viewingThis = isChatOpen?.call(chatId) ?? false;
+      final viewingThis = (isChatOpen?.call(chatId) ?? false) || isChatOpenNow(chatId);
       if (viewingThis) {
         requestOpenChatMessagesSync(chatId);
       }
-      if (!viewingThis && LocalNotificationsService.supported) {
+      final notificationsEnabled = await NotificationPreferences.areEnabled();
+      if (!viewingThis && notificationsEnabled && LocalNotificationsService.supported) {
         final sender = (message['sender_name'] ?? '').toString().trim();
         final preview = (message['preview'] ?? '').toString().trim();
         final avatarUrl = (message['chat_avatar_url'] ?? '').toString().trim();

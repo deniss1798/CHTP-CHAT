@@ -28,11 +28,36 @@ class ChatDetailMessageContent extends StatelessWidget {
     final messageType = (message['message_type'] ?? 'text').toString();
     final mediaUrl = (message['media_url'] ?? '').toString().trim();
 
+    if (messageType == 'deleted' || message['is_deleted'] == true) {
+      return const Text(
+        'Сообщение удалено',
+        style: TextStyle(
+          color: AppColors.textMuted,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          fontStyle: FontStyle.italic,
+          height: 1.35,
+        ),
+      );
+    }
+
+    if (messageType == 'call_event') {
+      return Text(
+        (message['text'] ?? 'Вызов').toString(),
+        style: const TextStyle(
+          color: AppColors.textSecondary,
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
+          height: 1.35,
+        ),
+      );
+    }
+
     if (messageType == 'voice' && mediaUrl.isNotEmpty) {
       return _VoiceMessageBar(url: mediaUrl);
     }
 
-    if (messageType == 'document' && mediaUrl.isNotEmpty) {
+    if ((messageType == 'document' || messageType == 'file') && mediaUrl.isNotEmpty) {
       return _buildDocumentCard(mediaUrl);
     }
 

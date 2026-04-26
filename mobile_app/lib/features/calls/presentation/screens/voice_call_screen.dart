@@ -152,7 +152,13 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
       remoteCallerPubB64: incoming?['ephem_pub_b64']?.toString(),
       onChatMessage: (text) {
         unawaited(
-          _messagesService.sendMessage(chatId: widget.chatId, text: text).then(
+          _messagesService
+              .sendMessage(
+                chatId: widget.chatId,
+                text: text,
+                messageType: 'call_event',
+              )
+              .then(
                 (_) {},
                 onError: (_) {},
               ),
@@ -231,14 +237,14 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
                         child: Text(
                           'ЧТП ЧАТ',
                           style: TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.2,
+                            color: AppColors.accentBright,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.5,
                           ),
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 18),
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -258,9 +264,9 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
                                     color: AppColors.textPrimary,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: -0.35,
+                                    fontSize: 36,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: -1.0,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
@@ -269,15 +275,40 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
                                   textAlign: TextAlign.center,
                                   maxLines: 2,
                                   style: const TextStyle(
-                                    color: AppColors.textSecondary,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
+                                    color: AppColors.accentBright,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                          const SizedBox(width: 48),
+                          AppSurface(
+                            radius: AppRadius.pill,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.shield_outlined,
+                                  size: 14,
+                                  color: AppColors.accentBright,
+                                ),
+                                SizedBox(width: 6),
+                                Text(
+                                  'Защищённый звонок',
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
                     ],

@@ -73,6 +73,11 @@ String? previewForLastMessageType(String rawType) {
     case 'document':
     case 'file':
       return 'Файл';
+    case 'call':
+    case 'call_event':
+      return 'Вызов';
+    case 'deleted':
+      return 'Сообщение удалено';
     case 'sticker':
       return 'Стикер';
     case 'text':

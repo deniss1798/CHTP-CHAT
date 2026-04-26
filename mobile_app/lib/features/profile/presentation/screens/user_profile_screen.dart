@@ -235,32 +235,23 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
   /// Кадр в стиле плиток эфира / карточек: тонкое оранжевое кольцо и лёгкое свечение.
   Widget _buildFramedAvatar(String title, double size) {
-    final radius = size * 0.2;
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(radius + 2.5),
+        shape: BoxShape.circle,
         border: Border.all(
-          color: AppColors.accent.withValues(alpha: 0.45),
-          width: 1.15,
+          color: AppColors.accentBright.withValues(alpha: 0.88),
+          width: 1.4,
         ),
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: AppColors.accent.withValues(alpha: 0.2),
-            blurRadius: 18,
-            offset: const Offset(0, 3),
-            spreadRadius: 0,
-          ),
-        ],
+        boxShadow: AppShadows.orbitGlow,
       ),
       padding: const EdgeInsets.all(2.5),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(radius),
-        child: _buildAvatarInner(title, size, radius),
+      child: ClipOval(
+        child: _buildAvatarInner(title, size),
       ),
     );
   }
 
-  Widget _buildAvatarInner(String title, double size, double radius) {
+  Widget _buildAvatarInner(String title, double size) {
     final url = _avatarUrl();
     if (url != null && url.isNotEmpty) {
       return Image.network(
@@ -268,20 +259,20 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         width: size,
         height: size,
         fit: BoxFit.cover,
-        errorBuilder: (_, _, _) => _fallbackAvatar(title, size, radius),
+        errorBuilder: (_, _, _) => _fallbackAvatar(title, size),
       );
     }
-    return _fallbackAvatar(title, size, radius);
+    return _fallbackAvatar(title, size);
   }
 
-  Widget _fallbackAvatar(String title, double size, double radius) {
+  Widget _fallbackAvatar(String title, double size) {
     final ch = title.isNotEmpty ? title[0].toUpperCase() : '?';
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
         gradient: AppGradients.accentPanel,
-        borderRadius: BorderRadius.circular(radius),
+        shape: BoxShape.circle,
         boxShadow: AppShadows.primaryButton,
       ),
       alignment: Alignment.center,

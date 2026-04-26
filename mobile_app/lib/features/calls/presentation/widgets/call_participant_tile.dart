@@ -61,25 +61,25 @@ class CallParticipantTile extends StatelessWidget {
         attachHiddenVideoSurface && !hasFrame ? 0.08 : 0.02;
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(28),
       child: Stack(
         fit: StackFit.expand,
         children: [
           DecoratedBox(
             decoration: BoxDecoration(
               gradient: AppGradients.heroPanel,
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(28),
               border: Border.all(
                 color: accentFrame
                     ? AppColors.accent.withValues(alpha: 0.42)
                     : AppColors.strokeSoft,
-                width: accentFrame ? 1.1 : 1,
+                width: accentFrame ? 1.25 : 1,
               ),
               boxShadow: accentFrame
                   ? <BoxShadow>[
                       BoxShadow(
-                        color: AppColors.accent.withValues(alpha: 0.2),
-                        blurRadius: 16,
+                        color: AppColors.accent.withValues(alpha: 0.28),
+                        blurRadius: 24,
                         spreadRadius: 0,
                         offset: const Offset(0, 2),
                       ),
@@ -132,8 +132,8 @@ class CallParticipantTile extends StatelessWidget {
             ),
           ),
           Positioned(
-            left: 8,
-            bottom: 8,
+            left: 16,
+            top: 16,
             child: DecoratedBox(
               decoration: BoxDecoration(
                 color: AppColors.surfaceGlass,
@@ -141,7 +141,7 @@ class CallParticipantTile extends StatelessWidget {
                 border: Border.all(color: AppColors.strokeSoft),
               ),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                 child: Text(
                   label,
                   maxLines: 1,
@@ -162,7 +162,7 @@ class CallParticipantTile extends StatelessWidget {
 
   Widget _buildAvatarPlace(BuildContext context) {
     final u = avatarUrl?.trim();
-    const size = 88.0;
+    const size = 112.0;
     if (u == null || u.isEmpty) {
       return Center(child: _avatarInitialFallback(size));
     }

@@ -68,7 +68,7 @@ String chatDetailReplyPreviewLabel(Map<String, dynamic> reply) {
   if (type == 'video_note') {
     return '🎬 Видеосообщение';
   }
-  if (type == 'document') {
+  if (type == 'document' || type == 'file') {
     final name = (reply['text'] ?? '').toString().trim();
     return name.isEmpty ? '📎 Файл' : '📎 $name';
   }

@@ -6,9 +6,9 @@ from sqlalchemy.orm import Session
 from app.application.media.constants import PRIVATE_MEDIA_MESSAGE_TYPES
 from app.application.messages.chat_recipients import recipient_user_ids_excluding_sender
 from app.application.messages.document_rules import push_preview_for_message
-from app.application.messages.membership_reads import repoint_last_read_before_message_delete
 from app.application.messages.message_projection import (
     build_message_payload,
+    DELETED_MESSAGE_TEXT,
     message_to_response,
     safe_message_text,
     safe_message_type,
@@ -72,12 +72,23 @@ async def send_text_message(
     repo = MessagesRepository(db)
     require_chat_member(db, payload.chat_id, current_user)
     validate_reply_target(db, payload.chat_id, payload.reply_to_message_id)
+    message_type = (payload.message_type or "text").strip()
+    if message_type not in {"text", "call_event"}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unsupported message type",
+        )
+    if message_type == "call_event" and payload.reply_to_message_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Call events cannot reply to messages",
+        )
 
     new_message = Message(
         chat_id=payload.chat_id,
         sender_id=current_user.id,
         text=payload.text,
-        message_type="text",
+        message_type=message_type,
         media_key=None,
         media_url=None,
         media_mime_type=None,
@@ -159,6 +170,12 @@ async def update_text_message(
 
     require_message_sender(message, current_user)
 
+    if bool(getattr(message, "is_deleted", False)):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Deleted messages cannot be edited",
+        )
+
     if message.message_type != "text":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -195,6 +212,9 @@ async def delete_message(
 
     require_message_sender_for_delete(message, current_user)
 
+    if bool(getattr(message, "is_deleted", False)):
+        return {"detail": "Message deleted"}
+
     chat_id = message.chat_id
     media_key = (
         message.media_key
@@ -202,12 +222,19 @@ async def delete_message(
         else None
     )
 
-    repoint_last_read_before_message_delete(db, chat_id, message.id)
-    repo.delete(message)
-    repo.commit()
+    message.text = DELETED_MESSAGE_TEXT
+    message.message_type = "deleted"
+    message.media_key = None
+    message.media_url = None
+    message.media_mime_type = None
+    message.media_size = None
+    message.is_deleted = True
+    message.updated_at = datetime.utcnow()
+    repo.commit_refresh(message)
 
     media_svc.delete_private_media_key(media_key)
 
+    await publish_message_updated(chat_id, build_message_payload(message, db))
     await publish_message_deleted(chat_id, message_id=message_id)
 
     return {"detail": "Message deleted"}

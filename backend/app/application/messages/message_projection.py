@@ -9,6 +9,8 @@ from app.application.messages.reaction_service import reaction_groups_for_messag
 from app.schemas.message_schema import MessageReplyPreview, MessageResponse, ReactionGroup
 from app.infrastructure.storage.s3_storage import S3StorageService, is_private_s3_ready
 
+DELETED_MESSAGE_TEXT = "Сообщение удалено"
+
 
 def make_s3_getter(
     storage: S3StorageService | None = None,
@@ -32,11 +34,15 @@ def load_reply_parent(db: Session, reply_to_message_id: int | None) -> Message |
 
 
 def safe_message_text(message: Message) -> str:
+    if bool(getattr(message, "is_deleted", False)):
+        return DELETED_MESSAGE_TEXT
     t = message.text
     return "" if t is None else str(t)
 
 
 def safe_message_type(message: Message) -> str:
+    if bool(getattr(message, "is_deleted", False)):
+        return "deleted"
     mt = message.message_type
     if mt is None or (isinstance(mt, str) and not mt.strip()):
         return "text"
@@ -49,6 +55,8 @@ def reply_preview_for_parent(
 ) -> MessageReplyPreview:
     media_url = parent.media_url
     ptype = safe_message_type(parent)
+    if bool(getattr(parent, "is_deleted", False)):
+        media_url = None
     if (
         is_private_s3_ready()
         and ptype in PRIVATE_MEDIA_MESSAGE_TYPES
@@ -103,6 +111,8 @@ def message_to_response(
 
     mtype_single = safe_message_type(message)
     media_url = message.media_url
+    if bool(getattr(message, "is_deleted", False)):
+        media_url = None
     if (
         is_private_s3_ready()
         and mtype_single in PRIVATE_MEDIA_MESSAGE_TYPES
@@ -127,13 +137,14 @@ def message_to_response(
         sender_id=message.sender_id,
         text=safe_message_text(message),
         message_type=mtype_single,
-        media_key=message.media_key,
+        media_key=None if bool(getattr(message, "is_deleted", False)) else message.media_key,
         media_url=media_url,
-        media_mime_type=message.media_mime_type,
-        media_size=message.media_size,
+        media_mime_type=None if bool(getattr(message, "is_deleted", False)) else message.media_mime_type,
+        media_size=None if bool(getattr(message, "is_deleted", False)) else message.media_size,
         created_at=message.created_at,
         updated_at=message.updated_at,
         is_updated=bool(message.is_updated) if message.is_updated is not None else False,
+        is_deleted=bool(getattr(message, "is_deleted", False)),
         reply_to_message_id=message.reply_to_message_id,
         reply_to=reply_preview,
         forwarded_from_user_id=message.forwarded_from_user_id,
@@ -158,6 +169,8 @@ def message_to_response_batched(
 
     media_url = message.media_url
     mtype = safe_message_type(message)
+    if bool(getattr(message, "is_deleted", False)):
+        media_url = None
     if (
         is_private_s3_ready()
         and mtype in PRIVATE_MEDIA_MESSAGE_TYPES
@@ -175,13 +188,14 @@ def message_to_response_batched(
         sender_id=message.sender_id,
         text=safe_message_text(message),
         message_type=mtype,
-        media_key=message.media_key,
+        media_key=None if bool(getattr(message, "is_deleted", False)) else message.media_key,
         media_url=media_url,
-        media_mime_type=message.media_mime_type,
-        media_size=message.media_size,
+        media_mime_type=None if bool(getattr(message, "is_deleted", False)) else message.media_mime_type,
+        media_size=None if bool(getattr(message, "is_deleted", False)) else message.media_size,
         created_at=message.created_at,
         updated_at=message.updated_at,
         is_updated=bool(message.is_updated) if message.is_updated is not None else False,
+        is_deleted=bool(getattr(message, "is_deleted", False)),
         reply_to_message_id=message.reply_to_message_id,
         reply_to=reply_preview,
         forwarded_from_user_id=message.forwarded_from_user_id,
@@ -203,6 +217,9 @@ def build_message_payload(
 
     media_url = message.media_url
     mtype_payload = safe_message_type(message)
+    is_deleted = bool(getattr(message, "is_deleted", False))
+    if is_deleted:
+        media_url = None
     if (
         is_private_s3_ready()
         and mtype_payload in PRIVATE_MEDIA_MESSAGE_TYPES
@@ -214,15 +231,16 @@ def build_message_payload(
         "id": message.id,
         "chat_id": message.chat_id,
         "sender_id": message.sender_id,
-        "text": message.text,
+        "text": safe_message_text(message),
         "message_type": mtype_payload,
-        "media_key": message.media_key,
+        "media_key": None if is_deleted else message.media_key,
         "media_url": media_url,
-        "media_mime_type": message.media_mime_type,
-        "media_size": message.media_size,
+        "media_mime_type": None if is_deleted else message.media_mime_type,
+        "media_size": None if is_deleted else message.media_size,
         "created_at": message.created_at.isoformat() if message.created_at else None,
         "updated_at": message.updated_at.isoformat() if message.updated_at else None,
         "is_updated": message.is_updated,
+        "is_deleted": is_deleted,
         "reply_to_message_id": message.reply_to_message_id,
         "reply_to": reply_to_dict,
         "forwarded_from_user_id": message.forwarded_from_user_id,
@@ -238,7 +256,7 @@ def apply_private_media_urls(messages: list[Message]) -> list[Message]:
 
     for message in messages:
         mtype = safe_message_type(message)
-        if mtype in PRIVATE_MEDIA_MESSAGE_TYPES and message.media_key:
+        if not bool(getattr(message, "is_deleted", False)) and mtype in PRIVATE_MEDIA_MESSAGE_TYPES and message.media_key:
             message.media_url = get_storage().generate_private_file_url(
                 object_key=message.media_key
             )
@@ -254,7 +272,7 @@ def apply_private_media_urls_map(messages: list[Message]) -> None:
 
     for message in messages:
         mtype = safe_message_type(message)
-        if mtype in PRIVATE_MEDIA_MESSAGE_TYPES and message.media_key:
+        if not bool(getattr(message, "is_deleted", False)) and mtype in PRIVATE_MEDIA_MESSAGE_TYPES and message.media_key:
             message.media_url = get_storage().generate_private_file_url(
                 object_key=message.media_key
             )

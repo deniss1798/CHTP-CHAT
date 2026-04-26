@@ -6,6 +6,7 @@ from sqlalchemy import and_, desc, func, or_
 from sqlalchemy.orm import Session
 
 from app.application.chats.chat_queries import message_type_for_chat_list, unread_count_for_user
+from app.application.messages.message_projection import DELETED_MESSAGE_TEXT
 from app.models.chat import Chat
 from app.models.chat_member import ChatMember
 from app.models.message import Message
@@ -86,7 +87,11 @@ def _build_chat_response(
         title=chat_title,
         avatar_url=chat_avatar_url,
         created_by=chat.created_by,
-        last_message=last_message.text if last_message else None,
+        last_message=(
+            DELETED_MESSAGE_TEXT
+            if last_message and bool(getattr(last_message, "is_deleted", False))
+            else (last_message.text if last_message else None)
+        ),
         last_message_type=message_type_for_chat_list(last_message),
         last_message_at=last_message.created_at if last_message else None,
         last_message_sender_id=last_message.sender_id if last_message else None,

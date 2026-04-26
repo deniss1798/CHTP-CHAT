@@ -1,0 +1,42 @@
+import 'package:flutter/material.dart';
+
+import 'app_colors.dart';
+
+abstract final class AppTextStyles {
+  static const TextStyle headline = TextStyle(
+    color: AppColors.textPrimary,
+    fontSize: 32,
+    fontWeight: FontWeight.w800,
+    height: 1.1,
+    letterSpacing: -0.8,
+  );
+
+  static const TextStyle title = TextStyle(
+    color: AppColors.textPrimary,
+    fontSize: 18,
+    fontWeight: FontWeight.w800,
+    height: 1.2,
+    letterSpacing: -0.3,
+  );
+
+  static const TextStyle body = TextStyle(
+    color: AppColors.textPrimary,
+    fontSize: 15,
+    fontWeight: FontWeight.w500,
+    height: 1.4,
+  );
+
+  static const TextStyle secondary = TextStyle(
+    color: AppColors.textSecondary,
+    fontSize: 14,
+    fontWeight: FontWeight.w500,
+    height: 1.4,
+  );
+
+  static const TextStyle caption = TextStyle(
+    color: AppColors.textMuted,
+    fontSize: 12,
+    fontWeight: FontWeight.w500,
+    height: 1.3,
+  );
+}

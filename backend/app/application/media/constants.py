@@ -7,7 +7,7 @@ ALLOWED_IMAGE_TYPES: dict[str, str] = {
     "image/webp": ".webp",
 }
 
-MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10 MB
+MAX_IMAGE_SIZE = 15 * 1024 * 1024  # 15 MB
 
 MAX_AVATAR_SIZE = 5 * 1024 * 1024  # 5 MB (чаты / пользователи)
 
@@ -19,9 +19,9 @@ ALLOWED_VIDEO_TYPES: dict[str, str] = {
     "video/3gp": ".3gp",
 }
 
-MAX_VIDEO_SIZE = 50 * 1024 * 1024  # 50 MB
+MAX_VIDEO_SIZE = 100 * 1024 * 1024  # 100 MB
 
-MAX_DOCUMENT_SIZE = 50 * 1024 * 1024  # 50 MB
+MAX_DOCUMENT_SIZE = 100 * 1024 * 1024  # 100 MB
 
 ALLOWED_DOCUMENT_EXTENSIONS: dict[str, str] = {
     ".pdf": "application/pdf",
@@ -38,7 +38,7 @@ ALLOWED_DOCUMENT_EXTENSIONS: dict[str, str] = {
     ".txt": "text/plain",
 }
 
-MAX_VOICE_SIZE = 10 * 1024 * 1024  # 10 MB
+MAX_VOICE_SIZE = 20 * 1024 * 1024  # 20 MB
 
 ALLOWED_VOICE_TYPES: dict[str, str] = {
     "audio/ogg": ".ogg",
@@ -52,5 +52,5 @@ ALLOWED_VOICE_TYPES: dict[str, str] = {
 }
 
 PRIVATE_MEDIA_MESSAGE_TYPES: frozenset[str] = frozenset(
-    {"image", "video", "video_note", "document", "voice"}
+    {"image", "video", "video_note", "document", "file", "voice"}
 )

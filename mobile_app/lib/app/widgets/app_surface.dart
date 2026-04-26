@@ -50,9 +50,9 @@ class AppSurface extends StatelessWidget {
     if (borderColor != null) return borderColor!;
     switch (tone) {
       case AppSurfaceTone.accent:
-        return AppColors.accent.withAlpha(90);
+        return AppColors.accent.withAlpha(130);
       case AppSurfaceTone.selected:
-        return AppColors.accentBorder.withAlpha(170);
+        return AppColors.accentBorder.withAlpha(210);
       case AppSurfaceTone.base:
       case AppSurfaceTone.elevated:
         return AppColors.strokeSoft;
@@ -69,7 +69,7 @@ class AppSurface extends StatelessWidget {
         borderRadius: BorderRadius.circular(radius),
         border: Border.all(
           color: _borderColor(),
-          width: 1,
+          width: tone == AppSurfaceTone.base ? 1.05 : 1.25,
         ),
         boxShadow: shadow ?? AppShadows.card,
       ),
@@ -108,17 +108,18 @@ class AppIconButtonSurface extends StatelessWidget {
             : () {
                 onTap!.call();
               },
-        borderRadius: BorderRadius.circular(AppRadius.md),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
         child: Ink(
           width: size,
           height: size,
           decoration: BoxDecoration(
             gradient: active ? AppGradients.selectedPanel : AppGradients.surfacePanel,
-            borderRadius: BorderRadius.circular(AppRadius.md),
+            shape: BoxShape.circle,
             border: Border.all(
               color: active
-                  ? AppColors.accent.withAlpha(120)
-                  : AppColors.strokeSoft,
+                  ? AppColors.accentBright.withAlpha(190)
+                  : AppColors.accent.withAlpha(70),
+              width: active ? 1.2 : 1,
             ),
             boxShadow: active ? AppShadows.accentStroke : AppShadows.lift,
           ),

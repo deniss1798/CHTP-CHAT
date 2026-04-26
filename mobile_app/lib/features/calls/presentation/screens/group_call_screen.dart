@@ -208,14 +208,14 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
                         child: Text(
                           'ЧТП ЧАТ',
                           style: TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.2,
+                            color: AppColors.accentBright,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.5,
                           ),
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 18),
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -235,8 +235,8 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
                                     color: AppColors.textPrimary,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w700,
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.w900,
                                     height: 1.25,
                                     letterSpacing: -0.35,
                                   ),
@@ -247,15 +247,40 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
                                   textAlign: TextAlign.center,
                                   maxLines: 2,
                                   style: const TextStyle(
-                                    color: AppColors.textSecondary,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
+                                    color: AppColors.accentBright,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                          const SizedBox(width: 48),
+                          AppSurface(
+                            radius: AppRadius.pill,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.shield_outlined,
+                                  size: 14,
+                                  color: AppColors.accentBright,
+                                ),
+                                SizedBox(width: 6),
+                                Text(
+                                  'Защищённый звонок',
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
                     ],

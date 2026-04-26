@@ -5,6 +5,7 @@ from app.domain.policies.chat_access import require_chat_member
 from app.domain.policies.group_chat_policy import (
     require_group_chat,
     require_group_creator,
+    require_group_owner,
 )
 from app.models.chat import Chat
 from app.models.chat_member import ChatMember
@@ -49,7 +50,8 @@ def add_chat_member(
         db.query(Chat).filter(Chat.id == chat_id).first(),
         detail="You can add members only to group chats",
     )
-    require_chat_member(db, chat_id, current_user)
+    membership = require_chat_member(db, chat_id, current_user)
+    require_group_owner(chat, membership)
 
     if payload.user_id == current_user.id:
         raise HTTPException(
@@ -143,7 +145,8 @@ def remove_group_member(
         db.query(Chat).filter(Chat.id == chat_id).first(),
         detail="Only for group chats",
     )
-    require_chat_member(db, chat.id, current_user)
+    membership = require_chat_member(db, chat.id, current_user)
+    require_group_owner(chat, membership)
     require_group_creator(chat, current_user)
 
     if member_user_id == current_user.id:

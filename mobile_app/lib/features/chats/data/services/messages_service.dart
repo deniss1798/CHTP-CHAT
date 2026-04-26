@@ -249,12 +249,14 @@ class MessagesService {
     required int chatId,
     required String text,
     int? replyToMessageId,
+    String messageType = 'text',
   }) async {
     final response = await _dio.post(
       '/messages/',
       data: {
         'chat_id': chatId,
         'text': text,
+        'message_type': messageType,
         if (replyToMessageId != null) 'reply_to_message_id': replyToMessageId,
       },
       options: await _authorizedOptions(),

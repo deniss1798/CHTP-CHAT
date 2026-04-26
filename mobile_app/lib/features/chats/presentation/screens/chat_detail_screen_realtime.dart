@@ -87,7 +87,21 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
       if (!mounted) return;
 
       setState(() {
-        _messages.removeWhere((m) => m['id'] == id);
+        final idx = _messages.indexWhere(
+          (m) => ChatDetailMessageMaps.intFromDynamic(m['id']) == id,
+        );
+        if (idx >= 0) {
+          final copy = Map<String, dynamic>.from(_messages[idx]);
+          copy['text'] = 'Сообщение удалено';
+          copy['message_type'] = 'deleted';
+          copy['media_key'] = null;
+          copy['media_url'] = null;
+          copy['media_mime_type'] = null;
+          copy['media_size'] = null;
+          copy['is_deleted'] = true;
+          copy['reactions'] = const [];
+          _messages[idx] = copy;
+        }
         if (_editingMessage != null && _editingMessage!['id'] == id) {
           _editingMessage = null;
           _messageController.clear();

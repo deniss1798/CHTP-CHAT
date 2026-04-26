@@ -8,23 +8,23 @@ abstract final class AppSpacing {
   static const double lg = 16;
   static const double xl = 20;
   static const double xxl = 24;
-  static const double xxxl = 32;
+  static const double xxxl = 30;
 }
 
 abstract final class AppRadius {
-  static const double sm = 10;
-  static const double md = 14;
-  static const double lg = 18;
-  static const double xl = 22;
-  static const double xxl = 28;
+  static const double sm = 12;
+  static const double md = 16;
+  static const double lg = 20;
+  static const double xl = 24;
+  static const double xxl = 30;
   static const double pill = 999;
 }
 
 /// Компактные контролы: плоские кнопки без «колхозных» полотен.
 abstract final class AppSizes {
-  static const double btnHeight = 40;
+  static const double btnHeight = 44;
   static const double fab = 56;
-  static const double inputAction = 40;
+  static const double inputAction = 42;
   static const double iconSm = 18;
   static const double iconMd = 20;
   static const double iconLg = 24;
@@ -57,9 +57,9 @@ abstract final class AppGradients {
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
     colors: [
-      Color(0xFF090705),
+      Color(0xFF130501),
       Color(0xFF000000),
-      Color(0xFF0D0603),
+      Color(0xFF1E0701),
     ],
     stops: [0, 0.58, 1],
   );
@@ -68,9 +68,9 @@ abstract final class AppGradients {
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
     colors: [
-      Color(0xFF19120F),
-      Color(0xFF111111),
-      Color(0xFF191008),
+      Color(0xFF23140E),
+      Color(0xFF121212),
+      Color(0xFF271107),
     ],
   );
 
@@ -78,9 +78,9 @@ abstract final class AppGradients {
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
     colors: [
-      Color(0xFF171412),
-      Color(0xFF100F0E),
-      Color(0xFF1A1410),
+      Color(0xFF1D1713),
+      Color(0xFF111111),
+      Color(0xFF21120C),
     ],
   );
 
@@ -88,9 +88,9 @@ abstract final class AppGradients {
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
     colors: [
-      Color(0xFFFF8C55),
-      Color(0xFFFF6A2A),
-      Color(0xFFE75418),
+      Color(0xFFFF8A4A),
+      Color(0xFFFF5B1F),
+      Color(0xFFFF3F0A),
     ],
   );
 
@@ -98,9 +98,9 @@ abstract final class AppGradients {
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
     colors: [
-      Color(0xFF22150E),
-      Color(0xFF181210),
-      Color(0xFF29160C),
+      Color(0xFF32180E),
+      Color(0xFF171312),
+      Color(0xFF341205),
     ],
   );
 
@@ -108,9 +108,9 @@ abstract final class AppGradients {
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
     colors: [
-      Color(0xFF22160F),
-      Color(0xFF18110E),
-      Color(0xFF28150B),
+      Color(0xFF25140D),
+      Color(0xFF151211),
+      Color(0xFF2A1107),
     ],
   );
 
@@ -118,9 +118,9 @@ abstract final class AppGradients {
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
     colors: [
-      Color(0xFF161616),
-      Color(0xFF0F0F0F),
-      Color(0xFF141312),
+      Color(0xFF191919),
+      Color(0xFF111111),
+      Color(0xFF161413),
     ],
   );
 }

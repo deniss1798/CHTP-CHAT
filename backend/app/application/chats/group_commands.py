@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.application.chats.chat_queries import build_chat_detail_response
 from app.application.media.constants import ALLOWED_IMAGE_TYPES, MAX_AVATAR_SIZE
 from app.domain.policies.chat_access import require_chat_member
-from app.domain.policies.group_chat_policy import require_group_chat
+from app.domain.policies.group_chat_policy import require_group_chat, require_group_owner
 from app.infrastructure.storage.s3_storage import S3StorageService, is_s3_configured
 from app.models.chat import Chat
 from app.models.user import User
@@ -22,7 +22,8 @@ def rename_group_chat(
         db.query(Chat).filter(Chat.id == chat_id).first(),
         detail="Only group chats can be renamed",
     )
-    require_chat_member(db, chat.id, current_user)
+    membership = require_chat_member(db, chat.id, current_user)
+    require_group_owner(chat, membership)
 
     chat.title = payload.title.strip()
     db.add(chat)
@@ -43,7 +44,8 @@ async def upload_group_chat_avatar(
         db.query(Chat).filter(Chat.id == chat_id).first(),
         detail="Avatar can be changed only for group chats",
     )
-    require_chat_member(db, chat.id, current_user)
+    membership = require_chat_member(db, chat.id, current_user)
+    require_group_owner(chat, membership)
 
     if not file.content_type or file.content_type not in ALLOWED_IMAGE_TYPES:
         raise HTTPException(

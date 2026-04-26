@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'desktop_chat_session.dart';
 import 'theme/app_colors.dart';
+import 'theme/design_tokens.dart';
 import '../features/chats/presentation/screens/chat_detail_screen.dart';
 import '../features/chats/presentation/screens/chats_screen.dart';
 
@@ -20,7 +21,7 @@ class DesktopChatsShell extends StatefulWidget {
 }
 
 class _DesktopChatsShellState extends State<DesktopChatsShell> {
-  double _leftPanelWidth = 340;
+  double _leftPanelWidth = 360;
   int? _selectedChatId;
   String _selectedTitle = '';
   String _selectedChatType = 'private';
@@ -96,39 +97,42 @@ class _DesktopChatsShellState extends State<DesktopChatsShell> {
 
         return Scaffold(
           backgroundColor: AppColors.background,
-          body: Row(
-            children: [
-              SizedBox(
-                width: left,
-                child: ChatsScreen(
-                  embedded: true,
-                  shellListMode: widget.shellListMode,
-                  selectedChatId: _selectedChatId,
-                  onChatSelected: _onChatSelected,
+          body: Container(
+            decoration: const BoxDecoration(gradient: AppGradients.background),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: left,
+                  child: ChatsScreen(
+                    embedded: true,
+                    shellListMode: widget.shellListMode,
+                    selectedChatId: _selectedChatId,
+                    onChatSelected: _onChatSelected,
+                  ),
                 ),
-              ),
-              _SplitDragHandle(
-                onDrag: (dx) {
-                  setState(() {
-                    _leftPanelWidth =
-                        (_leftPanelWidth + dx).clamp(minLeft, maxLeft);
-                  });
-                },
-                onDragEnd: _persistWidth,
-              ),
-              Expanded(
-                child: _selectedChatId == null
-                    ? _DesktopEmptyChatPane()
-                    : ChatDetailScreen(
-                        key: ValueKey(_selectedChatId),
-                        chatId: _selectedChatId!,
-                        title: _selectedTitle,
-                        chatType: _selectedChatType,
-                        avatarUrl: _selectedAvatarUrl,
-                        onBackOverride: _clearChat,
-                      ),
-              ),
-            ],
+                _SplitDragHandle(
+                  onDrag: (dx) {
+                    setState(() {
+                      _leftPanelWidth =
+                          (_leftPanelWidth + dx).clamp(minLeft, maxLeft);
+                    });
+                  },
+                  onDragEnd: _persistWidth,
+                ),
+                Expanded(
+                  child: _selectedChatId == null
+                      ? _DesktopEmptyChatPane()
+                      : ChatDetailScreen(
+                          key: ValueKey(_selectedChatId),
+                          chatId: _selectedChatId!,
+                          title: _selectedTitle,
+                          chatType: _selectedChatType,
+                          avatarUrl: _selectedAvatarUrl,
+                          onBackOverride: _clearChat,
+                        ),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -140,7 +144,7 @@ class _DesktopEmptyChatPane extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ColoredBox(
-      color: AppColors.background,
+      color: Colors.transparent,
       child: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -181,8 +185,17 @@ class _SplitDragHandle extends StatelessWidget {
           width: 8,
           child: Center(
             child: Container(
-              width: 1,
-              color: Colors.white.withAlpha(28),
+                width: 1,
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withAlpha(56),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.accent.withAlpha(76),
+                      blurRadius: 10,
+                      spreadRadius: -2,
+                    ),
+                  ],
+                ),
             ),
           ),
         ),

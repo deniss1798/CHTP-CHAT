@@ -24,7 +24,7 @@ const List<String> kDefaultQuickReactionEmojis = kReactionEmojiPalette;
 
 const int kCollapsedReactionSlots = 5;
 
-const double _menuRadius = 22;
+const double _menuRadius = 18;
 const double _reactionCellRadius = 12;
 
 bool primaryTapOpensMessageMenu(BuildContext context) {
@@ -83,7 +83,7 @@ class _ChatMessageActionsPanelState extends State<ChatMessageActionsPanel> {
 
     items.add(
       Padding(
-        padding: const EdgeInsets.fromLTRB(10, 12, 10, 10),
+        padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
         child: _reactionSection(),
       ),
     );
@@ -111,22 +111,20 @@ class _ChatMessageActionsPanelState extends State<ChatMessageActionsPanel> {
 
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF0D0D0D),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF171311), Color(0xFF0E0E0E), Color(0xFF17110D)],
+        ),
         borderRadius: BorderRadius.circular(_menuRadius),
         border: Border.all(
-          color: AppColors.accent.withValues(alpha: 0.5),
-          width: 1.1,
+          color: AppColors.accent.withValues(alpha: 0.24),
+          width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.accent.withValues(alpha: 0.22),
-            blurRadius: 20,
-            spreadRadius: 0,
-            offset: const Offset(0, 4),
-          ),
-          BoxShadow(
             color: Colors.black.withValues(alpha: 0.5),
-            blurRadius: 18,
+            blurRadius: 16,
             offset: const Offset(0, 8),
             spreadRadius: -4,
           ),
@@ -138,7 +136,7 @@ class _ChatMessageActionsPanelState extends State<ChatMessageActionsPanel> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           ...items,
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
         ],
       ),
     );
@@ -296,15 +294,15 @@ class _ChatMessageActionsPanelState extends State<ChatMessageActionsPanel> {
     bool isDestructive = false,
   }) {
     final destructive = isDestructive;
-    final textColor = destructive ? AppColors.accent : AppColors.textPrimary;
-    final iconColor = destructive ? AppColors.accent : AppColors.textPrimary;
+    final textColor = destructive ? AppColors.error : AppColors.textPrimary;
+    final iconColor = destructive ? AppColors.error : AppColors.textPrimary;
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(
             children: [
               Icon(icon, size: 22, color: iconColor),
@@ -314,7 +312,7 @@ class _ChatMessageActionsPanelState extends State<ChatMessageActionsPanel> {
                   label,
                   style: TextStyle(
                     color: textColor,
-                    fontSize: 16,
+                    fontSize: 15,
                     fontWeight: destructive ? FontWeight.w800 : FontWeight.w600,
                   ),
                 ),

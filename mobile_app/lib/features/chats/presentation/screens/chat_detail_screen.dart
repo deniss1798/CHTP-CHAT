@@ -15,6 +15,7 @@ import '../../../../core/constants/document_attachments.dart';
 import '../../../../core/formatting/last_seen_label.dart';
 import '../../../../core/formatting/server_time.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/notifiers/open_chat_state_notifier.dart';
 import '../../../../core/platform/desktop_layout.dart';
 import '../../../../core/realtime/chat_ws_contract.dart';
 import '../../../../core/notifiers/chats_list_refresh_notifier.dart';
@@ -43,12 +44,11 @@ import '../chat_detail_formatters.dart';
 import '../chat_detail_message_maps.dart';
 import '../widgets/chat_detail_app_bar.dart';
 import '../widgets/chat_detail_avatar_widgets.dart';
+import '../widgets/chat_detail_conversation_view.dart';
 import '../widgets/chat_detail_fullscreen_image_viewer.dart';
 import '../widgets/chat_detail_fullscreen_video_page.dart';
-import '../widgets/chat_detail_messages_list.dart';
 import '../widgets/messenger_styled_dialogs.dart';
 import '../widgets/chat_message_actions_panel.dart';
-import '../widgets/message_input_bar.dart';
 
 part 'chat_detail_screen_logic.dart';
 part 'chat_detail_screen_lifecycle.dart';
@@ -158,6 +158,7 @@ class _ChatDetailScreenState extends _ChatDetailScreenStateBase
     super.initState();
     _chatTitle = widget.title;
     _chatAvatarUrl = widget.avatarUrl;
+    markChatOpen(widget.chatId);
     _messageController.addListener(_onMessageTextChanged);
     _scrollController.addListener(_onMessagesScroll);
     if (!_isGroupChat) {
@@ -172,6 +173,7 @@ class _ChatDetailScreenState extends _ChatDetailScreenStateBase
 
   @override
   void dispose() {
+    clearOpenChat(widget.chatId);
     openChatSyncNotifier.removeListener(_onOpenChatSyncRequest);
     _socketReconnectTimer?.cancel();
     _lastSeenSubtitleTimer?.cancel();
@@ -226,87 +228,57 @@ class _ChatDetailScreenState extends _ChatDetailScreenStateBase
     }
 
     final reply = _replyingTo;
-    final chatColumn = Column(
-      children: [
-        Expanded(
-          child: ChatDetailMessagesList(
-            messages: _messages,
-            scrollController: _scrollController,
-            isGroupChat: _isGroupChat,
-            currentUserId: _currentUserId,
-            memberNames: _memberNames,
-            memberAvatarUrls: _memberAvatarUrls,
-            onRefresh: _loadMessages,
-            onSwipeReply: (m) {
-              setState(() {
-                _replyingTo = Map<String, dynamic>.from(m);
-                _editingMessage = null;
-              });
-            },
-            onMessageActions: _showMessageActions,
-            onOpenFullscreenImage: _openFullscreenImage,
-            onOpenFullscreenVideo: _openFullscreenVideo,
-            onOpenSenderProfile: (userId) {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => UserProfileScreen(userId: userId),
-                ),
-              );
-            },
-            onReactionEmojiTap: _toggleReactionEmoji,
-          ),
-        ),
-        if (_typingUserId != null)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                _isGroupChat
-                    ? '${_senderNameForUserId(_typingUserId)} печатает…'
-                    : 'Печатает…',
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 13,
-                  fontStyle: FontStyle.italic,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ),
-        ChatDetailMessageInputBar(
-          messageController: _messageController,
-          isEditing: _editingMessage != null,
-          replyingTo: reply,
-          replyAuthorLabel:
-              reply != null ? _senderName(reply) : '',
-          isSending: _isSending,
-          isSendingImage: _isSendingImage,
-          isSendingVideo: _isSendingVideo,
-          isSendingDocument: _isSendingDocument,
-          isSendingVoice: _isSendingVoice,
-          isRecordingVoice: _recordingVoice,
-          onCancelEdit: _cancelEdit,
-          onCancelReply: _cancelReply,
-          onPickAttachment: _showAttachmentPicker,
-          onVideoNote: _openVideoNoteRecorder,
-          onVoiceRecordTap: _toggleVoiceRecording,
-          onVoicePickFile: _pickAndSendVoiceFile,
-          onSend: _sendMessage,
-          onDesktopExtras: _showDesktopComposerExtras,
-        ),
-      ],
-    );
+    final typingLabel = _typingUserId == null
+        ? null
+        : (_isGroupChat
+            ? '${_senderNameForUserId(_typingUserId)} печатает…'
+            : 'Печатает…');
 
-    if (!isDesktopMessengerLayout) {
-      return chatColumn;
-    }
-
-    return DropTarget(
-      onDragDone: (DropDoneDetails detail) {
-        _onDesktopDocumentsDropped(detail);
+    return ChatDetailConversationView(
+      messages: _messages,
+      scrollController: _scrollController,
+      isGroupChat: _isGroupChat,
+      currentUserId: _currentUserId,
+      memberNames: _memberNames,
+      memberAvatarUrls: _memberAvatarUrls,
+      onRefresh: _loadMessages,
+      onSwipeReply: (m) {
+        setState(() {
+          _replyingTo = Map<String, dynamic>.from(m);
+          _editingMessage = null;
+        });
       },
-      child: chatColumn,
+      onMessageActions: _showMessageActions,
+      onOpenFullscreenImage: _openFullscreenImage,
+      onOpenFullscreenVideo: _openFullscreenVideo,
+      onOpenSenderProfile: (userId) {
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => UserProfileScreen(userId: userId),
+          ),
+        );
+      },
+      onReactionEmojiTap: _toggleReactionEmoji,
+      typingLabel: typingLabel,
+      messageController: _messageController,
+      isEditing: _editingMessage != null,
+      replyingTo: reply,
+      replyAuthorLabel: reply != null ? _senderName(reply) : '',
+      isSending: _isSending,
+      isSendingImage: _isSendingImage,
+      isSendingVideo: _isSendingVideo,
+      isSendingDocument: _isSendingDocument,
+      isSendingVoice: _isSendingVoice,
+      isRecordingVoice: _recordingVoice,
+      onCancelEdit: _cancelEdit,
+      onCancelReply: _cancelReply,
+      onPickAttachment: _showAttachmentPicker,
+      onVideoNote: _openVideoNoteRecorder,
+      onVoiceRecordTap: _toggleVoiceRecording,
+      onVoicePickFile: _pickAndSendVoiceFile,
+      onSend: _sendMessage,
+      onDesktopExtras: _showDesktopComposerExtras,
+      onDesktopDocumentsDropped: _onDesktopDocumentsDropped,
     );
   }
 

@@ -1,3 +1,4 @@
+import hmac
 from datetime import datetime, timedelta, timezone
 
 from jose import JWTError, jwt
@@ -21,6 +22,18 @@ def hash_password(password: str) -> str:
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
+
+
+def hash_verification_code(code: str) -> str:
+    return pwd_context.hash(code)
+
+
+def verify_verification_code(code: str, stored_code: str) -> bool:
+    if stored_code.startswith("$pbkdf2-sha256$"):
+        return pwd_context.verify(code, stored_code)
+
+    # Backward compatibility for pending registrations created before code hashing.
+    return hmac.compare_digest(stored_code, code)
 
 
 def create_access_token(data: dict) -> str:

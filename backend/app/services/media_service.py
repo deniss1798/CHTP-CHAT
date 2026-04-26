@@ -41,6 +41,16 @@ def delete_private_media_key(media_key: str | None) -> None:
         print(f"Private media delete skipped: {e}")
 
 
+def _image_signature_matches(content: bytes, content_type: str) -> bool:
+    if content_type in {"image/jpeg", "image/jpg"}:
+        return content.startswith(b"\xff\xd8\xff")
+    if content_type == "image/png":
+        return content.startswith(b"\x89PNG\r\n\x1a\n")
+    if content_type == "image/webp":
+        return len(content) >= 12 and content[:4] == b"RIFF" and content[8:12] == b"WEBP"
+    return False
+
+
 async def read_and_validate_photo(file: UploadFile) -> tuple[bytes, str]:
     if not file.content_type or file.content_type not in ALLOWED_IMAGE_TYPES:
         raise HTTPException(
@@ -56,7 +66,12 @@ async def read_and_validate_photo(file: UploadFile) -> tuple[bytes, str]:
     if len(content) > MAX_IMAGE_SIZE:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="File is too large. Max size is 10 MB",
+            detail="File is too large. Max size is 15 MB",
+        )
+    if not _image_signature_matches(content, file.content_type):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Image content does not match declared type",
         )
     return content, file.content_type
 
@@ -108,7 +123,7 @@ async def read_and_prepare_video(file: UploadFile) -> tuple[bytes, str, str]:
     if len(content) > MAX_VIDEO_SIZE:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="File is too large. Max size is 50 MB",
+            detail="File is too large. Max size is 100 MB",
         )
 
     transcoded = try_transcode_to_desktop_mp4(content)
@@ -169,7 +184,7 @@ async def read_and_validate_document(
     if len(content) > MAX_DOCUMENT_SIZE:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="File is too large. Max size is 50 MB",
+            detail="File is too large. Max size is 100 MB",
         )
     return content, safe_name, ext, resolved_mime
 
@@ -224,7 +239,7 @@ async def read_and_validate_voice(file: UploadFile) -> tuple[bytes, str, str]:
     if len(content) > MAX_VOICE_SIZE:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="File is too large. Max size is 10 MB",
+            detail="File is too large. Max size is 20 MB",
         )
     return content, extension, ct_raw
 

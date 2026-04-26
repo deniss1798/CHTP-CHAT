@@ -13,6 +13,7 @@ class MessageCreate(BaseModel):
     chat_id: int
     text: str = Field(..., min_length=1)
     reply_to_message_id: int | None = None
+    message_type: str = Field(default="text", max_length=32)
 
 
 class ReactionGroup(BaseModel):
@@ -64,6 +65,7 @@ class MessageResponse(BaseModel):
     created_at: datetime
     updated_at: datetime | None = None
     is_updated: bool | None = False
+    is_deleted: bool | None = False
 
     reply_to_message_id: int | None = None
     reply_to: MessageReplyPreview | None = None

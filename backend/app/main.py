@@ -7,6 +7,7 @@ from sqlalchemy import text
 
 from app.api.auth_router import router as auth_router
 from app.api.devices_router import router as devices_router
+from app.api.notification_settings_router import router as notification_settings_router
 from app.api.routers.chats.router import router as chats_router
 from app.api.routers.messages.router import router as messages_router
 from app.api.users_router import router as users_router
@@ -14,9 +15,11 @@ from app.api.ws_inbox_router import router as ws_inbox_router
 from app.api.webrtc_router import router as webrtc_router
 from app.api.ws_router import router as ws_router
 from app.core.config import get_settings
+from app.core.log_redaction import install_log_redaction
 from app.db.database import engine
 
 settings = get_settings()
+install_log_redaction()
 
 app = FastAPI(title=settings.app_name)
 
@@ -72,6 +75,7 @@ def _include_all_routers(prefix: str = "") -> None:
     app.include_router(ws_router, **kwargs)
     app.include_router(ws_inbox_router, **kwargs)
     app.include_router(devices_router, **kwargs)
+    app.include_router(notification_settings_router, **kwargs)
     app.include_router(webrtc_router, **kwargs)
 
 

@@ -67,17 +67,16 @@ class ChatDetailMessageInputBar extends StatelessWidget {
       top: false,
       child: Container(
         padding: EdgeInsets.fromLTRB(
-          mobileCompact ? 8 : 12,
+          mobileCompact ? 6 : 10,
+          mobileCompact ? 6 : 8,
+          mobileCompact ? 6 : 10,
           mobileCompact ? 8 : 10,
-          mobileCompact ? 8 : 12,
-          mobileCompact ? 10 : 12,
         ),
         decoration: BoxDecoration(
-          color: AppColors.background.withAlpha(235),
-          border: Border(
-            top: BorderSide(
-              color: AppColors.strokeSoft,
-            ),
+          color: AppColors.background.withValues(alpha: 0.96),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          border: Border.all(
+            color: AppColors.strokeSoft,
           ),
           boxShadow: AppShadows.topBar,
         ),
@@ -131,12 +130,13 @@ class ChatDetailMessageInputBar extends StatelessWidget {
                   ),
                   Expanded(
                     child: AppSurface(
-                      radius: AppRadius.xl,
+                      radius: AppRadius.pill,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 4,
                         vertical: 2,
                       ),
-                      shadow: AppShadows.lift,
+                      borderColor: AppColors.strokeSoft,
+                      shadow: const [],
                       child: TextField(
                         controller: messageController,
                         style: const TextStyle(

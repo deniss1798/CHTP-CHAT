@@ -36,6 +36,11 @@ async def add_message_reaction(
             detail="Message not found",
         )
     require_chat_member(db, message.chat_id, current_user)
+    if bool(getattr(message, "is_deleted", False)):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Deleted messages cannot have reactions",
+        )
 
     row = MessageReaction(
         message_id=message_id,
@@ -73,6 +78,11 @@ async def remove_message_reaction(
             detail="Message not found",
         )
     require_chat_member(db, message.chat_id, current_user)
+    if bool(getattr(message, "is_deleted", False)):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Deleted messages cannot have reactions",
+        )
 
     deleted = (
         db.query(MessageReaction)

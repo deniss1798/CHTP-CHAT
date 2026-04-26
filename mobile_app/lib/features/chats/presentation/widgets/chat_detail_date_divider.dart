@@ -17,24 +17,40 @@ class ChatDetailDateDivider extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 14),
-      child: Center(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            gradient: AppGradients.surfacePanel,
-            borderRadius: BorderRadius.circular(AppRadius.pill),
-            border: Border.all(color: AppColors.strokeSoft),
-            boxShadow: AppShadows.lift,
-          ),
-          child: Text(
-            label,
-            style: const TextStyle(
-              color: AppColors.textMuted,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
+      child: Row(
+        children: [
+          Expanded(
+            child: Container(
+              height: 1,
+              color: AppColors.strokeSoft,
             ),
           ),
-        ),
+          const SizedBox(width: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              gradient: AppGradients.surfacePanel,
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+              border: Border.all(color: AppColors.strokeSoft),
+              boxShadow: AppShadows.lift,
+            ),
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.textMuted,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Container(
+              height: 1,
+              color: AppColors.strokeSoft,
+            ),
+          ),
+        ],
       ),
     );
   }

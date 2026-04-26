@@ -3,23 +3,24 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'app_colors.dart';
 import 'design_tokens.dart';
+import 'app_shadows.dart';
 
 class AppTheme {
   static ThemeData get darkTheme {
     final baseTextTheme = GoogleFonts.manropeTextTheme(
       const TextTheme(
         headlineLarge: TextStyle(
-          fontSize: 34,
+          fontSize: 44,
           fontWeight: FontWeight.w800,
           color: AppColors.textPrimary,
-          height: 1.05,
-          letterSpacing: -0.85,
+          height: 1.02,
+          letterSpacing: -1.0,
         ),
         headlineMedium: TextStyle(
-          fontSize: 26,
+          fontSize: 30,
           fontWeight: FontWeight.w800,
           color: AppColors.textPrimary,
-          letterSpacing: -0.55,
+          letterSpacing: -0.75,
         ),
         titleLarge: TextStyle(
           fontSize: 19,
@@ -37,7 +38,7 @@ class AppTheme {
           color: AppColors.textPrimary,
         ),
         bodyMedium: TextStyle(
-          fontSize: 14,
+          fontSize: 15,
           fontWeight: FontWeight.w500,
           color: AppColors.textSecondary,
         ),
@@ -67,7 +68,7 @@ class AppTheme {
       useMaterial3: true,
       scaffoldBackgroundColor: AppColors.background,
       brightness: Brightness.dark,
-      splashColor: AppColors.accent.withAlpha(28),
+      splashColor: AppColors.accent.withAlpha(34),
       highlightColor: AppColors.textPrimary.withAlpha(10),
       textTheme: baseTextTheme,
       colorScheme: colorScheme,
@@ -115,6 +116,7 @@ class AppTheme {
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.lg),
+          side: const BorderSide(color: AppColors.strokeAccent),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -124,11 +126,11 @@ class AppTheme {
           backgroundColor: AppColors.accent,
           foregroundColor: AppColors.textOnAccent,
           disabledBackgroundColor: AppColors.accent.withAlpha(140),
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 18),
-          minimumSize: const Size(0, 46),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 22),
+          minimumSize: const Size(0, 52),
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           textStyle: GoogleFonts.manrope(
-            fontSize: 14,
+            fontSize: 16,
             fontWeight: FontWeight.w800,
             letterSpacing: -0.1,
           ),
@@ -143,11 +145,11 @@ class AppTheme {
           foregroundColor: AppColors.textOnAccent,
           elevation: 0,
           shadowColor: Colors.transparent,
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 18),
-          minimumSize: const Size(0, 46),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 22),
+          minimumSize: const Size(0, 52),
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           textStyle: GoogleFonts.manrope(
-            fontSize: 14,
+            fontSize: 16,
             fontWeight: FontWeight.w800,
           ),
           shape: RoundedRectangleBorder(
@@ -163,8 +165,8 @@ class AppTheme {
             width: 1,
           ),
           backgroundColor: AppColors.surface.withAlpha(170),
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-          minimumSize: const Size(0, 46),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 18),
+          minimumSize: const Size(0, 52),
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           textStyle: GoogleFonts.manrope(
             fontSize: 14,
@@ -190,7 +192,7 @@ class AppTheme {
       iconButtonTheme: IconButtonThemeData(
         style: IconButton.styleFrom(
           padding: const EdgeInsets.all(10),
-          minimumSize: const Size(44, 44),
+          minimumSize: const Size(48, 48),
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           iconSize: AppSizes.iconMd,
           foregroundColor: AppColors.textPrimary,
@@ -219,6 +221,7 @@ class AppTheme {
         ),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.lg),
+          side: const BorderSide(color: AppColors.strokeAccent),
         ),
       ),
       tooltipTheme: TooltipThemeData(
@@ -248,7 +251,7 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AppColors.surfaceRaised,
+        fillColor: AppColors.inputFill,
         hintStyle: GoogleFonts.manrope(
           color: AppColors.textMuted,
           fontSize: 14,
@@ -261,7 +264,7 @@ class AppTheme {
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.lg),
           borderSide: const BorderSide(
-            color: AppColors.strokeAccent,
+            color: AppColors.inputBorder,
             width: 1,
           ),
         ),
@@ -331,6 +334,45 @@ class AppTheme {
         selectionColor: Color(0x44FF6A2A),
         selectionHandleColor: AppColors.accent,
       ),
+      extensions: <ThemeExtension<dynamic>>[
+        _ShadowThemeExtension(
+          card: AppShadows.card,
+          primaryButton: AppShadows.primaryButton,
+        ),
+      ],
+    );
+  }
+}
+
+class _ShadowThemeExtension extends ThemeExtension<_ShadowThemeExtension> {
+  const _ShadowThemeExtension({
+    required this.card,
+    required this.primaryButton,
+  });
+
+  final List<BoxShadow> card;
+  final List<BoxShadow> primaryButton;
+
+  @override
+  _ShadowThemeExtension copyWith({
+    List<BoxShadow>? card,
+    List<BoxShadow>? primaryButton,
+  }) {
+    return _ShadowThemeExtension(
+      card: card ?? this.card,
+      primaryButton: primaryButton ?? this.primaryButton,
+    );
+  }
+
+  @override
+  _ShadowThemeExtension lerp(
+    covariant ThemeExtension<_ShadowThemeExtension>? other,
+    double t,
+  ) {
+    if (other is! _ShadowThemeExtension) return this;
+    return _ShadowThemeExtension(
+      card: t < 0.5 ? card : other.card,
+      primaryButton: t < 0.5 ? primaryButton : other.primaryButton,
     );
   }
 }

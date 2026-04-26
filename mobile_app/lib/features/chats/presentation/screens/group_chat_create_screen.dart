@@ -271,11 +271,8 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
     double size = AppSizes.listAvatar,
   }) {
     final safeUrl = (avatarUrl ?? '').trim();
-    final r = size * 0.28;
-
     if (safeUrl.isNotEmpty) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(r),
+      return ClipOval(
         child: Image.network(
           safeUrl,
           width: size,
@@ -287,7 +284,7 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
               height: size,
               decoration: BoxDecoration(
                 gradient: AppGradients.accentPanel,
-                borderRadius: BorderRadius.circular(r),
+                shape: BoxShape.circle,
                 boxShadow: AppShadows.primaryButton,
               ),
               alignment: Alignment.center,
@@ -310,7 +307,7 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
       height: size,
       decoration: BoxDecoration(
         gradient: AppGradients.accentPanel,
-        borderRadius: BorderRadius.circular(r),
+        shape: BoxShape.circle,
         boxShadow: AppShadows.primaryButton,
       ),
       alignment: Alignment.center,
@@ -1001,40 +998,43 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
       backgroundColor: AppColors.background,
       body: AppScreenBackground(
         child: SafeArea(
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(8, 14, 16, 8),
-                child: Row(
-                  children: [
-                    AppIconButtonSurface(
-                      icon: AppIcons.back,
-                      tooltip: 'Назад',
-                      onTap: () => Navigator.of(context).pop(),
-                    ),
-                    const SizedBox(width: 10),
-                    const Expanded(
-                      child: Text(
-                        'Новая группа',
-                        style: TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.3,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: AppBreakpoints.formPanelMaxWidth,
+              ),
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 14, 8, 8),
+                    child: Row(
+                      children: [
+                        AppIconButtonSurface(
+                          icon: AppIcons.back,
+                          tooltip: 'Назад',
+                          onTap: () => Navigator.of(context).pop(),
                         ),
-                      ),
+                        const SizedBox(width: 10),
+                        const Expanded(
+                          child: Text(
+                            'Новая группа',
+                            style: TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 30,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -0.8,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                  Expanded(
+                    child: _buildBody(),
+                  ),
+                ],
               ),
-              Expanded(
-                child: AppContentFrame(
-                  maxWidth: AppBreakpoints.formPanelMaxWidth,
-                  padding: EdgeInsets.zero,
-                  child: _buildBody(),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),

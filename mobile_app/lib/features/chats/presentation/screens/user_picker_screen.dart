@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_icons.dart';
@@ -34,6 +35,9 @@ class UserPickerScreen extends StatefulWidget {
 }
 
 class _UserPickerScreenState extends State<UserPickerScreen> {
+  static const _recentSearchesKey = 'user_picker_recent_searches';
+  static const _maxRecentSearches = 5;
+
   final UsersService _usersService = UsersService();
   final CreateChatService _createChatService = CreateChatService();
   final TextEditingController _searchController = TextEditingController();
@@ -45,10 +49,12 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
   String? _error;
 
   List<Map<String, dynamic>> _filteredUsers = [];
+  List<String> _recentSearches = [];
 
   @override
   void initState() {
     super.initState();
+    unawaited(_loadRecentSearches());
     _searchController.addListener(_onSearchChanged);
   }
 
@@ -90,6 +96,62 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
     });
   }
 
+  Future<void> _loadRecentSearches() async {
+    final prefs = await SharedPreferences.getInstance();
+    final values = prefs.getStringList(_recentSearchesKey) ?? const <String>[];
+    if (!mounted) return;
+    setState(() {
+      _recentSearches = values
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .take(_maxRecentSearches)
+          .toList();
+    });
+  }
+
+  Future<void> _saveRecentSearch(String value) async {
+    final q = value.trim();
+    if (q.length < 2) return;
+
+    final next = <String>[
+      q,
+      ..._recentSearches.where((item) => item.toLowerCase() != q.toLowerCase()),
+    ].take(_maxRecentSearches).toList();
+
+    setState(() {
+      _recentSearches = next;
+    });
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_recentSearchesKey, next);
+  }
+
+  Future<void> _removeRecentSearch(String value) async {
+    final next = _recentSearches
+        .where((item) => item.toLowerCase() != value.toLowerCase())
+        .toList();
+    setState(() {
+      _recentSearches = next;
+    });
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_recentSearchesKey, next);
+  }
+
+  Future<void> _clearRecentSearches() async {
+    setState(() {
+      _recentSearches = [];
+    });
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_recentSearchesKey);
+  }
+
+  void _applyRecentSearch(String value) {
+    _searchController.text = value;
+    _searchController.selection = TextSelection.collapsed(offset: value.length);
+  }
+
   Future<void> _performSearch() async {
     final q = _searchController.text.trim();
     if (q.isEmpty) return;
@@ -102,6 +164,9 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
     try {
       final users = await _usersService.searchUsers(q);
 
+      if (!mounted) return;
+
+      await _saveRecentSearch(q);
       if (!mounted) return;
 
       setState(() {
@@ -183,11 +248,8 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
     double size = AppSizes.listAvatar,
   }) {
     final safeUrl = (avatarUrl ?? '').trim();
-    final r = size * 0.28;
-
     if (safeUrl.isNotEmpty) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(r),
+      return ClipOval(
         child: Image.network(
           safeUrl,
           width: size,
@@ -199,7 +261,7 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
               height: size,
               decoration: BoxDecoration(
                 gradient: AppGradients.accentPanel,
-                borderRadius: BorderRadius.circular(r),
+                shape: BoxShape.circle,
                 boxShadow: AppShadows.primaryButton,
               ),
               alignment: Alignment.center,
@@ -222,7 +284,7 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
       height: size,
       decoration: BoxDecoration(
         gradient: AppGradients.accentPanel,
-        borderRadius: BorderRadius.circular(r),
+        shape: BoxShape.circle,
         boxShadow: AppShadows.primaryButton,
       ),
       alignment: Alignment.center,
@@ -341,8 +403,13 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
     }
 
     if (query.isEmpty) {
-      return const Center(
-        child: _UserSearchEmptyState(),
+      return Center(
+        child: _UserSearchEmptyState(
+          recentSearches: _recentSearches,
+          onRecentTap: _applyRecentSearch,
+          onRecentRemove: (value) => unawaited(_removeRecentSearch(value)),
+          onRecentClear: () => unawaited(_clearRecentSearches()),
+        ),
       );
     }
 
@@ -443,9 +510,14 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
       backgroundColor: AppColors.background,
       body: AppScreenBackground(
         child: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: AppBreakpoints.contentMaxWidth,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(8, 14, 16, 4),
                 child: Row(
@@ -463,9 +535,9 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
                         widget.embedded ? 'Контакты' : 'Кому написать',
                         style: const TextStyle(
                           color: AppColors.textPrimary,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.4,
+                          fontSize: 26,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -0.7,
                         ),
                       ),
                     ),
@@ -474,10 +546,7 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
-                child: AppContentFrame(
-                  maxWidth: AppBreakpoints.contentMaxWidth,
-                  padding: EdgeInsets.zero,
-                  child: TextField(
+                child: TextField(
                     controller: _searchController,
                     style: const TextStyle(
                       color: AppColors.textPrimary,
@@ -485,7 +554,7 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
                       fontWeight: FontWeight.w600,
                     ),
                     decoration: InputDecoration(
-                      hintText: 'Поиск по имени',
+                      hintText: 'Поиск по username',
                       hintStyle: TextStyle(
                         color: AppColors.textSecondary.withValues(alpha: 0.8),
                         fontWeight: FontWeight.w500,
@@ -523,16 +592,25 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
                         ),
                       ),
                     ),
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(22, 2, 22, 8),
+                child: Text(
+                  'Ищите по точному username (учитывается регистр)',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
               Expanded(
-                child: AppContentFrame(
-                  maxWidth: AppBreakpoints.contentMaxWidth,
-                  child: _buildBody(),
-                ),
+                child: _buildBody(),
               ),
             ],
+              ),
+            ),
           ),
         ),
       ),
@@ -541,12 +619,22 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
 }
 
 class _UserSearchEmptyState extends StatelessWidget {
-  const _UserSearchEmptyState();
+  const _UserSearchEmptyState({
+    required this.recentSearches,
+    required this.onRecentTap,
+    required this.onRecentRemove,
+    required this.onRecentClear,
+  });
+
+  final List<String> recentSearches;
+  final ValueChanged<String> onRecentTap;
+  final ValueChanged<String> onRecentRemove;
+  final VoidCallback onRecentClear;
 
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         mainAxisSize: MainAxisSize.min,
@@ -564,11 +652,11 @@ class _UserSearchEmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           const Text(
-            'Введите username, чтобы найти пользователя',
+            'Найдите пользователя',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: AppColors.textPrimary,
-              fontSize: 16.5,
+              fontSize: 24,
               fontWeight: FontWeight.w800,
               height: 1.35,
               letterSpacing: -0.2,
@@ -576,13 +664,201 @@ class _UserSearchEmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            'Начните вводить имя пользователя в строке поиска выше. Мы покажем подходящие результаты.',
+            'Введите username в строке поиска выше.\nМы покажем подходящие результаты.',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: AppColors.textSecondary.withValues(alpha: 0.95),
               fontSize: 14,
               fontWeight: FontWeight.w600,
               height: 1.45,
+            ),
+          ),
+          if (recentSearches.isNotEmpty) ...[
+            const SizedBox(height: 28),
+            _UserSearchInfoCard(
+              title: 'Недавние поиски',
+              icon: Icons.history_rounded,
+              trailing: GestureDetector(
+                onTap: onRecentClear,
+                behavior: HitTestBehavior.opaque,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Text(
+                    'Очистить',
+                    style: TextStyle(
+                      color: AppColors.accentBright.withValues(alpha: 0.95),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
+              child: Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  for (final search in recentSearches)
+                    _RecentSearchChip(
+                      search,
+                      onTap: () => onRecentTap(search),
+                      onRemove: () => onRecentRemove(search),
+                    ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 14),
+          const _UserSearchInfoCard(
+            title: 'Подсказки',
+            icon: Icons.lightbulb_outline_rounded,
+            child: Column(
+              children: [
+                _TipLine('Ищите по точному username (учитывается регистр)'),
+                _TipLine('Username — это уникальное имя пользователя'),
+                _TipLine('Нажмите на результат, чтобы начать чат'),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _UserSearchInfoCard extends StatelessWidget {
+  const _UserSearchInfoCard({
+    required this.title,
+    required this.icon,
+    required this.child,
+    this.trailing,
+  });
+
+  final String title;
+  final IconData icon;
+  final Widget child;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppSurface(
+      radius: AppRadius.xl,
+      borderColor: AppColors.accent.withValues(alpha: 0.22),
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: AppColors.accentBright, size: 18),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              if (trailing != null) trailing!,
+            ],
+          ),
+          const SizedBox(height: 14),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _RecentSearchChip extends StatelessWidget {
+  const _RecentSearchChip(
+    this.label, {
+    required this.onTap,
+    required this.onRemove,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(14, 9, 10, 9),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceSoft,
+            borderRadius: BorderRadius.circular(AppRadius.pill),
+            border: Border.all(color: AppColors.strokeSoft),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: onRemove,
+                behavior: HitTestBehavior.opaque,
+                child: Padding(
+                  padding: const EdgeInsets.all(2),
+                  child: Icon(
+                    Icons.close_rounded,
+                    color: AppColors.textSecondary.withValues(alpha: 0.75),
+                    size: 16,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TipLine extends StatelessWidget {
+  const _TipLine(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 7),
+            child: Icon(
+              Icons.circle,
+              color: AppColors.accent,
+              size: 4,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                color: AppColors.textSecondary.withValues(alpha: 0.96),
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                height: 1.35,
+              ),
             ),
           ),
         ],

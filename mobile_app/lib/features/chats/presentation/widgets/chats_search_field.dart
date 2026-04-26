@@ -26,11 +26,22 @@ class ChatsSearchField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
       decoration: BoxDecoration(
-        color: AppColors.chatListCard,
-        borderRadius: BorderRadius.circular(AppRadius.xxl),
-        border: Border.all(color: AppColors.strokeSoft),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF171717), Color(0xFF111111), Color(0xFF17100C)],
+        ),
+        borderRadius: BorderRadius.circular(AppRadius.xxl + 2),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.35)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.accent.withAlpha(30),
+            blurRadius: 18,
+            spreadRadius: -6,
+          ),
+        ],
       ),
       child: TextField(
         focusNode: focusNode,
@@ -46,7 +57,7 @@ class ChatsSearchField extends StatelessWidget {
           fillColor: Colors.transparent,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 18,
-            vertical: 14,
+            vertical: 15,
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(AppRadius.xl),

@@ -61,22 +61,43 @@ class ChatListItem extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
         child: Container(
           decoration: BoxDecoration(
-            color: selected ? AppColors.navRailActivePill : AppColors.chatListCard,
-            borderRadius: BorderRadius.circular(20),
+            gradient: selected
+                ? AppGradients.selectedPanel
+                : const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFF171717),
+                      Color(0xFF111111),
+                      Color(0xFF19110D),
+                    ],
+                  ),
+            borderRadius: BorderRadius.circular(24),
             border: Border.all(
               color: selected
-                  ? AppColors.navRailActiveAccent
+                  ? AppColors.accentBright
                   : AppColors.strokeSoft,
+              width: selected ? 1.1 : 1,
             ),
-            boxShadow: AppShadows.lift,
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: AppColors.accent.withValues(alpha: 0.16),
+                      blurRadius: 18,
+                      spreadRadius: -6,
+                      offset: const Offset(0, 10),
+                    ),
+                    ...AppShadows.lift,
+                  ]
+                : const [],
           ),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 _ChatListAvatar(
                   title: item.title,
@@ -98,7 +119,7 @@ class ChatListItem extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 color: AppColors.textPrimary,
-                                fontSize: 16,
+                                fontSize: 17,
                                 fontWeight: isUnread ? FontWeight.w800 : FontWeight.w700,
                                 letterSpacing: -0.3,
                               ),
@@ -136,7 +157,7 @@ class ChatListItem extends StatelessWidget {
                                 ? Text.rich(
                                     TextSpan(
                                       style: const TextStyle(
-                                        fontSize: 13.5,
+                                    fontSize: 14,
                                         height: 1.25,
                                       ),
                                       children: [
@@ -176,7 +197,7 @@ class ChatListItem extends StatelessWidget {
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
                                       color: subtitleColor,
-                                      fontSize: 13.5,
+                                      fontSize: 14,
                                       fontStyle: item.isTyping
                                           ? FontStyle.italic
                                           : FontStyle.normal,
@@ -190,14 +211,12 @@ class ChatListItem extends StatelessWidget {
                           if (item.unreadCount > 0) ...[
                             const SizedBox(width: 12),
                             Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 6,
-                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                               decoration: BoxDecoration(
                                 color: AppColors.navRailActiveAccent,
                                 borderRadius:
                                     BorderRadius.circular(AppRadius.pill),
+                                boxShadow: AppShadows.accentStroke,
                               ),
                               child: Text(
                                 item.unreadCount > 99 ? '99+' : item.unreadCount.toString(),
@@ -238,19 +257,18 @@ class _ChatListAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const size = 52.0;
+    const size = 58.0;
     final safeUrl = (avatarUrl ?? '').trim();
 
     Widget inner;
     if (safeUrl.isNotEmpty) {
-      inner = ClipRRect(
-        borderRadius: BorderRadius.circular(18),
+      inner = ClipOval(
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
+            shape: BoxShape.circle,
             border: Border.all(
               color: isSelected
-                  ? AppColors.navRailActiveAccent.withAlpha(160)
+                  ? AppColors.navRailActiveAccent.withAlpha(190)
                   : AppColors.strokeSoft,
             ),
           ),
@@ -315,7 +333,7 @@ class _AvatarFallback extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         gradient: AppGradients.accentPanel,
-        borderRadius: BorderRadius.circular(18),
+        shape: BoxShape.circle,
         boxShadow: AppShadows.primaryButton,
       ),
       alignment: Alignment.center,

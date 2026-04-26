@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'theme/design_tokens.dart';
 import '../core/notifiers/chats_list_refresh_notifier.dart';
 import '../features/chats/presentation/screens/user_picker_screen.dart';
 import '../features/settings/presentation/screens/settings_screen.dart';
@@ -61,17 +62,22 @@ class _MessengerDesktopShellState extends State<MessengerDesktopShell> {
                 ),
               ),
               Expanded(
-                child: IndexedStack(
-                  index: _section,
-                  sizing: StackFit.expand,
-                  children: [
-                    const DesktopChatsShell(shellListMode: true),
-                    UserPickerScreen(
-                      embedded: true,
-                      onPrivateChatCreated: _onChatCreatedFromPicker,
-                    ),
-                    const SettingsScreen(embedded: true),
-                  ],
+                child: Container(
+                  decoration: const BoxDecoration(
+                    gradient: AppGradients.background,
+                  ),
+                  child: IndexedStack(
+                    index: _section,
+                    sizing: StackFit.expand,
+                    children: [
+                      const DesktopChatsShell(shellListMode: true),
+                      UserPickerScreen(
+                        embedded: true,
+                        onPrivateChatCreated: _onChatCreatedFromPicker,
+                      ),
+                      const SettingsScreen(embedded: true),
+                    ],
+                  ),
                 ),
               ),
             ],

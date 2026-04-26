@@ -309,9 +309,9 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
                     children: [
                       Padding(
                         padding: EdgeInsets.fromLTRB(
-                          widget.embedded ? 12 : 20,
-                          widget.embedded ? 14 : 18,
-                          widget.embedded ? 12 : 20,
+                          widget.embedded ? 12 : 28,
+                          widget.embedded ? 14 : 26,
+                          widget.embedded ? 12 : 28,
                           0,
                         ),
                         child: Column(
@@ -339,7 +339,7 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 10),
                       Expanded(
                         child: _buildBody(state, items),
                       ),
@@ -362,18 +362,22 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
                           onTap: _openCreateChatSheet,
                           borderRadius: BorderRadius.circular(AppRadius.pill),
                           child: Ink(
-                            width: AppSizes.fab,
-                            height: AppSizes.fab,
+                            width: 68,
+                            height: 68,
                             decoration: BoxDecoration(
                               gradient: AppGradients.accentPanel,
                               shape: BoxShape.circle,
+                              border: Border.all(
+                                color: AppColors.accentBright.withValues(alpha: 0.65),
+                                width: 1,
+                              ),
                               boxShadow: AppShadows.accentFab(),
                             ),
                             child: const Center(
                               child: Icon(
                                 Icons.add_rounded,
                                 color: AppColors.textOnAccent,
-                                size: 24,
+                                size: 30,
                               ),
                             ),
                           ),
@@ -403,10 +407,14 @@ class _ChatsNewChatBar extends StatelessWidget {
         onTap: () => onTap(),
         borderRadius: BorderRadius.circular(999),
         child: Container(
-          height: 48,
+          height: 52,
           decoration: BoxDecoration(
-            color: AppColors.navRailActiveAccent,
+            gradient: AppGradients.accentPanel,
             borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: AppColors.accentBright.withValues(alpha: 0.6),
+              width: 1,
+            ),
             boxShadow: AppShadows.accentFab(),
           ),
           child: const Row(

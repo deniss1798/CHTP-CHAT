@@ -7,6 +7,7 @@ from app.core.firebase_admin import get_firebase_app
 from app.models.chat import Chat
 from app.models.chat_member import ChatMember
 from app.models.device_token import DeviceToken
+from app.models.notification_setting import NotificationSetting
 from app.models.user import User
 
 
@@ -105,10 +106,25 @@ def send_chat_message_push(
         print(f"[push] Firebase not configured, skip: {e}")
         return
 
+    disabled_user_ids = {
+        row.user_id
+        for row in db.query(NotificationSetting.user_id)
+        .filter(
+            NotificationSetting.user_id.in_(recipient_user_ids),
+            NotificationSetting.notifications_enabled == False,
+        )
+        .all()
+    }
+    enabled_recipient_user_ids = [
+        user_id for user_id in recipient_user_ids if user_id not in disabled_user_ids
+    ]
+    if not enabled_recipient_user_ids:
+        return
+
     tokens = (
         db.query(DeviceToken)
         .filter(
-            DeviceToken.user_id.in_(recipient_user_ids),
+            DeviceToken.user_id.in_(enabled_recipient_user_ids),
             DeviceToken.is_active == True,
         )
         .all()

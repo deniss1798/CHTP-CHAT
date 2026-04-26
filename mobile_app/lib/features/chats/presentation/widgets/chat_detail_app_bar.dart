@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_icons.dart';
+import '../../../../app/theme/app_shadows.dart';
+import '../../../../app/theme/design_tokens.dart';
 import '../../../../app/widgets/app_surface.dart';
 import '../../../../core/platform/desktop_layout.dart';
 
@@ -49,81 +51,89 @@ class ChatDetailAppBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDesktop = isDesktopMessengerLayout;
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(8, 10, 10, 10),
-      decoration: BoxDecoration(
-        color: AppColors.background.withAlpha(220),
-        border: const Border(
-          bottom: BorderSide(color: AppColors.strokeSoft),
-        ),
-      ),
-      child: Row(
-        children: [
-          AppIconButtonSurface(
-            icon: AppIcons.back,
-            tooltip: 'Назад',
-            onTap: onBack,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 6),
+      child: AppSurface(
+        tone: AppSurfaceTone.selected,
+        radius: 26,
+        borderColor: AppColors.accent.withValues(alpha: 0.38),
+        padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        shadow: [
+          BoxShadow(
+            color: AppColors.accent.withValues(alpha: 0.18),
+            blurRadius: 22,
+            spreadRadius: -8,
+            offset: const Offset(0, 8),
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Row(
-              children: [
-                avatarLeading,
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        visibleTitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.3,
+          ...AppShadows.card,
+        ],
+        child: Row(
+          children: [
+            AppIconButtonSurface(
+              icon: AppIcons.back,
+              tooltip: 'Назад',
+              onTap: onBack,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Row(
+                children: [
+                  avatarLeading,
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          visibleTitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 19,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.4,
+                          ),
                         ),
-                      ),
-                      if (!isGroupChat) const SizedBox(height: 2),
-                      if (!isGroupChat)
-                        Row(
-                          children: [
-                            if (peerOnline) ...[
-                              Container(
-                                width: 7,
-                                height: 7,
-                                margin: const EdgeInsets.only(right: 6, top: 1),
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFF2ECC71),
-                                  shape: BoxShape.circle,
+                        if (!isGroupChat) const SizedBox(height: 2),
+                        if (!isGroupChat)
+                          Row(
+                            children: [
+                              if (peerOnline) ...[
+                                Container(
+                                  width: 7,
+                                  height: 7,
+                                  margin: const EdgeInsets.only(right: 6, top: 1),
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFF2ECC71),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              ],
+                              Expanded(
+                                child: Text(
+                                  peerSubtitle,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: peerOnline
+                                        ? const Color(0xFF2ECC71)
+                                        : AppColors.textSecondary,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
                             ],
-                            Expanded(
-                              child: Text(
-                                peerSubtitle,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: peerOnline
-                                      ? const Color(0xFF2ECC71)
-                                      : AppColors.textSecondary,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                    ],
+                          ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          if (isDesktop) ...[
+            if (isDesktop) ...[
             if (onSearchInChat != null) ...[
               AppIconButtonSurface(
                 icon: AppIcons.search,
@@ -206,7 +216,7 @@ class ChatDetailAppBar extends StatelessWidget {
                 ),
               ],
             ],
-          ] else ...[
+            ] else ...[
             if (!isGroupChat)
               AppIconButtonSurface(
                 icon: AppIcons.call,
@@ -265,8 +275,9 @@ class ChatDetailAppBar extends StatelessWidget {
                 },
               ),
             ],
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

@@ -210,35 +210,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildAvatar() {
     final avatarUrl = _avatarUrl();
     final initials = _initials(_username());
-    const size = 104.0;
-    const r = 20.0;
+    const size = 128.0;
 
     if (avatarUrl != null && avatarUrl.isNotEmpty) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(r),
-        child: Image.network(
-          avatarUrl,
-          width: size,
-          height: size,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            return _buildAvatarFallback(initials, size, r);
-          },
+      return Container(
+        padding: const EdgeInsets.all(2.5),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: AppColors.accentBright, width: 1.4),
+          boxShadow: AppShadows.orbitGlow,
+        ),
+        child: ClipOval(
+          child: Image.network(
+            avatarUrl,
+            width: size,
+            height: size,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              return _buildAvatarFallback(initials, size);
+            },
+          ),
         ),
       );
     }
 
-    return _buildAvatarFallback(initials, size, r);
+    return _buildAvatarFallback(initials, size);
   }
 
-  Widget _buildAvatarFallback(String initials, double size, double r) {
+  Widget _buildAvatarFallback(String initials, double size) {
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
         gradient: AppGradients.accentPanel,
-        borderRadius: BorderRadius.circular(r),
-        boxShadow: AppShadows.lift,
+        shape: BoxShape.circle,
+        border: Border.all(color: AppColors.accentBright, width: 1.4),
+        boxShadow: AppShadows.orbitGlow,
       ),
       alignment: Alignment.center,
       child: Text(
@@ -479,25 +486,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: Ink(
                     height: 52,
                     decoration: BoxDecoration(
+                      gradient: AppGradients.accentPanel,
                       borderRadius: BorderRadius.circular(18),
-                      border: Border.all(
-                        color: AppColors.accent,
-                        width: 1.5,
-                      ),
+                      boxShadow: AppShadows.primaryButton,
                     ),
                     child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
                           AppIcons.logout,
-                          color: AppColors.accent,
+                          color: AppColors.textOnAccent,
                           size: 22,
                         ),
                         SizedBox(width: 10),
                         Text(
                           'Выйти из аккаунта',
                           style: TextStyle(
-                            color: AppColors.accent,
+                            color: AppColors.textOnAccent,
                             fontSize: 15,
                             fontWeight: FontWeight.w800,
                             letterSpacing: 0.15,

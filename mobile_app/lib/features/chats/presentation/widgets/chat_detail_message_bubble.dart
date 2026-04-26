@@ -268,10 +268,10 @@ class ChatDetailMessageBubble extends StatelessWidget {
     final bubbleShape = videoNoteCircleLayout
         ? BorderRadius.circular(110)
         : BorderRadius.only(
-            topLeft: const Radius.circular(18),
-            topRight: const Radius.circular(18),
-            bottomLeft: Radius.circular(isMine ? 18 : 8),
-            bottomRight: Radius.circular(isMine ? 8 : 18),
+            topLeft: const Radius.circular(22),
+            topRight: const Radius.circular(22),
+            bottomLeft: Radius.circular(isMine ? 22 : 10),
+            bottomRight: Radius.circular(isMine ? 10 : 22),
           );
 
     final bubble = Material(
@@ -289,22 +289,24 @@ class ChatDetailMessageBubble extends StatelessWidget {
             onOpenActions(details.globalPosition),
         child: Container(
           constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width * 0.72,
+            maxWidth: MediaQuery.of(context).size.width * 0.76,
           ),
-          margin: const EdgeInsets.symmetric(vertical: 2),
+          margin: const EdgeInsets.symmetric(vertical: 5),
           padding: useTimeOnMediaPreview
               ? EdgeInsets.zero
-              : const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              : const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
             gradient: useTimeOnMediaPreview
                 ? null
                 : (isMine ? AppGradients.bubbleMine : AppGradients.bubbleOther),
             borderRadius: bubbleShape,
-            border: useTimeOnMediaPreview || !isMine
+            border: useTimeOnMediaPreview
                 ? null
                 : Border.all(
-                    color: AppColors.navRailActiveAccent,
-                    width: 1,
+                    color: isMine
+                        ? AppColors.navRailActiveAccent.withValues(alpha: 0.72)
+                        : AppColors.accent.withValues(alpha: 0.20),
+                    width: isMine ? 1.15 : 1,
                   ),
             boxShadow: useTimeOnMediaPreview
                 ? null

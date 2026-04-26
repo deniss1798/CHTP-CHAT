@@ -1,6 +1,7 @@
 from fastapi import HTTPException, status
 
 from app.models.chat import Chat
+from app.models.chat_member import ChatMember
 from app.models.user import User
 
 
@@ -33,3 +34,12 @@ def require_group_creator(chat: Chat, current_user: User) -> None:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only group creator can remove members",
         )
+
+
+def require_group_owner(chat: Chat, membership: ChatMember | None) -> ChatMember:
+    if membership is None or membership.chat_id != chat.id or membership.role != "owner":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only group owner can manage this group",
+        )
+    return membership

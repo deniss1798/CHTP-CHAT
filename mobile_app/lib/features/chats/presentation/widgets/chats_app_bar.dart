@@ -66,10 +66,10 @@ class ChatsAppBar extends StatelessWidget {
                     'Сообщения',
                     style: textTheme.headlineLarge?.copyWith(
                       color: AppColors.textPrimary,
-                      fontSize: shellListMode ? 28 : 36,
+                      fontSize: shellListMode ? 32 : 54,
                       fontWeight: FontWeight.w800,
-                      height: 1.02,
-                      letterSpacing: -0.9,
+                      height: 1.0,
+                      letterSpacing: -1.2,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -77,7 +77,7 @@ class ChatsAppBar extends StatelessWidget {
                     'Все переписки и звонки в одном месте.',
                     style: TextStyle(
                       color: AppColors.textSecondary.withAlpha(210),
-                      fontSize: 13,
+                      fontSize: shellListMode ? 14 : 16,
                       fontWeight: FontWeight.w500,
                       height: 1.45,
                       letterSpacing: 0.1,

@@ -7,6 +7,8 @@ void main() {
       expect(previewForLastMessageType('image'), 'Фото');
       expect(previewForLastMessageType('video_note'), 'Видеосообщение');
       expect(previewForLastMessageType('document'), 'Файл');
+      expect(previewForLastMessageType('call_event'), 'Вызов');
+      expect(previewForLastMessageType('deleted'), 'Сообщение удалено');
     });
 
     test('returns null for text and fallback for unknown types', () {

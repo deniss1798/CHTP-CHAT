@@ -52,6 +52,8 @@
 - `role`
 - `last_seen_at`
 
+Для групповых управляющих операций (`POST /chats/{chat_id}/members`, `DELETE /chats/{chat_id}/members/{user_id}`, переименование и аватар группы) текущий пользователь должен быть участником с `role=owner`.
+
 ### `GET /chats/{chat_id}/read-state`
 
 Возвращает `MemberReadState[]`:
@@ -61,11 +63,71 @@
 
 ### `POST /messages/`
 
-Отправка текста. Ответ: `MessageResponse`.
+Отправка текста или системной строки звонка. Ответ: `MessageResponse`.
 
-### `POST /messages/photo|video|video-note|document`
+Тело:
+
+- `chat_id`
+- `text`
+- `reply_to_message_id` optional
+- `message_type`: optional, `text | call_event`; по умолчанию `text`
+
+`call_event` используется для строк истории звонков (`Вызов завершён`, `Нет ответа`, `Вызов отменён`) и не поддерживает reply.
+
+### `POST /messages/photo|video|video-note|video_note|voice|document|file`
 
 Отправка медиа. Ответ: `MessageResponse`.
+
+Форма:
+
+- `chat_id`
+- `file`
+- `reply_to_message_id` optional
+
+Типы сообщений в ответе:
+
+- `image` для `/photo`;
+- `video` для `/video`;
+- `video_note` для `/video-note` и `/video_note`;
+- `voice` для `/voice`;
+- `document` для `/document` и `/file`.
+
+Для приватных медиа `media_url` является временным presigned URL. `media_key` не является публичной ссылкой. Для документов отображаемое имя файла лежит в `text`.
+
+### `GET /devices`
+
+Возвращает устройства текущего пользователя (`DeviceTokenResponse[]`):
+
+- `id`
+- `platform`
+- `device_name`
+- `is_active`
+- `created_at`
+- `updated_at`
+
+### `DELETE /devices/{device_id}`
+
+Отключает push-токен устройства текущего пользователя (`is_active=false`). Чужие устройства возвращают `404`.
+
+### `GET /notification-settings`
+
+Возвращает настройки уведомлений текущего пользователя:
+
+- `notifications_enabled`
+- `created_at`
+- `updated_at`
+
+Если запись отсутствует, сервер создаёт настройки по умолчанию с `notifications_enabled=true`.
+
+### `PUT /notification-settings`
+
+Обновляет настройки уведомлений текущего пользователя.
+
+Тело:
+
+- `notifications_enabled`: `bool`
+
+Когда `notifications_enabled=false`, backend не отправляет FCM push на устройства пользователя.
 
 ## WebSocket чата
 
