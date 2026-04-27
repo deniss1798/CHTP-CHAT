@@ -267,6 +267,16 @@ class ChatsController extends ChangeNotifier {
     }
   }
 
+  /// Кнопка «Повторить» на экране ошибки: при сбое [getMe] userId нет, [refresh] ничего не сделает.
+  Future<void> retryAfterError() async {
+    if (_state.currentUserId == null) {
+      _setState(_state.copyWith(isLoading: true, clearError: true));
+      await _init();
+    } else {
+      await refresh();
+    }
+  }
+
   Future<void> _init() async {
     try {
       final me = await _authService.getMe();
@@ -471,7 +481,8 @@ class ChatsController extends ChangeNotifier {
         case DioExceptionType.connectionError:
         case DioExceptionType.connectionTimeout:
           return 'Нет связи с сервером ($base). '
-              'Рядом с exe положи api_base_url.txt (одна строка URL, часто :80 и /api).';
+              'Сейчас база API: ${ApiClient.baseUrl}. '
+              'Сборка: --dart-define=API_BASE_URL=... или файл api_base_url.txt рядом с exe (одна строка, напр. https://домен/api).';
         case DioExceptionType.receiveTimeout:
         case DioExceptionType.sendTimeout:
           return 'Таймаут запроса к серверу. $base';

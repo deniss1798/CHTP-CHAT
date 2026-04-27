@@ -115,12 +115,16 @@ class ApiClient {
 
   static Dio? _dio;
   static Dio get dio {
+    final currentBase = baseUrl;
     if (_dio != null) {
+      if (_dio!.options.baseUrl != currentBase) {
+        _dio!.options.baseUrl = currentBase;
+      }
       return _dio!;
     }
     _dio = Dio(
       BaseOptions(
-        baseUrl: baseUrl,
+        baseUrl: currentBase,
         connectTimeout: const Duration(seconds: 15),
         receiveTimeout: const Duration(seconds: 60),
         sendTimeout: const Duration(minutes: 5),

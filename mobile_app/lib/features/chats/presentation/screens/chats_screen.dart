@@ -260,7 +260,7 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
     if (state.error != null) {
       return ChatsErrorState(
         message: state.error!,
-        onRetry: () => _controller.refresh(),
+        onRetry: () => _controller.retryAfterError(),
       );
     }
 
