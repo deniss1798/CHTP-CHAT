@@ -22,8 +22,15 @@
 ## Связанные документы
 
 - [data-model.md](data-model.md)
+- [backend.md](backend.md)
+- [frontend.md](frontend.md)
+- [database.md](database.md)
+- [api.md](api.md)
 - [realtime.md](realtime.md)
 - [contracts.md](contracts.md)
 - [media.md](media.md)
 - [calls.md](calls.md)
+- [security.md](security.md)
 - [testing.md](testing.md)
+- [deployment.md](deployment.md)
+- [env.md](env.md)

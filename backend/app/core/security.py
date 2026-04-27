@@ -45,6 +45,16 @@ def create_access_token(data: dict) -> str:
     return jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)
 
 
+def create_ws_token(*, user_id: int, expires_seconds: int = 60) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(seconds=expires_seconds)
+    payload = {
+        "sub": str(user_id),
+        "typ": "ws",
+        "exp": expire,
+    }
+    return jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm)
+
+
 def decode_access_token(token: str):
     try:
         payload = jwt.decode(
@@ -55,3 +65,13 @@ def decode_access_token(token: str):
         return payload
     except JWTError:
         return None
+
+
+def decode_ws_or_access_token(token: str):
+    payload = decode_access_token(token)
+    if payload is None:
+        return None
+    token_type = payload.get("typ")
+    if token_type not in (None, "access", "ws"):
+        return None
+    return payload

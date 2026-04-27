@@ -20,6 +20,11 @@ def get_chat_messages(
         ge=1,
         description="Загрузить сообщения старее этого id (для прокрутки вверх)",
     ),
+    after_message_id: int | None = Query(
+        default=None,
+        ge=1,
+        description="Загрузить сообщения новее этого id (reconnect recovery)",
+    ),
     limit: int | None = Query(
         default=None,
         ge=1,
@@ -32,5 +37,6 @@ def get_chat_messages(
         current_user=current_user,
         chat_id=chat_id,
         before_message_id=before_message_id,
+        after_message_id=after_message_id,
         limit=limit,
     )

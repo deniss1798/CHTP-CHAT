@@ -1,0 +1,32 @@
+repos:
+  - repo: local
+    hooks:
+      - id: backend-ruff
+        name: backend ruff
+        entry: python -m ruff check backend/app backend/tests
+        language: system
+        pass_filenames: false
+
+      - id: backend-black
+        name: backend black
+        entry: python -m black --check backend/app backend/tests
+        language: system
+        pass_filenames: false
+
+      - id: backend-pytest
+        name: backend pytest
+        entry: python -m pytest backend/tests -q
+        language: system
+        pass_filenames: false
+
+      - id: flutter-format
+        name: flutter format
+        entry: dart format --set-exit-if-changed mobile_app/lib mobile_app/test
+        language: system
+        pass_filenames: false
+
+      - id: flutter-analyze
+        name: flutter analyze
+        entry: flutter analyze mobile_app
+        language: system
+        pass_filenames: false

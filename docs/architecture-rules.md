@@ -25,6 +25,7 @@
 - `repositories` не формируют HTTP responses.
 - `application` не должен разрастаться в смесь ORM-запросов, response-assembling и domain rules без явных границ.
 - Нельзя держать два конкурирующих источника истины для одного и того же сервиса без явной причины.
+- В Flutter message API временно канонизирован в `features/chats/data/services/messages_service.dart`; `features/messages/data/services/messages_service.dart` является compatibility export до полного переноса в `features/messages`.
 
 ## Mobile
 

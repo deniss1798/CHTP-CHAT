@@ -20,3 +20,9 @@ class DeviceTokenResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class DeviceListPage(BaseModel):
+    devices: list[DeviceTokenResponse]
+    has_more: bool
+    next_cursor: str | None = None

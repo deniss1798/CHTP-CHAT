@@ -240,7 +240,7 @@ class S3StorageService:
         self,
         *,
         object_key: str,
-        expires_in: int = 3600,
+        expires_in: int = 900,
     ) -> str:
         return self.client.generate_presigned_url(
             "get_object",

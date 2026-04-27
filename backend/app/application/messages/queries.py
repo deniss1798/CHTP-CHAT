@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.application.messages.message_projection import (
     apply_private_media_urls,
     apply_private_media_urls_map,
+    compute_delivery_statuses,
     make_s3_getter,
     message_to_response_batched,
 )
@@ -23,6 +24,7 @@ def list_chat_messages(
     current_user: User,
     chat_id: int,
     before_message_id: int | None = None,
+    after_message_id: int | None = None,
     limit: int | None = None,
 ) -> MessageListPage:
     repo = MessagesRepository(db)
@@ -31,7 +33,9 @@ def list_chat_messages(
     lim = limit if limit is not None else _DEFAULT_PAGE
     lim = max(1, min(lim, _MAX_PAGE))
 
-    if before_message_id is None:
+    if after_message_id is not None:
+        page_rows = repo.list_newer_than(chat_id, after_message_id, lim + 1)
+    elif before_message_id is None:
         page_rows = repo.list_latest_for_chat(chat_id, lim + 1)
     else:
         page_rows = repo.list_older_than(chat_id, before_message_id, lim + 1)
@@ -39,7 +43,9 @@ def list_chat_messages(
     # page_rows в порядке id по возрастанию: при lim+1 строке «лишняя» — самая старая
     # в окне (для has_more). Срез [:lim] ошибочно отбрасывал самую новую строку.
     has_more = len(page_rows) > lim
-    if len(page_rows) > lim:
+    if after_message_id is not None:
+        messages = page_rows[:lim]
+    elif len(page_rows) > lim:
         messages = page_rows[-lim:]
     else:
         messages = page_rows
@@ -59,6 +65,12 @@ def list_chat_messages(
     react_map = reaction_groups_for_messages(
         db, [m.id for m in messages], current_user.id
     )
+    delivery_statuses = compute_delivery_statuses(
+        db,
+        chat_id=chat_id,
+        messages=messages,
+        viewer_user_id=current_user.id,
+    )
 
     out = [
         message_to_response_batched(
@@ -68,6 +80,7 @@ def list_chat_messages(
             db,
             current_user.id,
             reactions=react_map.get(message.id, []),
+            delivery_status=delivery_statuses.get(message.id),
         )
         for message in messages
     ]

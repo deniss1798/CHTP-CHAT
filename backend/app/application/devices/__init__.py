@@ -1,0 +1,1 @@
+"""Device-related application logic."""

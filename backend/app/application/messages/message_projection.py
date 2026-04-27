@@ -95,6 +95,32 @@ def compute_delivery_status(
     return "read"
 
 
+def compute_delivery_statuses(
+    db: Session,
+    *,
+    chat_id: int,
+    messages: list[Message],
+    viewer_user_id: int,
+) -> dict[int, str | None]:
+    own_messages = [message for message in messages if message.sender_id == viewer_user_id]
+    if not own_messages:
+        return {}
+
+    members = db.query(ChatMember).filter(ChatMember.chat_id == chat_id).all()
+    others = [member for member in members if member.user_id != viewer_user_id]
+    if not others:
+        return {message.id: None for message in own_messages}
+
+    out: dict[int, str | None] = {}
+    for message in own_messages:
+        out[message.id] = (
+            "read"
+            if all((member.last_read_message_id or 0) >= message.id for member in others)
+            else "sent"
+        )
+    return out
+
+
 def message_to_response(
     message: Message,
     db: Session,
@@ -137,7 +163,7 @@ def message_to_response(
         sender_id=message.sender_id,
         text=safe_message_text(message),
         message_type=mtype_single,
-        media_key=None if bool(getattr(message, "is_deleted", False)) else message.media_key,
+        media_key=None,
         media_url=media_url,
         media_mime_type=None if bool(getattr(message, "is_deleted", False)) else message.media_mime_type,
         media_size=None if bool(getattr(message, "is_deleted", False)) else message.media_size,
@@ -160,6 +186,7 @@ def message_to_response_batched(
     db: Session,
     viewer_user_id: int,
     reactions: list[ReactionGroup] | None = None,
+    delivery_status: str | None = None,
 ) -> MessageResponse:
     reply_preview: MessageReplyPreview | None = None
     if message.reply_to_message_id:
@@ -178,9 +205,10 @@ def message_to_response_batched(
     ):
         media_url = get_storage().generate_private_file_url(object_key=message.media_key)
 
-    delivery_status = compute_delivery_status(
-        db, message.chat_id, message, viewer_user_id
-    )
+    if delivery_status is None:
+        delivery_status = compute_delivery_status(
+            db, message.chat_id, message, viewer_user_id
+        )
 
     return MessageResponse(
         id=message.id,
@@ -188,7 +216,7 @@ def message_to_response_batched(
         sender_id=message.sender_id,
         text=safe_message_text(message),
         message_type=mtype,
-        media_key=None if bool(getattr(message, "is_deleted", False)) else message.media_key,
+        media_key=None,
         media_url=media_url,
         media_mime_type=None if bool(getattr(message, "is_deleted", False)) else message.media_mime_type,
         media_size=None if bool(getattr(message, "is_deleted", False)) else message.media_size,
@@ -233,7 +261,7 @@ def build_message_payload(
         "sender_id": message.sender_id,
         "text": safe_message_text(message),
         "message_type": mtype_payload,
-        "media_key": None if is_deleted else message.media_key,
+        "media_key": None,
         "media_url": media_url,
         "media_mime_type": None if is_deleted else message.media_mime_type,
         "media_size": None if is_deleted else message.media_size,

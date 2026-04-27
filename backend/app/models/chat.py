@@ -2,12 +2,18 @@ from sqlalchemy import BigInteger, Column, ForeignKey, String, Text, TIMESTAMP, 
 from sqlalchemy.orm import relationship
 
 from app.db.database import Base
+from app.db.types import bigint_primary_key
 
 
 class Chat(Base):
     __tablename__ = "chats"
 
-    id = Column(BigInteger, primary_key=True, index=True)
+    id = Column(
+        bigint_primary_key(),
+        primary_key=True,
+        autoincrement=True,
+        index=True,
+    )
     type = Column(String(20), nullable=False)
     title = Column(String(255), nullable=True)
     avatar_url = Column(Text, nullable=True)

@@ -8,6 +8,7 @@ from app.application.messages.commands import (
     update_text_message as execute_update_text_message,
 )
 from app.core.dependencies import get_current_user
+from app.core.rate_limit import MESSAGE_SEND_RULE, rate_limiter
 from app.db.database import get_db
 from app.models.user import User
 from app.schemas.message_schema import (
@@ -26,6 +27,7 @@ async def send_message(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    rate_limiter.check(str(current_user.id), MESSAGE_SEND_RULE)
     return await execute_send_text_message(
         db,
         current_user=current_user,

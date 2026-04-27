@@ -5,7 +5,13 @@ from fastapi import HTTPException
 
 from app.application.auth.auth_commands import request_email_code, verify_email_code
 from app.core.log_redaction import redact_value
+from app.core.rate_limit import (
+    MEDIA_UPLOAD_RULE,
+    WS_CONNECT_RULE,
+    InMemoryRateLimiter,
+)
 from app.core.security import hash_verification_code, verify_verification_code
+from app.infrastructure.storage.s3_storage import S3StorageService
 from app.models.pending_registration import PendingRegistration
 from app.schemas.email_verification import RequestEmailCodeRequest, VerifyEmailCodeRequest
 
@@ -81,3 +87,27 @@ def test_redact_value_masks_sensitive_values() -> None:
     assert redacted["password"] == "***"
     assert redacted["nested"]["access_token"] == "***"
     assert redacted["nested"]["url"] == "***"
+
+
+def test_media_and_ws_rate_limit_rules_block_abuse() -> None:
+    limiter = InMemoryRateLimiter()
+
+    for _ in range(MEDIA_UPLOAD_RULE.max_attempts):
+        limiter.check("user-1", MEDIA_UPLOAD_RULE)
+
+    with pytest.raises(HTTPException) as media_exc:
+        limiter.check("user-1", MEDIA_UPLOAD_RULE)
+
+    assert media_exc.value.status_code == 429
+
+    for _ in range(WS_CONNECT_RULE.max_attempts):
+        limiter.check("ip:user-1", WS_CONNECT_RULE)
+
+    with pytest.raises(HTTPException) as ws_exc:
+        limiter.check("ip:user-1", WS_CONNECT_RULE)
+
+    assert ws_exc.value.status_code == 429
+
+
+def test_private_media_presigned_url_default_ttl_is_short() -> None:
+    assert S3StorageService.generate_private_file_url.__kwdefaults__["expires_in"] == 900

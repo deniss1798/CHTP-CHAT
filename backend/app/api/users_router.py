@@ -10,7 +10,8 @@ from app.models.chat_member import ChatMember
 from app.models.device_token import DeviceToken
 from app.models.message import Message
 from app.models.user import User
-from app.schemas.user_schema import UserPublicProfile, UserResponse
+from app.application.users.user_search import search_users_page
+from app.schemas.user_schema import UserPublicProfile, UserResponse, UserSearchPage
 from app.infrastructure.storage.s3_storage import S3StorageService, is_s3_configured
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -98,26 +99,24 @@ def get_me(current_user: User = Depends(get_current_user)):
     return current_user
 
 
-@router.get("/", response_model=list[UserResponse])
+@router.get("/", response_model=UserSearchPage)
 def search_users(
     q: str = Query("", max_length=50),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    limit: int = Query(20, ge=1, le=50),
+    cursor: str | None = Query(
+        default=None,
+        description="Курсор следующей страницы (next_cursor с предыдущего ответа)",
+    ),
 ):
-    raw = q.strip()
-    if len(raw) < 2:
-        return []
-
-    query = db.query(User).filter(User.username.ilike(f"%{raw}%"))
-
-    users = (
-        query.filter(User.id != current_user.id)
-        .order_by(User.username.asc())
-        .limit(20)
-        .all()
+    return search_users_page(
+        db,
+        current_user=current_user,
+        q=q,
+        limit=limit,
+        cursor=cursor,
     )
-
-    return users
 
 
 @router.get("/{user_id}", response_model=UserPublicProfile)

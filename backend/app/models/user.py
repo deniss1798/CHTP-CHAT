@@ -1,12 +1,18 @@
 from sqlalchemy import BigInteger, Column, DateTime, String, Text, TIMESTAMP, func
 
 from app.db.database import Base
+from app.db.types import bigint_primary_key
 
 
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(BigInteger, primary_key=True, index=True)
+    id = Column(
+        bigint_primary_key(),
+        primary_key=True,
+        autoincrement=True,
+        index=True,
+    )
     username = Column(String(50), unique=True, nullable=False)
     email = Column(String(255), unique=True, nullable=False)
     password_hash = Column(Text, nullable=False)

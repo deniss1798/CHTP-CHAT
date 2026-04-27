@@ -60,6 +60,19 @@ def test_validate_document_file_rejects_mime_extension_mismatch() -> None:
     assert exc_info.value.detail == "Content-type does not match file extension"
 
 
+def test_validate_document_file_rejects_double_extension_executable() -> None:
+    upload = _upload_file(
+        filename="photo.jpg.exe",
+        content_type="application/octet-stream",
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        validate_document_file(upload, "photo.jpg.exe")
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == "File type not allowed"
+
+
 def test_validate_document_file_accepts_octet_stream_with_extension() -> None:
     upload = _upload_file(
         filename="report.pdf",

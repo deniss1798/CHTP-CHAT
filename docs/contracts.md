@@ -18,6 +18,21 @@
 
 Проверяет email/password и возвращает `TokenResponse`.
 
+`POST /auth/ws-token`
+
+Требует обычный `Authorization: Bearer <access_token>` и возвращает короткоживущий токен для WebSocket:
+
+- `ws_token`
+- `expires_in`: сейчас 60 секунд
+
+Flutter должен использовать `ws_token` в query string WebSocket вместо долгоживущего access token. Backend временно принимает оба формата для совместимости.
+
+Auth endpoints защищены базовым in-memory rate-limit:
+
+- login: 5 попыток / 10 минут / IP + email;
+- request email code: 3 попытки / 10 минут / IP + email;
+- verify email code: 5 попыток / 10 минут / IP + email.
+
 ### `GET /chats/`
 
 Возвращает список `ChatResponse[]`:
@@ -102,6 +117,7 @@
 ### `POST /messages/`
 
 Отправка текста или системной строки звонка. Ответ: `MessageResponse`.
+Endpoint защищён базовым in-memory rate-limit: 60 сообщений / минуту / user.
 
 Тело:
 
@@ -110,15 +126,16 @@
 - `reply_to_message_id` optional
 - `message_type`: optional, `text | call_event`; по умолчанию `text`
 
-`call_event` используется для строк истории звонков (`Вызов завершён`, `Нет ответа`, `Вызов отменён`) и не поддерживает reply.
+`call_event` используется для строк истории звонков (`Пропущенный вызов`, `Вызов завершён · 03:06`, `Вызов отменён`) и не поддерживает reply.
 
-### `GET /messages/{chat_id}`
+### `GET /messages/chat/{chat_id}`
 
 Возвращает страницу истории сообщений. Доступ есть только у участников чата.
 
 Query:
 
 - `before_message_id` optional
+- `after_message_id` optional
 - `limit` optional, максимум 100
 
 ### `PATCH /messages/{message_id}`
@@ -161,9 +178,21 @@ Query:
 
 Для приватных медиа `media_url` является временным presigned URL. `media_key` не является публичной ссылкой. Для документов отображаемое имя файла лежит в `text`.
 
+### `GET /users/`
+
+Поиск пользователей (пагинация). Query: `q`, `limit`, `cursor`.
+
+Ответ `UserSearchPage`: `users: UserResponse[]`, `has_more`, `next_cursor` (nullable). Клиенту допустимо ожидать и легаси-формат «плоский массив users» (совместимость).
+
+### `GET /calls`
+
+История звонков текущего пользователя. Query: `chat_id` (optional), `limit`, `cursor`. Ответ: страница с `calls`, `has_more`, `next_cursor`.
+
 ### `GET /devices`
 
-Возвращает устройства текущего пользователя (`DeviceTokenResponse[]`):
+Возвращает устройства текущего пользователя. Query: `limit`, `cursor`.
+
+Ответ `DeviceListPage`: `devices: DeviceTokenResponse[]`, `has_more`, `next_cursor`. Элемент `devices[]`:
 
 - `id`
 - `platform`
@@ -175,6 +204,10 @@ Query:
 ### `DELETE /devices/{device_id}`
 
 Отключает push-токен устройства текущего пользователя (`is_active=false`). Чужие устройства возвращают `404`.
+
+### `DELETE /devices`
+
+Отключает все push-токены текущего пользователя (`is_active=false`).
 
 ### `GET /notification-settings`
 
@@ -196,6 +229,16 @@ Query:
 
 Когда `notifications_enabled=false`, backend не отправляет FCM push на устройства пользователя.
 
+### `GET /webrtc/ice-config`
+
+Возвращает WebRTC ICE configuration для клиента:
+
+- `ice_servers`
+- `ttl_seconds`
+- `expires_at`
+
+Если TURN не настроен, возвращаются fallback STUN servers.
+
 ## WebSocket чата
 
 Маршрут: `GET /ws/chat/{chat_id}?token=...`
@@ -212,6 +255,8 @@ Query:
 
 - `{"type":"typing","typing":true|false}`
 - сигнальные call events: `call_e2e_*`, `group_call_*`
+
+Call lifecycle statuses: `created`, `ringing`, `accepted`, `declined`, `cancelled`, `missed`, `ended`, `failed`, `expired`. Разрешённые переходы фиксируются state machine: terminal statuses (`declined/cancelled/missed/ended/failed/expired`) не могут перейти обратно в `accepted`.
 
 ## Inbox WebSocket
 

@@ -9,6 +9,7 @@ from app.application.messages.commands import (
     send_voice_message as execute_send_voice_message,
 )
 from app.core.dependencies import get_current_user
+from app.core.rate_limit import MEDIA_UPLOAD_RULE, rate_limiter
 from app.db.database import get_db
 from app.models.user import User
 from app.schemas.message_schema import MessageResponse
@@ -24,6 +25,7 @@ async def send_photo_message(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    rate_limiter.check(str(current_user.id), MEDIA_UPLOAD_RULE)
     return await execute_send_photo_message(
         db,
         current_user=current_user,
@@ -41,6 +43,7 @@ async def send_video_message(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    rate_limiter.check(str(current_user.id), MEDIA_UPLOAD_RULE)
     return await execute_send_video_message(
         db,
         current_user=current_user,
@@ -59,6 +62,7 @@ async def send_video_note_message(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    rate_limiter.check(str(current_user.id), MEDIA_UPLOAD_RULE)
     return await execute_send_video_note_message(
         db,
         current_user=current_user,
@@ -76,6 +80,7 @@ async def send_voice_message(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    rate_limiter.check(str(current_user.id), MEDIA_UPLOAD_RULE)
     return await execute_send_voice_message(
         db,
         current_user=current_user,
@@ -94,6 +99,7 @@ async def send_document_message(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    rate_limiter.check(str(current_user.id), MEDIA_UPLOAD_RULE)
     return await execute_send_document_message(
         db,
         current_user=current_user,

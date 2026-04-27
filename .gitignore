@@ -14,6 +14,7 @@ backend/app/core/firebase-service-account.json
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.pre-commit-cache/
 .coverage
 .coverage.*
 coverage/

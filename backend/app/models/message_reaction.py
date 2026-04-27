@@ -2,6 +2,7 @@ from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, String, UniqueC
 from sqlalchemy.sql import func
 
 from app.db.database import Base
+from app.db.types import bigint_primary_key
 
 
 class MessageReaction(Base):
@@ -12,7 +13,11 @@ class MessageReaction(Base):
         ),
     )
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    id = Column(
+        bigint_primary_key(),
+        primary_key=True,
+        autoincrement=True,
+    )
     message_id = Column(
         BigInteger, ForeignKey("messages.id", ondelete="CASCADE"), nullable=False, index=True
     )

@@ -45,6 +45,21 @@ class MessagesRepository:
         )
         return list(reversed(rows))
 
+    def list_newer_than(
+        self, chat_id: int, after_message_id: int, limit: int
+    ) -> list[Message]:
+        """Сообщения новее after_message_id (id > …), по возрастанию id."""
+        return (
+            self._db.query(Message)
+            .filter(
+                Message.chat_id == chat_id,
+                Message.id > after_message_id,
+            )
+            .order_by(Message.id.asc())
+            .limit(limit)
+            .all()
+        )
+
     def list_by_ids(self, ids: list[int]) -> list[Message]:
         if not ids:
             return []

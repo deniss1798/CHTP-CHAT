@@ -1,13 +1,19 @@
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, BigInteger, Text, String
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, BigInteger, Index, Text, String
 from sqlalchemy.sql import func
 
 from app.db.database import Base
+from app.db.types import bigint_primary_key
 
 
 class Message(Base):
     __tablename__ = "messages"
 
-    id = Column(BigInteger, primary_key=True, index=True)
+    id = Column(
+        bigint_primary_key(),
+        primary_key=True,
+        autoincrement=True,
+        index=True,
+    )
     chat_id = Column(BigInteger, ForeignKey("chats.id"), nullable=False, index=True)
     sender_id = Column(BigInteger, ForeignKey("users.id"), nullable=False, index=True)
 
@@ -37,3 +43,8 @@ class Message(Base):
     updated_at = Column(DateTime(timezone=False), server_default=func.now(), onupdate=func.now())
     is_updated = Column(Boolean, default=False)
     is_deleted = Column(Boolean, nullable=False, default=False)
+
+    __table_args__ = (
+        Index("ix_messages_chat_id_id", "chat_id", "id"),
+        Index("ix_messages_chat_id_created_at_id", "chat_id", "created_at", "id"),
+    )

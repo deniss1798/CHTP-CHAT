@@ -4,6 +4,7 @@ from firebase_admin import messaging
 from sqlalchemy.orm import Session
 
 from app.core.firebase_admin import get_firebase_app
+from app.application.realtime.event_payload import realtime_event
 from app.models.chat import Chat
 from app.models.chat_member import ChatMember
 from app.models.device_token import DeviceToken
@@ -83,13 +84,13 @@ def build_inbox_new_message_event(
     body = (preview or "").strip()
     if len(body) > 240:
         body = body[:240]
-    return {
+    return realtime_event({
         "type": "inbox_new_message",
         "chat_id": str(chat_id),
         "sender_name": sender_name,
         "preview": body or "Новое сообщение",
         "chat_avatar_url": avatar_url,
-    }
+    })
 
 
 def send_chat_message_push(

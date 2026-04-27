@@ -55,8 +55,8 @@ pytest
 
 ## Архитектурные правила
 
-См. [../docs/architecture-rules.md](C:/Users/User/Desktop/Messanger/docs/architecture-rules.md)
+См. [../docs/architecture-rules.md](../docs/architecture-rules.md)
 
 ## Контракты
 
-Канонические REST / WebSocket payloads описаны в [../docs/contracts.md](C:/Users/User/Desktop/Messanger/docs/contracts.md)
+Канонические REST / WebSocket payloads описаны в [../docs/contracts.md](../docs/contracts.md)

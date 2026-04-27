@@ -93,6 +93,9 @@ class Settings(BaseSettings):
         alias="WEBRTC_FALLBACK_STUN_URLS",
     )
 
+    # Log JSON with method/path/duration and set X-Response-Time-Ms (load tests / ops).
+    perf_log_requests: bool = Field(False, alias="PERF_LOG_REQUESTS")
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
