@@ -9,7 +9,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../app/theme/app_colors.dart';
-import '../../../../app/theme/app_icons.dart';
 import '../../../../app/widgets/app_screen_background.dart';
 import '../../../../core/constants/document_attachments.dart';
 import '../../../../core/formatting/last_seen_label.dart';
@@ -44,6 +43,7 @@ import '../chat_detail_message_maps.dart';
 import '../controllers/chat_detail_controller.dart';
 import '../widgets/chat_detail_app_bar.dart';
 import '../widgets/chat_detail_avatar_widgets.dart';
+import '../widgets/chat_composer_action_sheet.dart';
 import '../widgets/chat_detail_conversation_view.dart';
 import '../widgets/chat_detail_fullscreen_image_viewer.dart';
 import '../widgets/chat_detail_fullscreen_video_page.dart';
@@ -112,6 +112,7 @@ abstract class _ChatDetailScreenStateBase extends State<ChatDetailScreen> {
 
   bool _isLoading = true;
   bool _isSending = false;
+  bool _isRecoveringRealtime = false;
   String? _error;
 
   int? _currentUserId;

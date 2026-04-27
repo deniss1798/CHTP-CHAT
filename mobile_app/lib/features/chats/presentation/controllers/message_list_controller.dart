@@ -13,6 +13,54 @@ class MessageListController {
     return true;
   }
 
+  bool replaceByClientTempId(
+    List<Map<String, dynamic>> messages, {
+    required String clientTempId,
+    required Map<String, dynamic> replacement,
+  }) {
+    final idx = messages.indexWhere((m) => m['client_temp_id'] == clientTempId);
+    if (idx < 0) return false;
+    final replacementId = ChatDetailMessageMaps.intFromDynamic(replacement['id']);
+    if (replacementId != null) {
+      final existingIdx = messages.indexWhere(
+        (m) => ChatDetailMessageMaps.intFromDynamic(m['id']) == replacementId,
+      );
+      if (existingIdx >= 0 && existingIdx != idx) {
+        messages.removeAt(idx);
+        return true;
+      }
+    }
+    messages[idx] = replacement;
+    return true;
+  }
+
+  bool markClientTempFailed(
+    List<Map<String, dynamic>> messages, {
+    required String clientTempId,
+    required String error,
+  }) {
+    final idx = messages.indexWhere((m) => m['client_temp_id'] == clientTempId);
+    if (idx < 0) return false;
+    final copy = Map<String, dynamic>.from(messages[idx]);
+    copy['delivery_status'] = 'failed';
+    copy['error'] = error;
+    messages[idx] = copy;
+    return true;
+  }
+
+  bool markClientTempSending(
+    List<Map<String, dynamic>> messages, {
+    required String clientTempId,
+  }) {
+    final idx = messages.indexWhere((m) => m['client_temp_id'] == clientTempId);
+    if (idx < 0) return false;
+    final copy = Map<String, dynamic>.from(messages[idx]);
+    copy['delivery_status'] = 'sending';
+    copy.remove('error');
+    messages[idx] = copy;
+    return true;
+  }
+
   bool markDeleted(List<Map<String, dynamic>> messages, int messageId) {
     final idx = messages.indexWhere(
       (m) => ChatDetailMessageMaps.intFromDynamic(m['id']) == messageId,

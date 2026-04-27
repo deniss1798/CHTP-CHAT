@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -10,14 +9,17 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_icons.dart';
 import '../../../../app/theme/app_shadows.dart';
 import '../../../../app/theme/design_tokens.dart';
-import '../../../../app/widgets/app_content_frame.dart';
+import '../../../../app/widgets/app_avatar.dart';
+import '../../../../app/widgets/app_button.dart';
 import '../../../../app/widgets/app_screen_background.dart';
 import '../../../../app/widgets/app_surface.dart';
-import '../../../../core/network/api_client.dart';
+import '../../../../app/widgets/app_text_field.dart';
 import '../../../auth/data/services/auth_service.dart';
 import '../../data/services/chat_avatar_service.dart';
 import '../../data/services/create_chat_service.dart';
 import '../../data/services/users_service.dart';
+import '../controllers/user_presentation_helpers.dart';
+import '../controllers/user_selection_controller.dart';
 
 class GroupChatCreateScreen extends StatefulWidget {
   const GroupChatCreateScreen({super.key});
@@ -32,6 +34,7 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
   final ChatAvatarService _chatAvatarService = ChatAvatarService();
   final AuthService _authService = AuthService();
   final ImagePicker _imagePicker = ImagePicker();
+  final UserSelectionController _selectionController = UserSelectionController();
 
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
@@ -46,8 +49,6 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
 
   int? _currentUserId;
   List<Map<String, dynamic>> _searchResults = [];
-  final Map<int, Map<String, dynamic>> _selectedUsersCache = {};
-  final Set<int> _selectedUserIds = <int>{};
 
   File? _selectedAvatarFile;
 
@@ -91,7 +92,7 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
       if (!mounted) return;
 
       setState(() {
-        _error = _extractErrorMessage(
+        _error = extractFeatureErrorMessage(
           e,
           fallback: 'Не удалось загрузить профиль',
         );
@@ -148,13 +149,7 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
       if (!mounted) return;
 
       final filtered = users.where((u) {
-        final rawUserId = u['id'];
-        int? userId;
-        if (rawUserId is int) {
-          userId = rawUserId;
-        } else {
-          userId = int.tryParse(rawUserId.toString());
-        }
+        final userId = userIdFromMap(u);
         return userId != null && userId != me;
       }).toList();
 
@@ -167,7 +162,7 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
       if (!mounted) return;
 
       setState(() {
-        _searchError = _extractErrorMessage(
+        _searchError = extractFeatureErrorMessage(
           e,
           fallback: 'Не удалось выполнить поиск',
         );
@@ -176,150 +171,14 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
     }
   }
 
-  String _extractErrorMessage(Object e, {required String fallback}) {
-    if (e is DioException) {
-      final data = e.response?.data;
-
-      if (data is Map<String, dynamic>) {
-        return data['detail']?.toString() ??
-            data['message']?.toString() ??
-            fallback;
-      }
-
-      if (data is String && data.isNotEmpty) {
-        return data;
-      }
-
-      if (e.message != null && e.message!.isNotEmpty) {
-        return e.message!;
-      }
-    }
-
-    return e.toString().replaceFirst('Exception: ', '');
-  }
-
   void _toggleUser(Map<String, dynamic> user) {
-    final rawId = user['id'];
-    int? parsedUserId;
-
-    if (rawId is int) {
-      parsedUserId = rawId;
-    } else {
-      parsedUserId = int.tryParse(rawId.toString());
-    }
-
-    if (parsedUserId == null) return;
-
-    final userId = parsedUserId;
-
     setState(() {
-      if (_selectedUserIds.contains(userId)) {
-        _selectedUserIds.remove(userId);
-        _selectedUsersCache.remove(userId);
-      } else {
-        _selectedUserIds.add(userId);
-        _selectedUsersCache[userId] = Map<String, dynamic>.from(user);
-      }
+      _selectionController.toggle(user);
     });
   }
 
   String _initials(String title) {
-    final parts =
-        title.split(' ').where((e) => e.trim().isNotEmpty).take(2).toList();
-
-    if (parts.isEmpty) return '?';
-
-    if (parts.length == 1) {
-      final word = parts.first.trim();
-      return word.isNotEmpty ? word[0].toUpperCase() : '?';
-    }
-
-    final first = parts[0].trim();
-    final second = parts[1].trim();
-
-    final firstChar = first.isNotEmpty ? first[0].toUpperCase() : '';
-    final secondChar = second.isNotEmpty ? second[0].toUpperCase() : '';
-
-    final result = '$firstChar$secondChar'.trim();
-    return result.isEmpty ? '?' : result;
-  }
-
-  String? _userAvatarUrl(Map<String, dynamic> user) {
-    final possible = [
-      user['avatar_url'],
-      user['avatarUrl'],
-    ];
-
-    for (final value in possible) {
-      if (value != null && value.toString().trim().isNotEmpty) {
-        final raw = value.toString().trim();
-
-        if (raw.startsWith('http://') || raw.startsWith('https://')) {
-          return raw;
-        }
-
-        return '${ApiClient.baseUrl}$raw';
-      }
-    }
-
-    return null;
-  }
-
-  Widget _buildUserAvatar({
-    required String title,
-    required String? avatarUrl,
-    double size = AppSizes.listAvatar,
-  }) {
-    final safeUrl = (avatarUrl ?? '').trim();
-    if (safeUrl.isNotEmpty) {
-      return ClipOval(
-        child: Image.network(
-          safeUrl,
-          width: size,
-          height: size,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            return Container(
-              width: size,
-              height: size,
-              decoration: BoxDecoration(
-                gradient: AppGradients.accentPanel,
-                shape: BoxShape.circle,
-                boxShadow: AppShadows.primaryButton,
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                _initials(title),
-                style: TextStyle(
-                  color: AppColors.textOnAccent,
-                  fontSize: size * 0.36,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            );
-          },
-        ),
-      );
-    }
-
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        gradient: AppGradients.accentPanel,
-        shape: BoxShape.circle,
-        boxShadow: AppShadows.primaryButton,
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        _initials(title),
-        style: TextStyle(
-          color: AppColors.textOnAccent,
-          fontSize: size * 0.36,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-    );
+    return initialsForTitle(title);
   }
 
   Future<void> _pickGroupAvatar() async {
@@ -505,39 +364,6 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
     );
   }
 
-  InputDecoration _fieldDecoration({
-    required String hint,
-    required Widget prefix,
-  }) {
-    const r = 28.0;
-    return InputDecoration(
-      hintText: hint,
-      hintStyle: TextStyle(
-        color: AppColors.textSecondary.withValues(alpha: 0.75),
-        fontWeight: FontWeight.w500,
-        fontSize: 15,
-      ),
-      filled: true,
-      fillColor: const Color(0xFF1A1A1A),
-      prefixIcon: prefix,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 16),
-      border: const OutlineInputBorder(
-        borderRadius: BorderRadius.all(Radius.circular(r)),
-        borderSide: BorderSide.none,
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: const BorderRadius.all(Radius.circular(r)),
-        borderSide: BorderSide(
-          color: AppColors.textPrimary.withValues(alpha: 0.06),
-        ),
-      ),
-      focusedBorder: const OutlineInputBorder(
-        borderRadius: BorderRadius.all(Radius.circular(r)),
-        borderSide: BorderSide(color: AppColors.accent, width: 1.2),
-      ),
-    );
-  }
-
   Future<void> _createGroupChat() async {
     final title = _titleController.text.trim();
 
@@ -548,7 +374,7 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
       return;
     }
 
-    if (_selectedUserIds.isEmpty) {
+    if (_selectionController.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Выберите хотя бы одного участника')),
       );
@@ -562,7 +388,7 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
     try {
       final created = await _createChatService.createGroupChat(
         title: title,
-        memberIds: _selectedUserIds.toList(),
+        memberIds: _selectionController.toMemberIds(),
       );
 
       final rawChatId = created['id'];
@@ -597,7 +423,7 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            _extractErrorMessage(
+            extractFeatureErrorMessage(
               e,
               fallback: 'Не удалось создать групповой чат',
             ),
@@ -614,15 +440,10 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
   }
 
   List<Map<String, dynamic>> _usersForList() {
-    final q = _searchController.text.trim();
-    if (q.isNotEmpty) {
-      return _searchResults;
-    }
-    final ids = _selectedUserIds.toList()..sort();
-    return ids
-        .map((id) => _selectedUsersCache[id])
-        .whereType<Map<String, dynamic>>()
-        .toList();
+    return _selectionController.visibleUsers(
+      query: _searchController.text.trim(),
+      searchResults: _searchResults,
+    );
   }
 
   Widget _buildBody() {
@@ -677,41 +498,18 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 4, 20, 10),
-          child: TextField(
+          child: AppTextField(
             controller: _titleController,
+            hintText: 'Название группы',
+            prefixIcon: AppIcons.personAdd,
             onChanged: (_) => setState(() {}),
-            style: const TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-            ),
-            decoration: _fieldDecoration(
-              hint: 'Название группы',
-              prefix: const Icon(
-                AppIcons.personAdd,
-                color: AppColors.accent,
-                size: 22,
-              ),
-            ),
           ),
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-          child: TextField(
+          child: AppSearchField(
             controller: _searchController,
-            style: const TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-            ),
-            decoration: _fieldDecoration(
-              hint: 'Поиск участников',
-              prefix: const Icon(
-                AppIcons.search,
-                color: AppColors.accent,
-                size: 22,
-              ),
-            ),
+            hintText: 'Поиск участников',
           ),
         ),
         Padding(
@@ -719,7 +517,7 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
           child: Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              'Выбрано: ${_selectedUserIds.length}',
+              'Выбрано: ${_selectionController.selectedCount}',
               style: TextStyle(
                 color: AppColors.textSecondary.withValues(alpha: 0.9),
                 fontSize: 12.5,
@@ -740,36 +538,11 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
             child: SizedBox(
               width: double.infinity,
-              height: 52,
-              child: ElevatedButton(
+              child: AppButton(
+                label: 'Создать группу',
+                icon: AppIcons.group,
+                isLoading: _isCreating,
                 onPressed: _isCreating ? null : _createGroupChat,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.accent,
-                  foregroundColor: AppColors.textOnAccent,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(28),
-                  ),
-                ),
-                child: _isCreating
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            AppColors.textOnAccent,
-                          ),
-                        ),
-                      )
-                    : const Text(
-                        'Создать группу',
-                        style: TextStyle(
-                          fontSize: 15.5,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.2,
-                        ),
-                      ),
               ),
             ),
           ),
@@ -782,7 +555,7 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
     final q = _searchController.text.trim();
 
     if (q.isEmpty) {
-      if (_selectedUserIds.isEmpty) {
+      if (_selectionController.isEmpty) {
         return LayoutBuilder(
           builder: (context, constraints) {
             return SingleChildScrollView(
@@ -921,18 +694,8 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
   Widget _buildUserTile(Map<String, dynamic> user) {
     final username = (user['username'] ?? '').toString();
     final email = (user['email'] ?? '').toString();
-    final avatarUrl = _userAvatarUrl(user);
-
-    final rawId = user['id'];
-    int? userId;
-    if (rawId is int) {
-      userId = rawId;
-    } else {
-      userId = int.tryParse(rawId.toString());
-    }
-
-    final isSelected =
-        userId != null && _selectedUserIds.contains(userId);
+    final avatarUrl = avatarUrlFromUserMap(user);
+    final isSelected = _selectionController.contains(userIdFromMap(user));
 
     return GestureDetector(
       onTap: () => _toggleUser(user),
@@ -946,9 +709,9 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
         shadow: isSelected ? [...AppShadows.lift, ...AppShadows.accentStroke] : AppShadows.lift,
         child: Row(
           children: [
-            _buildUserAvatar(
+            AppAvatar(
               title: username,
-              avatarUrl: avatarUrl,
+              imageUrl: avatarUrl,
               size: AppSizes.listAvatar,
             ),
             const SizedBox(width: 14),

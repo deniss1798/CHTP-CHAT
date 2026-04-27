@@ -136,6 +136,7 @@ class MessagesService {
   Future<MessageListPageResult> getMessagesPage(
     int chatId, {
     int? beforeMessageId,
+    int? afterMessageId,
     int limit = 50,
   }) async {
     final response = await _dio.get(
@@ -143,6 +144,7 @@ class MessagesService {
       queryParameters: {
         'limit': limit,
         if (beforeMessageId != null) 'before_message_id': beforeMessageId,
+        if (afterMessageId != null) 'after_message_id': afterMessageId,
       },
       options: await _authorizedOptions(),
     );

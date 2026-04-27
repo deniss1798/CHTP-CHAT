@@ -53,6 +53,11 @@ class _ActiveDevicesScreenState extends State<ActiveDevicesScreen> {
     await _load();
   }
 
+  Future<void> _revokeAll() async {
+    await _devicesService.revokeAllDevices();
+    await _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -81,6 +86,12 @@ class _ActiveDevicesScreenState extends State<ActiveDevicesScreen> {
                           letterSpacing: -0.5,
                         ),
                       ),
+                    ),
+                    TextButton(
+                      onPressed: _devices.any((d) => d['is_active'] == true)
+                          ? _revokeAll
+                          : null,
+                      child: const Text('Отключить все'),
                     ),
                   ],
                 ),

@@ -1,20 +1,20 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_icons.dart';
-import '../../../../app/theme/app_shadows.dart';
 import '../../../../app/theme/design_tokens.dart';
-import '../../../../app/widgets/app_content_frame.dart';
+import '../../../../app/widgets/app_avatar.dart';
+import '../../../../app/widgets/app_card.dart';
 import '../../../../app/widgets/app_screen_background.dart';
 import '../../../../app/widgets/app_surface.dart';
-import '../../../../core/network/api_client.dart';
+import '../../../../app/widgets/app_text_field.dart';
 import '../../data/services/create_chat_service.dart';
 import '../../data/services/users_service.dart';
+import '../controllers/user_presentation_helpers.dart';
 
 class UserPickerScreen extends StatefulWidget {
   const UserPickerScreen({
@@ -176,139 +176,19 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
     } catch (e) {
       if (!mounted) return;
 
-      String message = 'Не удалось выполнить поиск';
-
-      if (e is DioException) {
-        final data = e.response?.data;
-
-        if (data is Map<String, dynamic>) {
-          message =
-              data['detail']?.toString() ?? data['message']?.toString() ?? message;
-        } else if (data is String && data.isNotEmpty) {
-          message = data;
-        } else if (e.message != null && e.message!.isNotEmpty) {
-          message = e.message!;
-        }
-      } else {
-        message = e.toString().replaceFirst('Exception: ', '');
-      }
-
       setState(() {
-        _error = message;
+        _error = extractFeatureErrorMessage(
+          e,
+          fallback: 'Не удалось выполнить поиск',
+        );
         _isSearching = false;
       });
     }
   }
 
-  String _initials(String title) {
-    final parts =
-        title.split(' ').where((e) => e.trim().isNotEmpty).take(2).toList();
-
-    if (parts.isEmpty) return '?';
-
-    if (parts.length == 1) {
-      final word = parts.first.trim();
-      return word.isNotEmpty ? word[0].toUpperCase() : '?';
-    }
-
-    final first = parts[0].trim();
-    final second = parts[1].trim();
-
-    final firstChar = first.isNotEmpty ? first[0].toUpperCase() : '';
-    final secondChar = second.isNotEmpty ? second[0].toUpperCase() : '';
-
-    final result = '$firstChar$secondChar'.trim();
-    return result.isEmpty ? '?' : result;
-  }
-
-  String? _userAvatarUrl(Map<String, dynamic> user) {
-    final possible = [
-      user['avatar_url'],
-      user['avatarUrl'],
-    ];
-
-    for (final value in possible) {
-      if (value != null && value.toString().trim().isNotEmpty) {
-        final raw = value.toString().trim();
-
-        if (raw.startsWith('http://') || raw.startsWith('https://')) {
-          return raw;
-        }
-
-        return '${ApiClient.baseUrl}$raw';
-      }
-    }
-
-    return null;
-  }
-
-  Widget _buildUserAvatar({
-    required String title,
-    required String? avatarUrl,
-    double size = AppSizes.listAvatar,
-  }) {
-    final safeUrl = (avatarUrl ?? '').trim();
-    if (safeUrl.isNotEmpty) {
-      return ClipOval(
-        child: Image.network(
-          safeUrl,
-          width: size,
-          height: size,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            return Container(
-              width: size,
-              height: size,
-              decoration: BoxDecoration(
-                gradient: AppGradients.accentPanel,
-                shape: BoxShape.circle,
-                boxShadow: AppShadows.primaryButton,
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                _initials(title),
-                style: TextStyle(
-                  color: AppColors.textOnAccent,
-                  fontSize: size * 0.36,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            );
-          },
-        ),
-      );
-    }
-
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        gradient: AppGradients.accentPanel,
-        shape: BoxShape.circle,
-        boxShadow: AppShadows.primaryButton,
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        _initials(title),
-        style: TextStyle(
-          color: AppColors.textOnAccent,
-          fontSize: size * 0.36,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-    );
-  }
-
   Future<void> _createPrivateChat(Map<String, dynamic> user) async {
-    final rawUserId = user['id'];
+    final userId = userIdFromMap(user);
     final username = (user['username'] ?? 'Чат').toString();
-
-    int? userId;
-    if (rawUserId is int) {
-      userId = rawUserId;
-    } else {
-      userId = int.tryParse(rawUserId.toString());
-    }
 
     if (userId == null) return;
 
@@ -340,27 +220,15 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
     } catch (e) {
       if (!mounted) return;
 
-      String message = 'Не удалось создать чат';
-
-      if (e is DioException) {
-        final data = e.response?.data;
-
-        if (data is Map<String, dynamic>) {
-          message =
-              data['detail']?.toString() ?? data['message']?.toString() ?? message;
-        } else if (data is String && data.isNotEmpty) {
-          message = data;
-        } else if (e.message != null && e.message!.isNotEmpty) {
-          message = e.message!;
-        }
-      } else {
-        message = e.toString().replaceFirst('Exception: ', '');
-      }
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: AppColors.surfaceSoft,
-          content: Text(message),
+          content: Text(
+            extractFeatureErrorMessage(
+              e,
+              fallback: 'Не удалось создать чат',
+            ),
+          ),
         ),
       );
     } finally {
@@ -441,19 +309,18 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
         final user = _filteredUsers[index];
         final username = (user['username'] ?? '').toString();
         final email = (user['email'] ?? '').toString();
-        final avatarUrl = _userAvatarUrl(user);
+        final avatarUrl = avatarUrlFromUserMap(user);
 
         return GestureDetector(
           onTap: _isCreating ? null : () => _createPrivateChat(user),
-          child: AppSurface(
+          child: AppCard(
             radius: AppRadius.xl,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            shadow: AppShadows.lift,
             child: Row(
               children: [
-                _buildUserAvatar(
+                AppAvatar(
                   title: username,
-                  avatarUrl: avatarUrl,
+                  imageUrl: avatarUrl,
                   size: 48,
                 ),
                 const SizedBox(width: 14),
@@ -546,52 +413,9 @@ class _UserPickerScreenState extends State<UserPickerScreen> {
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
-                child: TextField(
-                    controller: _searchController,
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: 'Поиск по username',
-                      hintStyle: TextStyle(
-                        color: AppColors.textSecondary.withValues(alpha: 0.8),
-                        fontWeight: FontWeight.w500,
-                      ),
-                      filled: true,
-                      fillColor: AppColors.chatListCard,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 16,
-                      ),
-                      prefixIcon: const Icon(
-                        AppIcons.search,
-                        color: AppColors.textMuted,
-                        size: 22,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(28),
-                        borderSide: const BorderSide(
-                          color: AppColors.accentBorder,
-                          width: 1,
-                        ),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(28),
-                        borderSide: BorderSide(
-                          color: AppColors.accent.withValues(alpha: 0.35),
-                          width: 1,
-                        ),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(28),
-                        borderSide: const BorderSide(
-                          color: AppColors.accent,
-                          width: 1.2,
-                        ),
-                      ),
-                    ),
+                child: AppSearchField(
+                  controller: _searchController,
+                  hintText: 'Поиск по username',
                 ),
               ),
               const Padding(

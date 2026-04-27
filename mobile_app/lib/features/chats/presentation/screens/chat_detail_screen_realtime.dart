@@ -10,9 +10,12 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
       baseHttpUrl: ApiClient.baseUrl,
       onMessage: _handleSocketEvent,
     );
+    await _recoverMissedMessages();
   }
 
   void _handleSocketEvent(Map<String, dynamic> incoming) {
+    if (!_chatSocketEventController.shouldProcess(incoming)) return;
+
     if (_chatSocketEventController.isGroupCallInvite(incoming)) {
       _handleGroupCallInvite(incoming);
       return;
@@ -89,20 +92,20 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
       return;
     }
 
-    var normalized = _chatSocketEventController.updatedMessage(incoming);
-    if (normalized != null) {
-      if (_isMine(normalized)) {
-        final mid = ChatDetailMessageMaps.intFromDynamic(normalized['id']);
+    final rawUpdated = _chatSocketEventController.updatedMessage(incoming);
+    if (rawUpdated != null) {
+      var work = Map<String, dynamic>.from(rawUpdated);
+      if (_isMine(work)) {
+        final mid = ChatDetailMessageMaps.intFromDynamic(work['id']);
         if (mid != null) {
-          normalized = Map<String, dynamic>.from(normalized);
-          normalized['delivery_status'] = _computeDeliveryForOutgoing(mid);
+          work['delivery_status'] = _computeDeliveryForOutgoing(mid);
         }
       }
 
       if (!mounted) return;
 
       setState(() {
-        _messageListController.replaceUpdated(_messages, normalized);
+        _messageListController.replaceUpdated(_messages, work);
       });
 
       return;
@@ -380,14 +383,14 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
   }
 
   Future<void> _handleNewMessage(Map<String, dynamic> incoming) async {
-    var normalized = _chatSocketEventController.newMessage(incoming);
-    if (normalized == null) return;
+    final raw = _chatSocketEventController.newMessage(incoming);
+    if (raw == null) return;
+    var normalized = Map<String, dynamic>.from(raw);
     final incomingId = ChatDetailMessageMaps.intFromDynamic(normalized['id']);
     final senderId = ChatDetailMessageMaps.intFromDynamic(normalized['sender_id']);
     if (_isMine(normalized)) {
       final mid = ChatDetailMessageMaps.intFromDynamic(normalized['id']);
       if (mid != null) {
-        normalized = Map<String, dynamic>.from(normalized);
         normalized['delivery_status'] = _computeDeliveryForOutgoing(mid);
       }
     }
@@ -423,6 +426,62 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToBottom();
     });
+  }
+
+  int? _lastKnownServerMessageId() {
+    int? maxId;
+    for (final message in _messages) {
+      final id = ChatDetailMessageMaps.intFromDynamic(message['id']);
+      if (id == null) continue;
+      if (maxId == null || id > maxId) {
+        maxId = id;
+      }
+    }
+    return maxId;
+  }
+
+  Future<void> _recoverMissedMessages() async {
+    if (_isRecoveringRealtime) return;
+    final lastKnownId = _lastKnownServerMessageId();
+    if (lastKnownId == null) return;
+
+    _isRecoveringRealtime = true;
+    try {
+      final page = await _messagesService.getMessagesPage(
+        widget.chatId,
+        afterMessageId: lastKnownId,
+        limit: 100,
+      );
+      if (!mounted || page.messages.isEmpty) return;
+
+      final normalized = page.messages
+          .map(ChatDetailMessageMaps.normalizeMessageMap)
+          .map((message) {
+        if (_currentUserId == null || !_isMine(message)) return message;
+        final mid = ChatDetailMessageMaps.intFromDynamic(message['id']);
+        if (mid == null) return message;
+        final copy = Map<String, dynamic>.from(message);
+        copy['delivery_status'] = _computeDeliveryForOutgoing(mid);
+        return copy;
+      }).toList();
+
+      setState(() {
+        for (final message in normalized) {
+          _messageListController.appendIfMissing(_messages, message);
+        }
+        _messages.sort((a, b) {
+          final am = serverInstantMillis(a['created_at']?.toString());
+          final bm = serverInstantMillis(b['created_at']?.toString());
+          return (am ?? 0).compareTo(bm ?? 0);
+        });
+      });
+
+      await _markCurrentChatAsRead();
+    } catch (_) {
+      // Best-effort recovery; the periodic reconnect loop will try again.
+    } finally {
+      _isRecoveringRealtime = false;
+    }
   }
 
   Future<void> _markCurrentChatAsRead() async {

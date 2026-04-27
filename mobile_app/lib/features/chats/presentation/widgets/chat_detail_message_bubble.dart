@@ -66,6 +66,30 @@ class ChatDetailMessageBubble extends StatelessWidget {
         defaultTargetPlatform == TargetPlatform.iOS;
   }
 
+  IconData _deliveryIcon(String? status) {
+    switch (status) {
+      case 'read':
+        return AppIcons.doneAll;
+      case 'sending':
+        return Icons.schedule_rounded;
+      case 'failed':
+        return Icons.error_outline_rounded;
+      default:
+        return AppIcons.done;
+    }
+  }
+
+  Color _deliveryColor(String? status) {
+    switch (status) {
+      case 'read':
+        return const Color(0xFFB8E0FF);
+      case 'failed':
+        return AppColors.danger;
+      default:
+        return Colors.white.withValues(alpha: 0.5);
+    }
+  }
+
   void _showGroupReactionReactors(
     BuildContext context,
     String emoji,
@@ -241,13 +265,11 @@ class ChatDetailMessageBubble extends StatelessWidget {
                       ),
                     if (isMine) ...[
                       Icon(
-                        (message['delivery_status']?.toString() == 'read')
-                            ? AppIcons.doneAll
-                            : AppIcons.done,
+                        _deliveryIcon(message['delivery_status']?.toString()),
                         size: 14,
-                        color: (message['delivery_status']?.toString() == 'read')
-                            ? const Color(0xFFB8E0FF)
-                            : Colors.white.withValues(alpha: 0.5),
+                        color: _deliveryColor(
+                          message['delivery_status']?.toString(),
+                        ),
                       ),
                       const SizedBox(width: 4),
                     ],
@@ -376,13 +398,11 @@ class ChatDetailMessageBubble extends StatelessWidget {
                       ),
                     if (isMine) ...[
                       Icon(
-                        (message['delivery_status']?.toString() == 'read')
-                            ? AppIcons.doneAll
-                            : AppIcons.done,
+                        _deliveryIcon(message['delivery_status']?.toString()),
                         size: 15,
-                        color: (message['delivery_status']?.toString() == 'read')
-                            ? const Color(0xFFB8E0FF)
-                            : Colors.white.withValues(alpha: 0.5),
+                        color: _deliveryColor(
+                          message['delivery_status']?.toString(),
+                        ),
                       ),
                       const SizedBox(width: AppSpacing.xs),
                     ],

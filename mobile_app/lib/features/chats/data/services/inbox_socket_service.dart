@@ -3,12 +3,13 @@ import 'dart:convert' show jsonDecode, jsonEncode, utf8;
 
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-import '../../../../core/storage/secure_storage_service.dart';
+import '../../../../core/realtime/ws_token_service.dart';
 
 /// События для списка чатов (typing и др.) без открытого чата.
 class InboxSocketService {
   WebSocketChannel? _channel;
   StreamSubscription? _subscription;
+  final WsTokenService _wsTokenService = WsTokenService();
 
   final StreamController<Map<String, dynamic>> _messageController =
       StreamController<Map<String, dynamic>>.broadcast();
@@ -20,8 +21,8 @@ class InboxSocketService {
   Future<void> connect({required String baseHttpUrl}) async {
     await disconnect();
 
-    final token = await SecureStorageService.getAccessToken();
-    if (token == null || token.isEmpty) {
+    final token = await _wsTokenService.issueWsToken();
+    if (token.isEmpty) {
       throw Exception('Токен не найден');
     }
 

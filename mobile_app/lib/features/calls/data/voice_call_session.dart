@@ -8,6 +8,7 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../call_chat_message.dart';
+import '../call_state_machine.dart';
 import '../call_coordinator.dart';
 import 'call_signaling_crypto.dart';
 import 'ice_config_service.dart';
@@ -130,7 +131,7 @@ class VoiceCallSession {
     final mic = await Permission.microphone.request();
     if (!mic.isGranted) {
       onStatus('Нет доступа к микрофону');
-      _finish(notify: true, kind: CallEndKind.error);
+      _finish(notify: true, reason: CallEndReason.error);
       return;
     }
 
@@ -148,7 +149,7 @@ class VoiceCallSession {
     } catch (_) {
       onStatus('Нет ответа');
       _sendHangup();
-      _finish(notify: true, kind: CallEndKind.ackTimeout);
+      _finish(notify: true, reason: CallEndReason.ackTimeout);
       return;
     }
 
@@ -162,7 +163,7 @@ class VoiceCallSession {
     } catch (e) {
       onStatus('Ошибка: $e');
       _sendHangup();
-      _finish(notify: true, kind: CallEndKind.error);
+      _finish(notify: true, reason: CallEndReason.error);
     }
   }
 
@@ -171,14 +172,14 @@ class VoiceCallSession {
     if (!mic.isGranted) {
       onStatus('Нет доступа к микрофону');
       _sendHangup();
-      _finish(notify: true, kind: CallEndKind.error);
+      _finish(notify: true, reason: CallEndReason.error);
       return;
     }
 
     if (remoteCallerPubB64 == null || remoteCallerPubB64!.isEmpty) {
       onStatus('Некорректный звонок');
       _sendHangup();
-      _finish(notify: true, kind: CallEndKind.error);
+      _finish(notify: true, reason: CallEndReason.error);
       return;
     }
 
@@ -200,7 +201,7 @@ class VoiceCallSession {
     } catch (e) {
       onStatus('Ошибка: $e');
       _sendHangup();
-      _finish(notify: true, kind: CallEndKind.error);
+      _finish(notify: true, reason: CallEndReason.error);
       return;
     }
 
@@ -549,7 +550,7 @@ class VoiceCallSession {
         break;
       case 'call_e2e_hangup':
         onStatus('Собеседник завершил звонок');
-        _finish(notify: true, kind: CallEndKind.remoteHangup);
+        _finish(notify: true, reason: CallEndReason.remoteHangup);
         break;
       default:
         break;
@@ -565,7 +566,7 @@ class VoiceCallSession {
     } catch (e) {
       onStatus('Ошибка ключа: $e');
       _sendHangup();
-      _finish(notify: true, kind: CallEndKind.error);
+      _finish(notify: true, reason: CallEndReason.error);
     }
   }
 
@@ -624,7 +625,7 @@ class VoiceCallSession {
     } catch (e) {
       onStatus('Ошибка ответа: $e');
       _sendHangup();
-      _finish(notify: true, kind: CallEndKind.error);
+      _finish(notify: true, reason: CallEndReason.error);
     }
   }
 
@@ -642,7 +643,7 @@ class VoiceCallSession {
     } catch (e) {
       onStatus('Ошибка: $e');
       _sendHangup();
-      _finish(notify: true, kind: CallEndKind.error);
+      _finish(notify: true, reason: CallEndReason.error);
     }
   }
 
@@ -694,7 +695,7 @@ class VoiceCallSession {
   void hangUp() {
     if (_ended) return;
     _sendHangup();
-    _finish(notify: true, kind: CallEndKind.localHangup);
+    _finish(notify: true, reason: CallEndReason.localHangup);
   }
 
   void setMicEnabled(bool on) {
@@ -705,7 +706,10 @@ class VoiceCallSession {
     }
   }
 
-  void _finish({bool notify = true, CallEndKind kind = CallEndKind.disposeSilent}) {
+  void _finish({
+    bool notify = true,
+    CallEndReason reason = CallEndReason.silentDispose,
+  }) {
     if (_ended) return;
     _ended = true;
     try {
@@ -743,7 +747,7 @@ class VoiceCallSession {
         connectedAt: _connectedAt,
         callerAckCompleted: _callerAck.isCompleted,
         calleeAnswerSent: _answerSent,
-        kind: kind,
+        reason: reason,
       );
       final post = onChatMessage;
       if (text != null && post != null) {
@@ -757,7 +761,7 @@ class VoiceCallSession {
     if (!_ended) {
       _sendHangup();
     }
-    _finish(notify: false, kind: CallEndKind.disposeSilent);
+    _finish(notify: false, reason: CallEndReason.silentDispose);
     try {
       await remoteRenderer.dispose();
     } catch (_) {}

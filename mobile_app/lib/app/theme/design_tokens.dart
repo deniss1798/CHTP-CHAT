@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 /// Сетка 4pt, скругления и градиенты — единый язык интерфейса.
 abstract final class AppSpacing {
+  static const double none = 0;
   static const double xs = 4;
   static const double sm = 8;
   static const double md = 12;
@@ -9,6 +10,7 @@ abstract final class AppSpacing {
   static const double xl = 20;
   static const double xxl = 24;
   static const double xxxl = 30;
+  static const double huge = 40;
 }
 
 abstract final class AppRadius {
@@ -22,9 +24,12 @@ abstract final class AppRadius {
 
 /// Компактные контролы: плоские кнопки без «колхозных» полотен.
 abstract final class AppSizes {
+  static const double btnSmHeight = 40;
   static const double btnHeight = 44;
+  static const double btnLgHeight = 52;
   static const double fab = 56;
   static const double inputAction = 42;
+  static const double inputHeight = 52;
   static const double iconSm = 18;
   static const double iconMd = 20;
   static const double iconLg = 24;

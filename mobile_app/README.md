@@ -52,7 +52,7 @@ build_flutter_release.bat
 
 Контракты событий и API:
 
-- [../docs/contracts.md](C:/Users/User/Desktop/Messanger/docs/contracts.md)
+- [../docs/contracts.md](../docs/contracts.md)
 - `lib/core/realtime/chat_ws_contract.dart`
 
 ## Качество

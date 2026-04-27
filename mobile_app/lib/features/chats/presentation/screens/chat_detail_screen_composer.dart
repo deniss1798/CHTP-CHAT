@@ -18,14 +18,35 @@ mixin _ChatDetailComposerAndActionsLogic
       return;
     }
     final text = _composerController.normalizedText(_messageController);
+    final replyId = _pendingReplyToMessageId();
+    final clientTempId =
+        'tmp-${widget.chatId}-${DateTime.now().microsecondsSinceEpoch}';
+    final optimisticMessage = <String, dynamic>{
+      'client_temp_id': clientTempId,
+      'chat_id': widget.chatId,
+      'sender_id': _currentUserId,
+      'sender_username': _memberNames[_currentUserId] ?? 'Вы',
+      'text': text,
+      'message_type': 'text',
+      'created_at': DateTime.now().toUtc().toIso8601String(),
+      'reply_to_message_id': replyId,
+      'reply_to': _replyingTo,
+      'delivery_status': 'sending',
+      'reactions': const [],
+    };
 
     setState(() {
       _isSending = true;
+      _messageListController.appendIfMissing(_messages, optimisticMessage);
+      _replyingTo = null;
+    });
+    _messageController.clear();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToBottom();
     });
 
     try {
-      final replyId = _pendingReplyToMessageId();
-
       final createdMessage = await _messageSendController.sendText(
         chatId: widget.chatId,
         text: text,
@@ -34,11 +55,15 @@ mixin _ChatDetailComposerAndActionsLogic
 
       if (!mounted) return;
 
-      _messageController.clear();
-
       setState(() {
-        _messageListController.appendIfMissing(_messages, createdMessage);
-        _replyingTo = null;
+        final replaced = _messageListController.replaceByClientTempId(
+          _messages,
+          clientTempId: clientTempId,
+          replacement: createdMessage,
+        );
+        if (!replaced) {
+          _messageListController.appendIfMissing(_messages, createdMessage);
+        }
         _isSending = false;
       });
 
@@ -51,6 +76,14 @@ mixin _ChatDetailComposerAndActionsLogic
       if (!mounted) return;
 
       setState(() {
+        _messageListController.markClientTempFailed(
+          _messages,
+          clientTempId: clientTempId,
+          error: chatDetailExtractErrorMessage(
+            e,
+            fallback: 'Failed to send message',
+          ),
+        );
         _isSending = false;
       });
 
@@ -68,67 +101,74 @@ mixin _ChatDetailComposerAndActionsLogic
     }
   }
 
+  Future<void> _retryFailedMessage(Map<String, dynamic> message) async {
+    final clientTempId = message['client_temp_id']?.toString();
+    final text = (message['text'] ?? '').toString().trim();
+    if (clientTempId == null || clientTempId.isEmpty || text.isEmpty) return;
+
+    setState(() {
+      _messageListController.markClientTempSending(
+        _messages,
+        clientTempId: clientTempId,
+      );
+    });
+
+    try {
+      final createdMessage = await _messageSendController.sendText(
+        chatId: widget.chatId,
+        text: text,
+        replyToMessageId: ChatDetailMessageMaps.intFromDynamic(
+          message['reply_to_message_id'],
+        ),
+      );
+      if (!mounted) return;
+      setState(() {
+        _messageListController.replaceByClientTempId(
+          _messages,
+          clientTempId: clientTempId,
+          replacement: createdMessage,
+        );
+      });
+      await _markCurrentChatAsRead();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _messageListController.markClientTempFailed(
+          _messages,
+          clientTempId: clientTempId,
+          error: chatDetailExtractErrorMessage(
+            e,
+            fallback: 'Failed to send message',
+          ),
+        );
+      });
+    }
+  }
+
   Future<void> _showAttachmentPicker() async {
     if (_isUploadingChatAvatar || _isSendingDocument) return;
 
-    final choice = await showModalBottomSheet<String>(
+    final choice = await showModalBottomSheet<ChatComposerAttachmentAction>(
       context: context,
       backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
       ),
-      builder: (ctx) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  leading: const Icon(AppIcons.photo, color: AppColors.accent),
-                  title: const Text('Photo'),
-                  onTap: () => Navigator.of(ctx).pop('photo'),
-                ),
-                ListTile(
-                  leading: const Icon(
-                    AppIcons.videoLibrary,
-                    color: AppColors.accent,
-                  ),
-                  title: const Text('Video'),
-                  subtitle: const Text('Pick a regular video from gallery'),
-                  onTap: () => Navigator.of(ctx).pop('video_gallery'),
-                ),
-                ListTile(
-                  leading: const Icon(
-                    Icons.insert_drive_file,
-                    color: AppColors.accent,
-                  ),
-                  title: const Text('File'),
-                  subtitle: const Text('PDF, Office, ODF, RTF, TXT up to 50 MB'),
-                  onTap: () => Navigator.of(ctx).pop('document'),
-                ),
-                const SizedBox(height: 4),
-              ],
-            ),
-          ),
-        );
-      },
+      builder: (_) => const ChatComposerAttachmentSheet(),
     );
 
     if (!mounted || choice == null) return;
 
-    if (choice == 'photo') {
-      await _pickAndSendImage();
-      return;
-    }
-
-    if (choice == 'video_gallery') {
-      await _pickAndSendVideo(source: ImageSource.gallery);
-      return;
-    }
-
-    if (choice == 'document') {
-      await _pickAndSendDocument();
+    switch (choice) {
+      case ChatComposerAttachmentAction.photo:
+        await _pickAndSendImage();
+        break;
+      case ChatComposerAttachmentAction.videoGallery:
+        await _pickAndSendVideo(source: ImageSource.gallery);
+        break;
+      case ChatComposerAttachmentAction.document:
+        await _pickAndSendDocument();
+        break;
     }
   }
 
@@ -427,7 +467,8 @@ mixin _ChatDetailComposerAndActionsLogic
     Offset? menuPosition,
   ]) async {
     final messageId = ChatDetailMessageMaps.intFromDynamic(message['id']);
-    if (messageId == null) return;
+    final isFailed = message['delivery_status']?.toString() == 'failed';
+    if (messageId == null && !isFailed) return;
 
     final text = (message['text'] ?? '').toString().trim();
 
@@ -496,6 +537,11 @@ mixin _ChatDetailComposerAndActionsLogic
 
     if (!mounted) return;
 
+    if (action == 'retry') {
+      await _retryFailedMessage(message);
+      return;
+    }
+
     if (action == 'reply') {
       setState(() {
         _replyingTo = Map<String, dynamic>.from(message);
@@ -537,6 +583,7 @@ mixin _ChatDetailComposerAndActionsLogic
     }
 
     if (action == 'delete') {
+      if (messageId == null) return;
       await _confirmDeleteMessage(messageId);
     }
   }
@@ -1007,45 +1054,23 @@ mixin _ChatDetailComposerAndActionsLogic
     if (!mounted) return;
     if (_isUploadingChatAvatar || _isSendingDocument) return;
 
-    final choice = await showModalBottomSheet<String>(
+    final choice = await showModalBottomSheet<ChatComposerDesktopExtraAction>(
       context: context,
       backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
       ),
-      builder: (ctx) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  leading: const Icon(AppIcons.videocam, color: AppColors.accent),
-                  title: const Text('Видеосообщение'),
-                  onTap: () => Navigator.of(ctx).pop('video'),
-                ),
-                ListTile(
-                  leading: const Icon(
-                    Icons.mic_none_rounded,
-                    color: AppColors.accent,
-                  ),
-                  title: const Text('Голосовое'),
-                  onTap: () => Navigator.of(ctx).pop('voice'),
-                ),
-                const SizedBox(height: 4),
-              ],
-            ),
-          ),
-        );
-      },
+      builder: (_) => const ChatComposerDesktopExtraSheet(),
     );
 
     if (!mounted || choice == null) return;
-    if (choice == 'video') {
-      await _openVideoNoteRecorder();
-    } else if (choice == 'voice') {
-      await _toggleVoiceRecording();
+    switch (choice) {
+      case ChatComposerDesktopExtraAction.videoNote:
+        await _openVideoNoteRecorder();
+        break;
+      case ChatComposerDesktopExtraAction.voice:
+        await _toggleVoiceRecording();
+        break;
     }
   }
 

@@ -1,11 +1,4 @@
-/// How the voice call ended (for optional chat line).
-enum CallEndKind {
-  disposeSilent,
-  localHangup,
-  remoteHangup,
-  ackTimeout,
-  error,
-}
+import 'call_state_machine.dart';
 
 String _formatDuration(Duration d) {
   final total = d.inSeconds;
@@ -21,30 +14,35 @@ String? buildCallChatMessage({
   required DateTime? connectedAt,
   required bool callerAckCompleted,
   required bool calleeAnswerSent,
-  required CallEndKind kind,
+  required CallEndReason reason,
 }) {
-  if (hadP2PConnected && connectedAt != null) {
-    final d = DateTime.now().difference(connectedAt);
-    return '📞 Вызов завершён. Длительность: ${_formatDuration(d)}';
-  }
-  switch (kind) {
-    case CallEndKind.disposeSilent:
-    case CallEndKind.error:
+  final status = terminalStatusForCallEnd(
+    isCaller: isCaller,
+    hadP2PConnected: hadP2PConnected,
+    callerAckCompleted: callerAckCompleted,
+    calleeAnswerSent: calleeAnswerSent,
+    reason: reason,
+  );
+
+  switch (status) {
+    case CallStatus.ended:
+      if (connectedAt != null) {
+        final d = DateTime.now().difference(connectedAt);
+        return '📞 Вызов завершён · ${_formatDuration(d)}';
+      }
+      return '📞 Вызов завершён';
+    case CallStatus.missed:
+      return isCaller ? '📞 Пропущенный вызов' : null;
+    case CallStatus.cancelled:
+      return isCaller ? '📞 Вызов отменён' : null;
+    case CallStatus.declined:
+      return isCaller ? '📞 Звонок отклонён' : null;
+    case CallStatus.failed:
       return null;
-    case CallEndKind.ackTimeout:
-      return isCaller ? '📞 Нет ответа' : null;
-    case CallEndKind.remoteHangup:
-      if (isCaller) {
-        return '📞 Звонок отклонён';
-      }
-      return '📞 Вызов отменён';
-    case CallEndKind.localHangup:
-      if (isCaller && !callerAckCompleted) {
-        return '📞 Вызов отменён';
-      }
-      if (!isCaller && !calleeAnswerSent) {
-        return null;
-      }
+    case CallStatus.created:
+    case CallStatus.ringing:
+    case CallStatus.accepted:
+    case CallStatus.expired:
       return null;
   }
 }

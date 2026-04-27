@@ -6,3 +6,5 @@ export 'media_upload_controller.dart';
 export 'message_action_controller.dart';
 export 'message_list_controller.dart';
 export 'message_send_controller.dart';
+export 'user_presentation_helpers.dart';
+export 'user_selection_controller.dart';

@@ -22,7 +22,12 @@ class UsersService {
     );
 
     final data = response.data;
-
+    if (data is Map && data['users'] is List) {
+      return (data['users']! as List)
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+    }
     if (data is List) {
       return data
           .whereType<Map>()
@@ -57,7 +62,12 @@ class UsersService {
     );
 
     final data = response.data;
-
+    if (data is Map && data['users'] is List) {
+      return (data['users']! as List)
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+    }
     if (data is List) {
       return data
           .whereType<Map>()

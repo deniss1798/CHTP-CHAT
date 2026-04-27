@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_icons.dart';
 import '../../../../app/theme/app_shadows.dart';
-import '../../../../app/theme/design_tokens.dart';
 import '../../../../app/widgets/app_surface.dart';
 import '../../../../core/platform/desktop_layout.dart';
 

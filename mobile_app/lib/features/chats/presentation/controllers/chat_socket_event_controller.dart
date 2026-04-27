@@ -32,6 +32,47 @@ class ReactionUpdateSocketEvent {
 }
 
 class ChatSocketEventController {
+  final Set<String> _seenEventIds = <String>{};
+  final List<String> _seenEventOrder = <String>[];
+  static const int _maxSeenEvents = 400;
+
+  bool shouldProcess(Map<String, dynamic> event) {
+    final key = eventKey(event);
+    if (key == null || key.isEmpty) return true;
+    if (_seenEventIds.contains(key)) return false;
+    _seenEventIds.add(key);
+    _seenEventOrder.add(key);
+    while (_seenEventOrder.length > _maxSeenEvents) {
+      _seenEventIds.remove(_seenEventOrder.removeAt(0));
+    }
+    return true;
+  }
+
+  String? eventKey(Map<String, dynamic> event) {
+    final eventId = event['event_id']?.toString().trim();
+    if (eventId != null && eventId.isNotEmpty) return eventId;
+
+    final type = event['type']?.toString().trim();
+    final name = event['event']?.toString().trim();
+    final message = event['message'];
+    final messageId = message is Map
+        ? ChatDetailMessageMaps.intFromDynamic(message['id'])
+        : null;
+    if (messageId != null && (type?.isNotEmpty == true || name?.isNotEmpty == true)) {
+      return '${type ?? name}:message:$messageId';
+    }
+    final deletedId = ChatDetailMessageMaps.intFromDynamic(event['id']);
+    if (deletedId != null && name == ChatWsContract.eventMessageDeleted) {
+      return '$name:deleted:$deletedId';
+    }
+    final reactionId = ChatDetailMessageMaps.intFromDynamic(event['message_id']);
+    if (reactionId != null &&
+        name == ChatWsContract.eventMessageReactionsUpdated) {
+      return '$name:reactions:$reactionId:${event['occurred_at'] ?? ''}';
+    }
+    return null;
+  }
+
   bool isGroupCallInvite(Map<String, dynamic> event) {
     return event['type'] == 'group_call_invite';
   }

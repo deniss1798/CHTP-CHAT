@@ -20,6 +20,12 @@ class DevicesService {
       options: await _authorizedOptions(),
     );
     final data = response.data;
+    if (data is Map && data['devices'] is List) {
+      return (data['devices']! as List)
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+    }
     if (data is List) {
       return data
           .whereType<Map>()
@@ -32,6 +38,13 @@ class DevicesService {
   Future<void> revokeDevice(int deviceId) async {
     await _dio.delete(
       '/devices/$deviceId',
+      options: await _authorizedOptions(),
+    );
+  }
+
+  Future<void> revokeAllDevices() async {
+    await _dio.delete(
+      '/devices',
       options: await _authorizedOptions(),
     );
   }

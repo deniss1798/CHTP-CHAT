@@ -63,7 +63,7 @@ Future<void> main() async {
 Future<void> _initPush() async {
   final messaging = FirebaseMessaging.instance;
 
-  final settings = await messaging.requestPermission(
+  await messaging.requestPermission(
     alert: true,
     badge: true,
     sound: true,

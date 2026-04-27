@@ -62,6 +62,8 @@ class _ChatMessageActionsPanelState extends State<ChatMessageActionsPanel> {
     final messageType = (widget.message['message_type'] ?? 'text').toString();
     final text = (widget.message['text'] ?? '').toString().trim();
     final mt = messageType.toLowerCase().trim();
+    final deliveryStatus = widget.message['delivery_status']?.toString();
+    final isFailed = deliveryStatus == 'failed';
 
     final items = <Widget>[];
 
@@ -81,25 +83,31 @@ class _ChatMessageActionsPanelState extends State<ChatMessageActionsPanel> {
       );
     }
 
-    items.add(
-      Padding(
-        padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
-        child: _reactionSection(),
-      ),
-    );
+    if (isFailed) {
+      addTile(Icons.refresh_rounded, 'Повторить отправку', 'retry');
+    } else {
+      items.add(
+        Padding(
+          padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+          child: _reactionSection(),
+        ),
+      );
+      items.add(_menuLine());
+      addTile(AppIcons.reply, 'Ответить', 'reply');
+    }
     items.add(_menuLine());
-    addTile(AppIcons.reply, 'Ответить', 'reply');
-    items.add(_menuLine());
-    addTile(Icons.forward_rounded, 'Переслать', 'forward');
+    if (!isFailed) {
+      addTile(Icons.forward_rounded, 'Переслать', 'forward');
+    }
     if (text.isNotEmpty) {
       items.add(_menuLine());
       addTile(AppIcons.copy, 'Копировать', 'copy');
     }
-    if (widget.isMineMessage && text.isNotEmpty && mt == 'text') {
+    if (!isFailed && widget.isMineMessage && text.isNotEmpty && mt == 'text') {
       items.add(_menuLine());
       addTile(AppIcons.edit, 'Изменить', 'edit');
     }
-    if (widget.isMineMessage) {
+    if (!isFailed && widget.isMineMessage) {
       items.add(_menuLine());
       addTile(
         AppIcons.delete,

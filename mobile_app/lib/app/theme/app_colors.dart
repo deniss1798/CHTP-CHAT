@@ -31,6 +31,8 @@ class AppColors {
   static const Color textOnAccent = Color(0xFF120A05);
 
   static const Color error = Color(0xFFFF5C5C);
+  static const Color danger = Color(0xFFFF5A5A);
+  static const Color dangerSurface = Color(0xFF3C1616);
 
   static const Color inputFill = Color(0xFF0E0E0E);
   static const Color inputBorder = Color(0xFF512516);

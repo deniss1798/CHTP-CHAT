@@ -9,6 +9,7 @@ import '../../../../app/theme/design_tokens.dart';
 import '../../../../app/widgets/app_content_frame.dart';
 import '../../../../app/widgets/app_screen_background.dart';
 import '../../../../app/widgets/app_surface.dart';
+import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/push/notification_preferences.dart';
 import '../../../../core/storage/secure_storage_service.dart';
 import '../../../calls/data/ice_config_service.dart';
@@ -24,9 +25,9 @@ class SettingsScreen extends StatelessWidget {
   /// Во вкладке [MessengerDesktopShell] без кнопки «Назад».
   final bool embedded;
 
-  static const Color _dangerZoneIconBg = Color(0xFF3C1616);
-  static const Color _dangerText = Color(0xFFFF5A5A);
-  static const Color _dangerIcon = Color(0xFFFF5A5A);
+  static const Color _dangerZoneIconBg = AppColors.dangerSurface;
+  static const Color _dangerText = AppColors.danger;
+  static const Color _dangerIcon = AppColors.danger;
 
   @override
   Widget build(BuildContext context) {
@@ -61,13 +62,7 @@ class SettingsScreen extends StatelessWidget {
                       const Expanded(
                         child: Text(
                           'Настройки',
-                          style: TextStyle(
-                            color: AppColors.textPrimary,
-                            fontSize: 44,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -1.2,
-                            height: 1.2,
-                          ),
+                          style: AppTextStyles.display,
                         ),
                       ),
                     ],
@@ -75,12 +70,7 @@ class SettingsScreen extends StatelessWidget {
                   const SizedBox(height: 10),
                   const Text(
                     'Управляйте своим аккаунтом и безопасностью.',
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                      height: 1.4,
-                    ),
+                    style: AppTextStyles.secondary,
                   ),
                   const SizedBox(height: 28),
                   _sectionTitle('Аккаунт'),
@@ -321,22 +311,18 @@ class SettingsScreen extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: TextStyle(
+                      style: AppTextStyles.bodyStrong.copyWith(
                         color: titleColor,
                         fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        height: 1.25,
                       ),
                     ),
                     if (subtitle != null && subtitle.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Text(
                         subtitle,
-                        style: TextStyle(
+                        style: AppTextStyles.secondary.copyWith(
                           color: subtitleColor ?? AppColors.textSecondary,
                           fontSize: 13.5,
-                          fontWeight: FontWeight.w500,
-                          height: 1.35,
                         ),
                       ),
                     ],
@@ -358,11 +344,8 @@ class SettingsScreen extends StatelessWidget {
       children: [
         Text(
           value.toUpperCase(),
-          style: TextStyle(
+          style: AppTextStyles.section.copyWith(
             color: color.withValues(alpha: 0.95),
-            fontSize: 13,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0.45,
           ),
         ),
         const SizedBox(width: 12),

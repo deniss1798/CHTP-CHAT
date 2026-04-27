@@ -1,13 +1,15 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_icons.dart';
 import '../../../../app/theme/app_shadows.dart';
 import '../../../../app/theme/design_tokens.dart';
+import '../../../../app/widgets/app_avatar.dart';
 import '../../../../app/widgets/app_screen_background.dart';
 import '../../../../app/widgets/app_surface.dart';
+import '../../../../app/widgets/app_text_field.dart';
 import '../../data/services/chats_service.dart';
 import '../../data/services/users_service.dart';
+import '../controllers/user_presentation_helpers.dart';
 
 class ChatMemberAddScreen extends StatefulWidget {
   final int chatId;
@@ -58,15 +60,7 @@ class _ChatMemberAddScreenState extends State<ChatMemberAddScreen> {
       final users = await _usersService.getUsers();
 
       final availableUsers = users.where((user) {
-        final rawId = user['id'];
-
-        int? userId;
-        if (rawId is int) {
-          userId = rawId;
-        } else {
-          userId = int.tryParse(rawId.toString());
-        }
-
+        final userId = userIdFromMap(user);
         return userId != null && !widget.existingMemberIds.contains(userId);
       }).toList();
 
@@ -81,7 +75,7 @@ class _ChatMemberAddScreenState extends State<ChatMemberAddScreen> {
       if (!mounted) return;
 
       setState(() {
-        _error = _extractErrorMessage(
+        _error = extractFeatureErrorMessage(
           e,
           fallback: 'Не удалось загрузить пользователей',
         );
@@ -107,15 +101,7 @@ class _ChatMemberAddScreenState extends State<ChatMemberAddScreen> {
   }
 
   Future<void> _addMember(Map<String, dynamic> user) async {
-    final rawId = user['id'];
-    int? userId;
-
-    if (rawId is int) {
-      userId = rawId;
-    } else {
-      userId = int.tryParse(rawId.toString());
-    }
-
+    final userId = userIdFromMap(user);
     if (userId == null || _isAdding) return;
 
     setState(() {
@@ -138,7 +124,7 @@ class _ChatMemberAddScreenState extends State<ChatMemberAddScreen> {
         SnackBar(
           backgroundColor: AppColors.surfaceSoft,
           content: Text(
-            _extractErrorMessage(
+            extractFeatureErrorMessage(
               e,
               fallback: 'Не удалось добавить участника',
             ),
@@ -152,28 +138,6 @@ class _ChatMemberAddScreenState extends State<ChatMemberAddScreen> {
         });
       }
     }
-  }
-
-  String _extractErrorMessage(Object e, {required String fallback}) {
-    if (e is DioException) {
-      final data = e.response?.data;
-
-      if (data is Map<String, dynamic>) {
-        return data['detail']?.toString() ??
-            data['message']?.toString() ??
-            fallback;
-      }
-
-      if (data is String && data.isNotEmpty) {
-        return data;
-      }
-
-      if (e.message != null && e.message!.isNotEmpty) {
-        return e.message!;
-      }
-    }
-
-    return e.toString().replaceFirst('Exception: ', '');
   }
 
   Widget _buildBody() {
@@ -258,23 +222,11 @@ class _ChatMemberAddScreenState extends State<ChatMemberAddScreen> {
             shadow: AppShadows.lift,
             child: Row(
               children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    gradient: AppGradients.accentPanel,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: AppShadows.primaryButton,
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    username.isNotEmpty ? username[0].toUpperCase() : '?',
-                    style: const TextStyle(
-                      color: AppColors.textOnAccent,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
+                AppAvatar(
+                  title: username,
+                  size: AppSizes.listAvatar,
+                  square: true,
+                  radius: AppRadius.md,
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -349,32 +301,9 @@ class _ChatMemberAddScreenState extends State<ChatMemberAddScreen> {
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
-                child: AppSurface(
-                  radius: AppRadius.xxl,
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-                  shadow: AppShadows.lift,
-                  child: TextField(
-                    controller: _searchController,
-                    style: const TextStyle(color: AppColors.textPrimary),
-                    decoration: InputDecoration(
-                      hintText: 'Поиск по имени',
-                      hintStyle: const TextStyle(color: AppColors.textMuted),
-                      prefixIcon: const Icon(
-                        AppIcons.search,
-                        color: AppColors.textMuted,
-                      ),
-                      filled: true,
-                      fillColor: Colors.transparent,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 14,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(18),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
+                child: AppSearchField(
+                  controller: _searchController,
+                  hintText: 'Поиск по имени',
                 ),
               ),
               Expanded(child: _buildBody()),
