@@ -264,3 +264,45 @@ def presign_media_url(media_key: str | None) -> str | None:
     if not media_key:
         return None
     return S3StorageService().generate_private_file_url(object_key=media_key)
+
+
+def presign_story_media_url(media_key: str | None) -> str | None:
+    """Длиннее TTL — полноэкранный просмотр видео/фото."""
+    if not media_key:
+        return None
+    return S3StorageService().generate_private_file_url(
+        object_key=media_key,
+        expires_in=7200,
+    )
+
+
+def upload_private_story_image(
+    *,
+    user_id: int,
+    content: bytes,
+    content_type: str,
+) -> tuple[str, str]:
+    storage = S3StorageService()
+    extension = ALLOWED_IMAGE_TYPES[content_type]
+    return storage.upload_private_story_image(
+        user_id=user_id,
+        content=content,
+        extension=extension,
+        content_type=content_type,
+    )
+
+
+def upload_private_story_video(
+    *,
+    user_id: int,
+    content: bytes,
+    extension: str,
+    content_type: str,
+) -> tuple[str, str]:
+    storage = S3StorageService()
+    return storage.upload_private_story_video(
+        user_id=user_id,
+        content=content,
+        extension=extension,
+        content_type=content_type,
+    )

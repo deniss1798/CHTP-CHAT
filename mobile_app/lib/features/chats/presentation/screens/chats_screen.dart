@@ -24,6 +24,8 @@ import '../widgets/chats_search_field.dart';
 import 'chat_detail_screen.dart';
 import 'group_chat_create_screen.dart';
 import 'user_picker_screen.dart';
+import '../../../stories/presentation/stories_feed_controller.dart';
+import '../../../stories/presentation/widgets/stories_strip.dart';
 
 class ChatsScreen extends StatefulWidget {
   const ChatsScreen({
@@ -56,6 +58,8 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
     isChatOpen: (chatId) => widget.embedded && widget.selectedChatId == chatId,
   );
 
+  late final StoriesFeedController _storiesFeedController = StoriesFeedController();
+
   final FocusNode _searchFocus = FocusNode();
 
   @override
@@ -63,12 +67,14 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     unawaited(_controller.initialize());
+    unawaited(_storiesFeedController.load());
   }
 
   @override
   void dispose() {
     _searchFocus.dispose();
     WidgetsBinding.instance.removeObserver(this);
+    _storiesFeedController.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -339,6 +345,26 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
                           ],
                         ),
                       ),
+                      if (state.currentUserId != null && state.error == null)
+                        AnimatedBuilder(
+                          animation: _storiesFeedController,
+                          builder: (context, _) {
+                            return Padding(
+                              padding: EdgeInsets.only(
+                                bottom: _storiesFeedController.entries.isEmpty &&
+                                        !_storiesFeedController.loading
+                                    ? 0
+                                    : 6,
+                              ),
+                              child: StoriesStrip(
+                                entries: _storiesFeedController.entries,
+                                loading: _storiesFeedController.loading,
+                                onRefreshFeed: () =>
+                                    _storiesFeedController.load(silent: true),
+                              ),
+                            );
+                          },
+                        ),
                       const SizedBox(height: 10),
                       Expanded(
                         child: _buildBody(state, items),

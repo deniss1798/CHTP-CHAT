@@ -13,6 +13,7 @@ from app.api.routers.chats.router import router as chats_router
 from app.api.routers.messages.router import router as messages_router
 from app.api.users_router import router as users_router
 from app.api.ws_inbox_router import router as ws_inbox_router
+from app.api.stories_router import router as stories_router
 from app.api.webrtc_router import router as webrtc_router
 from app.api.ws_router import router as ws_router
 from app.core.config import get_settings
@@ -116,6 +117,7 @@ def _include_all_routers(prefix: str = "") -> None:
     app.include_router(calls_router, **kwargs)
     app.include_router(notification_settings_router, **kwargs)
     app.include_router(webrtc_router, **kwargs)
+    app.include_router(stories_router, **kwargs)
 
 
 _include_all_routers()
