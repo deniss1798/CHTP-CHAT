@@ -329,7 +329,36 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
                                   ? null
                                   : _openSettings,
                             ),
-                            const SizedBox(height: 16),
+                            if (state.currentUserId != null) ...[
+                              const SizedBox(height: 12),
+                              AnimatedBuilder(
+                                animation: _storiesFeedController,
+                                builder: (context, _) {
+                                  return StoriesStrip(
+                                    entries: _storiesFeedController.entries,
+                                    loading: _storiesFeedController.loading,
+                                    currentUserId: state.currentUserId,
+                                    onRefreshFeed: () =>
+                                        _storiesFeedController.load(silent: true),
+                                  );
+                                },
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.only(top: 14, bottom: 14),
+                                child: Container(
+                                  height: 1,
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        AppColors.strokeSoft.withValues(alpha: 0),
+                                        AppColors.strokeMedium.withValues(alpha: 0.35),
+                                        AppColors.strokeSoft.withValues(alpha: 0),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                             ChatsSearchField(
                               focusNode: _searchFocus,
                               showShortcutHint: useDesktopListChrome,
@@ -345,26 +374,6 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
                           ],
                         ),
                       ),
-                      if (state.currentUserId != null && state.error == null)
-                        AnimatedBuilder(
-                          animation: _storiesFeedController,
-                          builder: (context, _) {
-                            return Padding(
-                              padding: EdgeInsets.only(
-                                bottom: _storiesFeedController.entries.isEmpty &&
-                                        !_storiesFeedController.loading
-                                    ? 0
-                                    : 6,
-                              ),
-                              child: StoriesStrip(
-                                entries: _storiesFeedController.entries,
-                                loading: _storiesFeedController.loading,
-                                onRefreshFeed: () =>
-                                    _storiesFeedController.load(silent: true),
-                              ),
-                            );
-                          },
-                        ),
                       const SizedBox(height: 10),
                       Expanded(
                         child: _buildBody(state, items),

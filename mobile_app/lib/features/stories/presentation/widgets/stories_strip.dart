@@ -10,17 +10,41 @@ import '../../data/stories_service.dart';
 import '../screens/story_viewer_screen.dart';
 import '../stories_feed_controller.dart';
 
+List<StoryFeedEntryVm> mergeStoriesWithSelfFallback({
+  required List<StoryFeedEntryVm> entries,
+  required int? currentUserId,
+}) {
+  final uid = currentUserId;
+  if (uid == null) return entries;
+  final hasSelf = entries.any((e) => e.isSelf || e.userId == uid);
+  if (hasSelf) return entries;
+  return [
+    StoryFeedEntryVm(
+      userId: uid,
+      username: 'Вы',
+      avatarUrl: null,
+      isSelf: true,
+      hasUnseen: false,
+      storyCount: 0,
+    ),
+    ...entries,
+  ];
+}
+
 class StoriesStrip extends StatelessWidget {
   const StoriesStrip({
     super.key,
     required this.entries,
     required this.loading,
     required this.onRefreshFeed,
+    required this.currentUserId,
   });
 
   final List<StoryFeedEntryVm> entries;
   final bool loading;
   final Future<void> Function() onRefreshFeed;
+  /// Если API ещё не отдал «мою» строку или запрос упал — показываем пузырь «История».
+  final int? currentUserId;
 
   Future<void> _openStory(BuildContext context, StoryFeedEntryVm e) async {
     if (e.storyCount == 0 && e.isSelf) {
@@ -48,7 +72,7 @@ class StoriesStrip extends StatelessWidget {
       final picker = ImagePicker();
       final action = await showModalBottomSheet<String>(
         context: context,
-        backgroundColor: AppColors.surfaceElevated,
+        backgroundColor: AppColors.surfaceRaised,
         builder: (ctx) => SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -114,38 +138,79 @@ class StoriesStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (loading && entries.isEmpty) {
-      return const SizedBox(
-        height: 100,
-        child: Center(
-          child: SizedBox(
-            width: 28,
-            height: 28,
-            child: CircularProgressIndicator(strokeWidth: 2.2),
-          ),
-        ),
-      );
-    }
+    final merged = mergeStoriesWithSelfFallback(
+      entries: entries,
+      currentUserId: currentUserId,
+    );
 
-    if (entries.isEmpty) {
+    if (merged.isEmpty) {
+      if (loading && currentUserId == null) {
+        return const SizedBox(
+          height: 100,
+          child: Center(
+            child: SizedBox(
+              width: 28,
+              height: 28,
+              child: CircularProgressIndicator(strokeWidth: 2.2),
+            ),
+          ),
+        );
+      }
       return const SizedBox.shrink();
     }
 
-    return SizedBox(
-      height: 104,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        itemCount: entries.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 10),
-        itemBuilder: (context, i) {
-          final e = entries[i];
-          return _StoryBubble(
-            entry: e,
-            onTap: () => _openStory(context, e),
-          );
-        },
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Row(
+            children: [
+              Icon(
+                Icons.auto_stories_rounded,
+                size: 20,
+                color: AppColors.accentBright.withValues(alpha: 0.92),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Истории',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textSecondary,
+                  letterSpacing: 0.35,
+                ),
+              ),
+              if (loading && entries.isEmpty) ...[
+                const SizedBox(width: 10),
+                const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ],
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 104,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: EdgeInsets.zero,
+            clipBehavior: Clip.none,
+            itemCount: merged.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            itemBuilder: (context, i) {
+              final e = merged[i];
+              return _StoryBubble(
+                entry: e,
+                onTap: () => _openStory(context, e),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }

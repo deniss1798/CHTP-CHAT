@@ -58,7 +58,7 @@ class StoriesService {
     });
 
     final response = await _dio.post<Map<String, dynamic>>(
-      '/stories',
+      '/stories/upload',
       data: form,
       options: Options(
         headers: await _authHeaders(),

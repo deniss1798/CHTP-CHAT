@@ -40,16 +40,55 @@ def stories_by_user(
     return get_user_stories(db, current_user, author_id)
 
 
-@router.post("", response_model=StoryCreatedResponse)
-async def stories_create(
+async def _stories_create_impl(
+    *,
+    file: UploadFile,
+    media_type: str,
+    caption: str | None,
+    db: Session,
+    current_user: User,
+) -> StoryCreatedResponse:
+    rate_limiter.check(str(current_user.id), MEDIA_UPLOAD_RULE)
+    return await create_story(
+        db, current_user, file=file, media_type=media_type, caption=caption
+    )
+
+
+@router.post("/upload", response_model=StoryCreatedResponse)
+async def stories_create_upload(
     file: UploadFile = File(...),
     media_type: str = Form(...),
     caption: str | None = Form(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    rate_limiter.check(str(current_user.id), MEDIA_UPLOAD_RULE)
-    return await create_story(db, current_user, file=file, media_type=media_type, caption=caption)
+    """Канонический путь загрузки (без путаницы с trailing slash у POST \"\", прокси и т.д.)."""
+    return await _stories_create_impl(
+        file=file,
+        media_type=media_type,
+        caption=caption,
+        db=db,
+        current_user=current_user,
+    )
+
+
+@router.post("", response_model=StoryCreatedResponse)
+@router.post("/", response_model=StoryCreatedResponse)
+async def stories_create_legacy(
+    file: UploadFile = File(...),
+    media_type: str = Form(...),
+    caption: str | None = Form(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Обратная совместимость со старым клиентом."""
+    return await _stories_create_impl(
+        file=file,
+        media_type=media_type,
+        caption=caption,
+        db=db,
+        current_user=current_user,
+    )
 
 
 @router.post("/{story_id}/view", response_model=StoryViewAck)
