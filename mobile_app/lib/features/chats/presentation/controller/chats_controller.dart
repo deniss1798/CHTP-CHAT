@@ -283,10 +283,13 @@ class ChatsController extends ChangeNotifier {
       if (_state.currentUserId != null) {
         await _connectInboxWithRetry();
       }
-    } catch (_) {
+    } catch (error, stack) {
+      if (kDebugMode) {
+        debugPrint('ChatsController._init failed: $error\n$stack');
+      }
       _setState(
         _state.copyWith(
-          error: 'Не удалось инициализировать список чатов',
+          error: _extractInitErrorMessage(error),
           isLoading: false,
         ),
       );
@@ -459,6 +462,30 @@ class ChatsController extends ChangeNotifier {
       ).line.toLowerCase();
       return title.contains(query) || subtitle.contains(query);
     }).toList();
+  }
+
+  String _extractInitErrorMessage(Object error) {
+    final base = _extractLoadChatsErrorMessage(error);
+    if (error is DioException) {
+      switch (error.type) {
+        case DioExceptionType.connectionError:
+        case DioExceptionType.connectionTimeout:
+          return 'Нет связи с сервером ($base). '
+              'Рядом с exe положи api_base_url.txt (одна строка URL, часто :80 и /api).';
+        case DioExceptionType.receiveTimeout:
+        case DioExceptionType.sendTimeout:
+          return 'Таймаут запроса к серверу. $base';
+        default:
+          break;
+      }
+      if (error.response?.statusCode == 401) {
+        return 'Сессия истекла или токен недействителен. Выйдите и войдите снова.';
+      }
+    }
+    if (base.contains('Токен не найден')) {
+      return 'Сессия не найдена. Войдите в аккаунт ещё раз.';
+    }
+    return 'Не удалось открыть список чатов: $base';
   }
 
   String _extractLoadChatsErrorMessage(Object error) {

@@ -21,7 +21,10 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 database_url = os.getenv("DATABASE_URL")
-config.set_main_option("sqlalchemy.url", database_url)
+if not database_url:
+    raise RuntimeError("DATABASE_URL is not set")
+# ConfigParser интерпретирует «%» как interpolation; в пароле URL часто есть %23, %3F и т.д.
+config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
 
 target_metadata = Base.metadata
 
