@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart';
 import '../../../../core/formatting/server_time.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/notifiers/chats_list_refresh_notifier.dart';
+import '../../../../core/notifiers/open_chat_sync_notifier.dart';
 import '../../../../core/notifiers/open_chat_state_notifier.dart';
 import '../../../../core/push/local_notifications_service.dart';
 import '../../../../core/push/notification_preferences.dart';
@@ -147,7 +148,7 @@ class ChatsController extends ChangeNotifier {
     final nowArchived = filter == ChatsListFilter.archive;
     _setState(_state.copyWith(listFilter: filter));
     if (wasArchived != nowArchived) {
-      unawaited(refresh(silent: true));
+      unawaited(refresh(silent: false));
     }
   }
 
@@ -160,25 +161,39 @@ class ChatsController extends ChangeNotifier {
     return false;
   }
 
-  Future<void> patchMemberPreferences({
+  /// null — успех; иначе текст ошибки для SnackBar (детали сервера где возможно).
+  Future<String?> patchMemberPreferences({
     required int chatId,
     bool? isArchived,
     bool? notificationsMuted,
   }) async {
-    if (_state.currentUserId == null) return;
-    if (isArchived == null && notificationsMuted == null) return;
+    if (_state.currentUserId == null) {
+      return 'Не выполнен вход';
+    }
+    if (isArchived == null && notificationsMuted == null) {
+      return 'Нет полей для обновления';
+    }
     try {
       await _chatsService.patchChatMemberPreferences(
         chatId: chatId,
         isArchived: isArchived,
         notificationsMuted: notificationsMuted,
       );
+    } catch (error, stack) {
+      if (kDebugMode) {
+        debugPrint('patchChatMemberPreferences failed: $error\n$stack');
+      }
+      return _extractLoadChatsErrorMessage(error);
+    }
+    try {
       await refresh(silent: true);
     } catch (error, stack) {
       if (kDebugMode) {
-        debugPrint('patchMemberPreferences failed: $error\n$stack');
+        debugPrint('refresh after patch failed: $error\n$stack');
       }
+      return _extractLoadChatsErrorMessage(error);
     }
+    return null;
   }
 
   bool _chatMatchesListFilter(ChatSummary c) {

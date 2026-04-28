@@ -22,9 +22,9 @@ class ChatsService {
 
     final response = await _dio.get(
       '/chats/',
-      queryParameters: {
+      queryParameters: <String, dynamic>{
         'limit': limit,
-        if (archived) 'archived': true,
+        'archived': archived ? 'true' : 'false',
         if (cursor != null && cursor.isNotEmpty) 'cursor': cursor,
       },
       options: Options(

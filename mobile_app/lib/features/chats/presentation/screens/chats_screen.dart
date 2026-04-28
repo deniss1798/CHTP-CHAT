@@ -22,6 +22,7 @@ import '../widgets/chats_error_state.dart';
 import '../widgets/chats_incoming_call_dialogs.dart';
 import '../widgets/chats_list_filter_chips.dart';
 import '../widgets/chats_list.dart';
+import '../widgets/chat_dialogue_actions_sheet.dart';
 import '../widgets/chats_loading_state.dart';
 import '../widgets/chats_search_field.dart';
 import 'chat_detail_screen.dart';
@@ -125,72 +126,11 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
     await _controller.refresh(silent: true);
   }
 
-  Future<void> _showChatRowActions(ChatListItemModel item) async {
-    await showModalBottomSheet<void>(
+  Future<void> _showChatRowActions(ChatListItemModel item) {
+    return showChatDialogueActionsSheet(
       context: context,
-      backgroundColor: AppColors.chatListCard,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: Icon(
-                  item.isArchived
-                      ? Icons.unarchive_outlined
-                      : Icons.archive_outlined,
-                  color: AppColors.textPrimary,
-                ),
-                title: Text(
-                  item.isArchived ? 'Вернуть из архива' : 'В архив',
-                  style: const TextStyle(
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                onTap: () {
-                  Navigator.of(ctx).pop();
-                  unawaited(
-                    _controller.patchMemberPreferences(
-                      chatId: item.chatId,
-                      isArchived: !item.isArchived,
-                    ),
-                  );
-                },
-              ),
-              ListTile(
-                leading: Icon(
-                  item.notificationsMuted
-                      ? Icons.notifications_active_outlined
-                      : Icons.notifications_off_outlined,
-                  color: AppColors.textPrimary,
-                ),
-                title: Text(
-                  item.notificationsMuted
-                      ? 'Включить уведомления'
-                      : 'Отключить уведомления',
-                  style: const TextStyle(
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                onTap: () {
-                  Navigator.of(ctx).pop();
-                  unawaited(
-                    _controller.patchMemberPreferences(
-                      chatId: item.chatId,
-                      notificationsMuted: !item.notificationsMuted,
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-        );
-      },
+      controller: _controller,
+      initial: item,
     );
   }
 
