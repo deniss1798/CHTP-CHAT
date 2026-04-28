@@ -1,3 +1,4 @@
+import '../../../../core/formatting/server_time.dart';
 import '../../../../core/network/url_helper.dart';
 
 int? _asInt(Object? value) {
@@ -123,6 +124,7 @@ class ChatSummary {
     this.peerLastSeenAtRaw,
     this.isArchived = false,
     this.notificationsMuted = false,
+    this.isPinned = false,
   });
 
   final int id;
@@ -143,6 +145,7 @@ class ChatSummary {
   /// Персонификация участника ([PATCH /chats/:id/member-preferences]).
   final bool isArchived;
   final bool notificationsMuted;
+  final bool isPinned;
 
   factory ChatSummary.fromApi(Map<String, dynamic> raw) {
     final id = _asInt(raw['id'] ?? raw['chat_id']);
@@ -199,6 +202,7 @@ class ChatSummary {
           _asBool(raw['is_archived'] ?? raw['isArchived']),
       notificationsMuted:
           _asBool(raw['notifications_muted'] ?? raw['notificationsMuted']),
+      isPinned: _asBool(raw['is_pinned'] ?? raw['isPinned']),
     );
   }
 
@@ -216,6 +220,7 @@ class ChatSummary {
     String? peerLastSeenAtRaw,
     bool? isArchived,
     bool? notificationsMuted,
+    bool? isPinned,
   }) {
     return ChatSummary(
       id: id,
@@ -235,8 +240,19 @@ class ChatSummary {
       peerLastSeenAtRaw: peerLastSeenAtRaw ?? this.peerLastSeenAtRaw,
       isArchived: isArchived ?? this.isArchived,
       notificationsMuted: notificationsMuted ?? this.notificationsMuted,
+      isPinned: isPinned ?? this.isPinned,
     );
   }
+}
+
+/// Порядок как на сервере: закреплённые выше, затем по времени последней активности.
+int compareChatSummariesListOrder(ChatSummary a, ChatSummary b) {
+  if (a.isPinned != b.isPinned) {
+    return a.isPinned ? -1 : 1;
+  }
+  final aMs = serverInstantMillis(a.lastMessageAtRaw) ?? 0;
+  final bMs = serverInstantMillis(b.lastMessageAtRaw) ?? 0;
+  return bMs.compareTo(aMs);
 }
 
 class ChatListPageResult {

@@ -12,7 +12,7 @@ String _shortSnack(String message) {
   return '${t.substring(0, 177)}…';
 }
 
-/// Нижняя шторка действий над диалогом (архив / уведомления), в духе Telegram.
+/// Нижняя шторка действий над диалогом (архив / закрепление / уведомления), в духе Telegram.
 Future<void> showChatDialogueActionsSheet({
   required BuildContext context,
   required ChatsController controller,
@@ -49,18 +49,40 @@ class _ChatDialogueActionsSheetInnerState
     extends State<_ChatDialogueActionsSheetInner> {
   late bool archived;
   late bool muted;
+  late bool pinned;
   bool workingArchive = false;
   bool workingMute = false;
+  bool workingPin = false;
 
   @override
   void initState() {
     super.initState();
     archived = widget.initial.isArchived;
     muted = widget.initial.notificationsMuted;
+    pinned = widget.initial.isPinned;
+  }
+
+  Future<void> _onPin() async {
+    if (workingArchive || workingMute || workingPin) return;
+    final nextPinned = !pinned;
+    setState(() => workingPin = true);
+    final err = await widget.controller.patchMemberPreferences(
+      chatId: widget.initial.chatId,
+      isPinned: nextPinned,
+    );
+    if (!mounted) return;
+    setState(() => workingPin = false);
+    if (err != null) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(content: Text(_shortSnack(err))),
+      );
+      return;
+    }
+    setState(() => pinned = nextPinned);
   }
 
   Future<void> _onArchive() async {
-    if (workingArchive) return;
+    if (workingArchive || workingMute || workingPin) return;
     final nextArchived = !archived;
     setState(() => workingArchive = true);
     final err = await widget.controller.patchMemberPreferences(
@@ -76,7 +98,12 @@ class _ChatDialogueActionsSheetInnerState
       return;
     }
 
-    setState(() => archived = nextArchived);
+    setState(() {
+      archived = nextArchived;
+      if (nextArchived) {
+        pinned = false;
+      }
+    });
 
     final tab = widget.controller.state.listFilter;
     final leaveList = (tab != ChatsListFilter.archive && nextArchived) ||
@@ -85,7 +112,7 @@ class _ChatDialogueActionsSheetInnerState
   }
 
   Future<void> _onMute() async {
-    if (workingMute) return;
+    if (workingArchive || workingMute || workingPin) return;
     final nextMuted = !muted;
     setState(() => workingMute = true);
     final err = await widget.controller.patchMemberPreferences(
@@ -166,7 +193,7 @@ class _ChatDialogueActionsSheetInnerState
               endIndent: AppSpacing.md,
             ),
             _SheetAction(
-              enabled: !workingArchive && !workingMute,
+              enabled: !workingArchive && !workingMute && !workingPin,
               busy: workingArchive,
               icon: archived ? Icons.unarchive_outlined : Icons.archive_outlined,
               label:
@@ -174,7 +201,17 @@ class _ChatDialogueActionsSheetInnerState
               onTap: _onArchive,
             ),
             _SheetAction(
-              enabled: !workingArchive && !workingMute,
+              enabled: !workingArchive && !workingMute && !workingPin,
+              busy: workingPin,
+              icon: pinned
+                  ? Icons.push_pin
+                  : Icons.push_pin_outlined,
+              label:
+                  pinned ? 'Открепить' : 'Закрепить',
+              onTap: _onPin,
+            ),
+            _SheetAction(
+              enabled: !workingArchive && !workingMute && !workingPin,
               busy: workingMute,
               icon: muted
                   ? Icons.notifications_active_outlined

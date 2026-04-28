@@ -1,6 +1,5 @@
 import 'package:dio/dio.dart';
 
-import '../../../../core/formatting/server_time.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/secure_storage_service.dart';
 import '../models/chat_models.dart';
@@ -49,11 +48,7 @@ class ChatsService {
           .map((e) => Map<String, dynamic>.from(e))
           .map(ChatSummary.fromApi)
           .toList();
-      chats.sort((a, b) {
-        final aMs = serverInstantMillis(a.lastMessageAtRaw) ?? 0;
-        final bMs = serverInstantMillis(b.lastMessageAtRaw) ?? 0;
-        return bMs.compareTo(aMs);
-      });
+      chats.sort(compareChatSummariesListOrder);
       return ChatListPageResult(
         chats: chats,
         hasMore: false,
@@ -68,8 +63,9 @@ class ChatsService {
     required int chatId,
     bool? isArchived,
     bool? notificationsMuted,
+    bool? isPinned,
   }) async {
-    if (isArchived == null && notificationsMuted == null) {
+    if (isArchived == null && notificationsMuted == null && isPinned == null) {
       throw ArgumentError('Нет полей для обновления');
     }
     final token = await SecureStorageService.getAccessToken();
@@ -81,6 +77,7 @@ class ChatsService {
       data: {
         if (isArchived != null) 'is_archived': isArchived,
         if (notificationsMuted != null) 'notifications_muted': notificationsMuted,
+        if (isPinned != null) 'is_pinned': isPinned,
       },
       options: Options(
         headers: {'Authorization': 'Bearer $token'},
@@ -108,11 +105,7 @@ class ChatsService {
         }
       }
     }
-    chats.sort((a, b) {
-      final aMs = serverInstantMillis(a.lastMessageAtRaw) ?? 0;
-      final bMs = serverInstantMillis(b.lastMessageAtRaw) ?? 0;
-      return bMs.compareTo(aMs);
-    });
+    chats.sort(compareChatSummariesListOrder);
     final next = data['next_cursor']?.toString();
     final hasMore = data['has_more'] == true;
     return ChatListPageResult(
@@ -137,11 +130,7 @@ class ChatsService {
       cursor = page.hasMore ? page.nextCursor : null;
     } while (cursor != null);
 
-    out.sort((a, b) {
-      final aMs = serverInstantMillis(a.lastMessageAtRaw) ?? 0;
-      final bMs = serverInstantMillis(b.lastMessageAtRaw) ?? 0;
-      return bMs.compareTo(aMs);
-    });
+    out.sort(compareChatSummariesListOrder);
 
     return out;
   }

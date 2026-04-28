@@ -2,7 +2,7 @@ import base64
 import json
 from datetime import datetime
 
-from sqlalchemy import and_, desc, func, or_
+from sqlalchemy import Integer, and_, cast, desc, func, or_
 from sqlalchemy.orm import Session
 
 from app.application.chats.chat_queries import message_type_for_chat_list
@@ -16,8 +16,12 @@ from app.schemas.chat_schema import ChatListPage, ChatResponse
 _EPOCH = datetime(1970, 1, 1)
 
 
-def _encode_chat_cursor(last_message_at: datetime | None, chat_id: int) -> str:
+def _encode_chat_cursor(last_message_at: datetime | None, chat_id: int, *, pinned: bool) -> str:
+    """Курсор v2: pin (bool→int закрепление), активность по последнему сообщению."""
+    pin_ord = 1 if pinned else 0
     payload = {
+        "v": 2,
+        "p": pin_ord,
         "a": last_message_at.isoformat() if last_message_at else None,
         "c": chat_id,
     }
@@ -25,10 +29,19 @@ def _encode_chat_cursor(last_message_at: datetime | None, chat_id: int) -> str:
     return base64.urlsafe_b64encode(raw).decode()
 
 
-def _decode_chat_cursor(cursor: str) -> tuple[datetime | None, int]:
+def _decode_chat_cursor(
+    cursor: str,
+) -> tuple[int | None, datetime | None, int]:
+    """legacy: (_, la, cid) с pin=None; v2: (0|1 для cast(is_pinned), la, cid)."""
     raw = json.loads(base64.urlsafe_b64decode(cursor.encode()).decode())
+    if raw.get("v") != 2:
+        la = datetime.fromisoformat(raw["a"]) if raw.get("a") else None
+        cid = int(raw["c"])
+        return None, la, cid
+    pin = int(raw["p"])
     la = datetime.fromisoformat(raw["a"]) if raw.get("a") else None
-    return la, int(raw["c"])
+    cid = int(raw["c"])
+    return pin, la, cid
 
 
 def _build_chat_responses_batch(
@@ -124,6 +137,7 @@ def _build_chat_responses_batch(
         my_last_read = (membership.last_read_message_id or 0) if membership else 0
         is_archived = bool(getattr(membership, "is_archived", False)) if membership else False
         notifications_muted = bool(getattr(membership, "notifications_muted", False)) if membership else False
+        is_pinned = bool(getattr(membership, "is_pinned", False)) if membership else False
 
         responses.append(
             ChatResponse(
@@ -147,6 +161,7 @@ def _build_chat_responses_batch(
                 peer_last_seen_at=peer_last_seen_at,
                 is_archived=is_archived,
                 notifications_muted=notifications_muted,
+                is_pinned=is_pinned,
             )
         )
 
@@ -167,7 +182,7 @@ def list_my_chats_page(
     cursor: str | None,
     archived: bool = False,
 ) -> ChatListPage:
-    """Список чатов по активности (последнее сообщение), курсорная пагинация."""
+    """Закреплённые первыми, затем по активности (последнее сообщение); курсор v2 совместим с pin."""
     lim = max(1, min(limit, 200))
 
     last_sub = (
@@ -180,9 +195,10 @@ def list_my_chats_page(
     )
 
     sort_col = func.coalesce(last_sub.c.last_at, _EPOCH)
+    pin_ord = cast(ChatMember.is_pinned, Integer)
 
     q = (
-        db.query(Chat, last_sub.c.last_at)
+        db.query(Chat, last_sub.c.last_at, ChatMember.is_pinned)
         .join(ChatMember, ChatMember.chat_id == Chat.id)
         .outerjoin(last_sub, last_sub.c.chat_id == Chat.id)
         .filter(ChatMember.user_id == current_user.id)
@@ -190,31 +206,45 @@ def list_my_chats_page(
     )
 
     if cursor:
-        cursor_la, cursor_cid = _decode_chat_cursor(cursor)
+        pin_cursor, cursor_la, cursor_cid = _decode_chat_cursor(cursor)
         cursor_sort = cursor_la or _EPOCH
-        q = q.filter(
-            or_(
-                sort_col < cursor_sort,
-                and_(sort_col == cursor_sort, Chat.id < cursor_cid),
-            )
-        )
 
-    rows = (
-        q.order_by(desc(sort_col), desc(Chat.id)).limit(lim + 1).all()
-    )
+        if pin_cursor is None:
+            q = q.filter(
+                or_(
+                    sort_col < cursor_sort,
+                    and_(sort_col == cursor_sort, Chat.id < cursor_cid),
+                )
+            )
+        else:
+            q = q.filter(
+                or_(
+                    pin_ord < pin_cursor,
+                    and_(
+                        pin_ord == pin_cursor,
+                        or_(
+                            sort_col < cursor_sort,
+                            and_(sort_col == cursor_sort, Chat.id < cursor_cid),
+                        ),
+                    ),
+                )
+            )
+
+    rows = q.order_by(desc(pin_ord), desc(sort_col), desc(Chat.id)).limit(lim + 1).all()
 
     has_more = len(rows) > lim
     page_rows = rows[:lim]
 
     chats = _build_chat_responses_batch(
         db,
-        [chat for chat, _last_at in page_rows],
+        [chat for chat, _last_at, _p in page_rows],
         current_user,
     )
 
     next_cursor: str | None = None
     if has_more and page_rows:
-        last_chat, last_la = page_rows[-1]
-        next_cursor = _encode_chat_cursor(last_la, last_chat.id)
+        last_chat, last_la, last_pin = page_rows[-1]
+        pinned_flag = bool(last_pin)
+        next_cursor = _encode_chat_cursor(last_la, last_chat.id, pinned=pinned_flag)
 
     return ChatListPage(chats=chats, has_more=has_more, next_cursor=next_cursor)

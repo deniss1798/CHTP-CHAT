@@ -17,7 +17,11 @@ def patch_member_preferences(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if payload.is_archived is None and payload.notifications_muted is None:
+    if (
+        payload.is_archived is None
+        and payload.notifications_muted is None
+        and payload.is_pinned is None
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No fields to update",
@@ -29,6 +33,7 @@ def patch_member_preferences(
             current_user=current_user,
             is_archived=payload.is_archived,
             notifications_muted=payload.notifications_muted,
+            is_pinned=payload.is_pinned,
         )
     except ValueError as e:
         raise HTTPException(

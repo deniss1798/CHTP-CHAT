@@ -54,6 +54,9 @@ class ChatListItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final previewIcon = _listPreviewIcon(item);
     final isUnread = item.unreadCount > 0;
+    // При mute уведомлений счётчик остаётся, но акцент снимаем (как в Telegram).
+    final grayMutedUnreadBadge =
+        item.notificationsMuted && item.unreadCount > 0;
     final selected = item.isSelected;
     final subtitleColor = item.isTyping
         ? AppColors.accentBright
@@ -121,6 +124,18 @@ class ChatListItem extends StatelessWidget {
                           Expanded(
                             child: Row(
                               children: [
+                                if (item.isPinned) ...[
+                                  Transform.rotate(
+                                    angle: -0.45,
+                                    child: Icon(
+                                      Icons.push_pin,
+                                      size: 15,
+                                      color:
+                                          AppColors.navRailActiveAccent.withValues(alpha: 0.75),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                ],
                                 Flexible(
                                   child: Text(
                                     item.title,
@@ -235,17 +250,24 @@ class ChatListItem extends StatelessWidget {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                               decoration: BoxDecoration(
-                                color: AppColors.navRailActiveAccent,
+                                color: grayMutedUnreadBadge
+                                    ? const Color(0xFF3D3D3D)
+                                    : AppColors.navRailActiveAccent,
                                 borderRadius:
                                     BorderRadius.circular(AppRadius.pill),
-                                boxShadow: AppShadows.accentStroke,
+                                boxShadow: grayMutedUnreadBadge
+                                    ? null
+                                    : AppShadows.accentStroke,
                               ),
                               child: Text(
                                 item.unreadCount > 99 ? '99+' : item.unreadCount.toString(),
-                                style: const TextStyle(
-                                  color: Colors.white,
+                                style: TextStyle(
+                                  color: grayMutedUnreadBadge
+                                      ? AppColors.textSecondary
+                                      : Colors.white,
                                   fontSize: 11,
-                                  fontWeight: FontWeight.w900,
+                                  fontWeight:
+                                      grayMutedUnreadBadge ? FontWeight.w800 : FontWeight.w900,
                                 ),
                               ),
                             ),

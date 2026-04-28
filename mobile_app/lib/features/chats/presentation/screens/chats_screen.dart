@@ -197,6 +197,7 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
           isTyping: false,
           isArchived: false,
           notificationsMuted: false,
+          isPinned: false,
         ),
       );
     }
@@ -230,6 +231,7 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
           isTyping: false,
           isArchived: false,
           notificationsMuted: false,
+          isPinned: false,
         ),
       );
     }

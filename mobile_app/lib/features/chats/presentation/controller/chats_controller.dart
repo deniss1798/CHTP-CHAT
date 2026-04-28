@@ -166,11 +166,14 @@ class ChatsController extends ChangeNotifier {
     required int chatId,
     bool? isArchived,
     bool? notificationsMuted,
+    bool? isPinned,
   }) async {
     if (_state.currentUserId == null) {
       return 'Не выполнен вход';
     }
-    if (isArchived == null && notificationsMuted == null) {
+    if (isArchived == null &&
+        notificationsMuted == null &&
+        isPinned == null) {
       return 'Нет полей для обновления';
     }
     try {
@@ -178,6 +181,7 @@ class ChatsController extends ChangeNotifier {
         chatId: chatId,
         isArchived: isArchived,
         notificationsMuted: notificationsMuted,
+        isPinned: isPinned,
       );
     } catch (error, stack) {
       if (kDebugMode) {
@@ -258,6 +262,7 @@ class ChatsController extends ChangeNotifier {
         isTyping: typingLabel != null,
         isArchived: chat.isArchived,
         notificationsMuted: chat.notificationsMuted,
+        isPinned: chat.isPinned,
       );
     }).toList();
   }
@@ -635,12 +640,8 @@ class ChatsController extends ChangeNotifier {
         byId[c.id] = updated;
       }
 
-      final merged = byId.values.toList();
-      merged.sort((a, b) {
-        final aMs = serverInstantMillis(a.lastMessageAtRaw) ?? 0;
-        final bMs = serverInstantMillis(b.lastMessageAtRaw) ?? 0;
-        return bMs.compareTo(aMs);
-      });
+      final merged = byId.values.toList()
+        ..sort(compareChatSummariesListOrder);
 
       _setState(
         _state.copyWith(

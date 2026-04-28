@@ -26,6 +26,7 @@ class ChatMember(Base):
     )
     is_archived = Column(Boolean, nullable=False, server_default=sa_false())
     notifications_muted = Column(Boolean, nullable=False, server_default=sa_false())
+    is_pinned = Column(Boolean, nullable=False, server_default=sa_false())
 
     __table_args__ = (
         UniqueConstraint("chat_id", "user_id", name="uq_chat_members_chat_user"),

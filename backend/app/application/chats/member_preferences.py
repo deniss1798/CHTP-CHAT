@@ -14,12 +14,17 @@ def update_member_chat_preferences(
     current_user: User,
     is_archived: bool | None = None,
     notifications_muted: bool | None = None,
+    is_pinned: bool | None = None,
 ) -> ChatResponse:
     row = require_chat_member(db, chat_id, current_user)
     if is_archived is not None:
-        row.is_archived = is_archived
+        row.is_archived = bool(is_archived)
+    if getattr(row, "is_archived", False):
+        row.is_pinned = False
+    elif is_pinned is not None:
+        row.is_pinned = bool(is_pinned)
     if notifications_muted is not None:
-        row.notifications_muted = notifications_muted
+        row.notifications_muted = bool(notifications_muted)
     db.add(row)
     db.commit()
 

@@ -59,6 +59,7 @@ class ChatResponse(BaseModel):
     # Персонификация на участника (вы).
     is_archived: bool = False
     notifications_muted: bool = False
+    is_pinned: bool = False
 
     class Config:
         from_attributes = True
@@ -67,6 +68,7 @@ class ChatResponse(BaseModel):
 class ChatMemberPreferencesPayload(BaseModel):
     is_archived: bool | None = None
     notifications_muted: bool | None = None
+    is_pinned: bool | None = None
 
 
 class ChatListPage(BaseModel):

@@ -15,6 +15,7 @@ class ChatListItemModel {
     required this.isTyping,
     required this.isArchived,
     required this.notificationsMuted,
+    required this.isPinned,
   });
 
   final int chatId;
@@ -34,4 +35,5 @@ class ChatListItemModel {
   /// Локально для действий строки ([PATCH /chats/:id/member-preferences]).
   final bool isArchived;
   final bool notificationsMuted;
+  final bool isPinned;
 }
