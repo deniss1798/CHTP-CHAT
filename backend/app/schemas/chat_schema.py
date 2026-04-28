@@ -1,7 +1,7 @@
 from typing import Literal
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, EmailStr, Field
 
 
 class UserShort(BaseModel):
@@ -66,9 +66,25 @@ class ChatResponse(BaseModel):
 
 
 class ChatMemberPreferencesPayload(BaseModel):
-    is_archived: bool | None = None
-    notifications_muted: bool | None = None
-    is_pinned: bool | None = None
+    """PATCH /chats/{id}/member-preferences: принимаем snake_case и camelCase."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    is_archived: bool | None = Field(
+        default=None,
+        validation_alias=AliasChoices("is_archived", "isArchived"),
+    )
+    notifications_muted: bool | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "notifications_muted",
+            "notificationsMuted",
+        ),
+    )
+    is_pinned: bool | None = Field(
+        default=None,
+        validation_alias=AliasChoices("is_pinned", "isPinned"),
+    )
 
 
 class ChatListPage(BaseModel):

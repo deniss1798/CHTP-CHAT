@@ -80,7 +80,10 @@ class ChatsService {
         if (isPinned != null) 'is_pinned': isPinned,
       },
       options: Options(
-        headers: {'Authorization': 'Bearer $token'},
+        headers: {
+          'Authorization': 'Bearer $token',
+          Headers.contentTypeHeader: Headers.jsonContentType,
+        },
       ),
     );
     final data = response.data;
