@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 
+import json
+
 from firebase_admin import messaging
 from sqlalchemy.orm import Session
 
@@ -196,6 +198,83 @@ def send_chat_message_push(
             messaging.send(msg)
         except Exception as e:
             print(f"Push send failed for token id={item.id}: {e}")
+            if _is_invalid_fcm_token_error(e):
+                item.is_active = False
+                db.commit()
+
+
+def send_incoming_call_fallback_push_to_user(
+    db: Session,
+    *,
+    recipient_user_id: int,
+    chat_id: int,
+    call_signal_type: str,
+    caller_display_name: str,
+    call_payload: dict,
+) -> None:
+    """
+    FCM, если у пользователя нет активного /ws/inbox (приложение свёрнуто / убито).
+    Клиент без WebSocket может принять звонок по тем же данным, что раздаёт inbox.
+    """
+    try:
+        get_firebase_app()
+    except RuntimeError as e:
+        print(f"[push] Firebase not configured, skip incoming-call: {e}")
+        return
+
+    disabled = (
+        db.query(NotificationSetting.user_id)
+        .filter(
+            NotificationSetting.user_id == recipient_user_id,
+            NotificationSetting.notifications_enabled.is_(False),
+        )
+        .first()
+    )
+    if disabled is not None:
+        return
+
+    tokens = (
+        db.query(DeviceToken)
+        .filter(
+            DeviceToken.user_id == recipient_user_id,
+            DeviceToken.is_active.is_(True),
+        )
+        .all()
+    )
+    if not tokens:
+        return
+
+    body = caller_display_name.strip() or ("Собеседник" if call_signal_type == "call_e2e_init" else "Участник")
+
+    invite_json = json.dumps(call_payload, default=str)
+
+    base_data = {
+        "type": "incoming_call",
+        "call_signal_type": call_signal_type,
+        "chat_id": str(chat_id),
+        "caller_name": body[:160],
+        "invite_json": invite_json[:3800],
+    }
+
+    for item in tokens:
+        try:
+            data_flat = {k: str(v) for k, v in base_data.items()}
+            msg = messaging.Message(
+                token=item.token,
+                data=data_flat,
+                android=messaging.AndroidConfig(priority="high"),
+                apns=messaging.APNSConfig(
+                    payload=messaging.APNSPayload(
+                        aps=messaging.Aps(
+                            sound="default",
+                            content_available=True,
+                        ),
+                    ),
+                ),
+            )
+            messaging.send(msg)
+        except Exception as e:
+            print(f"Incoming-call push failed for token id={item.id}: {e}")
             if _is_invalid_fcm_token_error(e):
                 item.is_active = False
                 db.commit()

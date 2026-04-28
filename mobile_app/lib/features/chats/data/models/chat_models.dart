@@ -96,6 +96,15 @@ class ChatDetail {
   }
 }
 
+bool _asBool(Object? value) {
+  if (value == null) return false;
+  if (value is bool) return value;
+  final s = value.toString().trim().toLowerCase();
+  if (s == 'true' || s == '1') return true;
+  if (s == 'false' || s == '0') return false;
+  return false;
+}
+
 class ChatSummary {
   const ChatSummary({
     required this.id,
@@ -112,6 +121,8 @@ class ChatSummary {
     required this.myLastReadMessageId,
     required this.unreadCount,
     this.peerLastSeenAtRaw,
+    this.isArchived = false,
+    this.notificationsMuted = false,
   });
 
   final int id;
@@ -128,6 +139,10 @@ class ChatSummary {
   final int myLastReadMessageId;
   final int unreadCount;
   final String? peerLastSeenAtRaw;
+
+  /// Персонификация участника ([PATCH /chats/:id/member-preferences]).
+  final bool isArchived;
+  final bool notificationsMuted;
 
   factory ChatSummary.fromApi(Map<String, dynamic> raw) {
     final id = _asInt(raw['id'] ?? raw['chat_id']);
@@ -180,6 +195,10 @@ class ChatSummary {
       peerLastSeenAtRaw: _asTrimmedString(
         raw['peer_last_seen_at'] ?? raw['peerLastSeenAt'],
       ),
+      isArchived:
+          _asBool(raw['is_archived'] ?? raw['isArchived']),
+      notificationsMuted:
+          _asBool(raw['notifications_muted'] ?? raw['notificationsMuted']),
     );
   }
 
@@ -195,6 +214,8 @@ class ChatSummary {
     int? myLastReadMessageId,
     int? unreadCount,
     String? peerLastSeenAtRaw,
+    bool? isArchived,
+    bool? notificationsMuted,
   }) {
     return ChatSummary(
       id: id,
@@ -212,6 +233,8 @@ class ChatSummary {
       myLastReadMessageId: myLastReadMessageId ?? this.myLastReadMessageId,
       unreadCount: unreadCount ?? this.unreadCount,
       peerLastSeenAtRaw: peerLastSeenAtRaw ?? this.peerLastSeenAtRaw,
+      isArchived: isArchived ?? this.isArchived,
+      notificationsMuted: notificationsMuted ?? this.notificationsMuted,
     );
   }
 }

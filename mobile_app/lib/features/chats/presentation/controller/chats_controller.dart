@@ -8,7 +8,6 @@ import '../../../../core/formatting/server_time.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/notifiers/chats_list_refresh_notifier.dart';
 import '../../../../core/notifiers/open_chat_state_notifier.dart';
-import '../../../../core/notifiers/open_chat_sync_notifier.dart';
 import '../../../../core/push/local_notifications_service.dart';
 import '../../../../core/push/notification_preferences.dart';
 import '../../../../core/realtime/chat_ws_contract.dart';
@@ -144,12 +143,49 @@ class ChatsController extends ChangeNotifier {
 
   void setListFilter(ChatsListFilter filter) {
     if (_state.listFilter == filter) return;
+    final wasArchived = _state.listFilter == ChatsListFilter.archive;
+    final nowArchived = filter == ChatsListFilter.archive;
     _setState(_state.copyWith(listFilter: filter));
+    if (wasArchived != nowArchived) {
+      unawaited(refresh(silent: true));
+    }
+  }
+
+  bool _listFetchArchived() => _state.listFilter == ChatsListFilter.archive;
+
+  bool isChatNotificationsMuted(int chatId) {
+    for (final c in _state.allChats) {
+      if (c.id == chatId) return c.notificationsMuted;
+    }
+    return false;
+  }
+
+  Future<void> patchMemberPreferences({
+    required int chatId,
+    bool? isArchived,
+    bool? notificationsMuted,
+  }) async {
+    if (_state.currentUserId == null) return;
+    if (isArchived == null && notificationsMuted == null) return;
+    try {
+      await _chatsService.patchChatMemberPreferences(
+        chatId: chatId,
+        isArchived: isArchived,
+        notificationsMuted: notificationsMuted,
+      );
+      await refresh(silent: true);
+    } catch (error, stack) {
+      if (kDebugMode) {
+        debugPrint('patchMemberPreferences failed: $error\n$stack');
+      }
+    }
   }
 
   bool _chatMatchesListFilter(ChatSummary c) {
     switch (_state.listFilter) {
       case ChatsListFilter.all:
+        return true;
+      case ChatsListFilter.archive:
         return true;
       case ChatsListFilter.unread:
         return resolveUnreadCount(
@@ -205,6 +241,8 @@ class ChatsController extends ChangeNotifier {
             resolvePeerOnlineFromLastSeen(chat.peerLastSeenAtRaw),
         isSelected: selectedChatId != null && chat.id == selectedChatId,
         isTyping: typingLabel != null,
+        isArchived: chat.isArchived,
+        notificationsMuted: chat.notificationsMuted,
       );
     }).toList();
   }
@@ -221,6 +259,7 @@ class ChatsController extends ChangeNotifier {
         currentUserId: _state.currentUserId!,
         limit: 50,
         cursor: null,
+        archived: _listFetchArchived(),
       );
       var chats = page.chats;
       final localReads = await _localChatStateService.getAllLastReadMessageIds();
@@ -357,6 +396,12 @@ class ChatsController extends ChangeNotifier {
     }
   }
 
+  bool _isUserViewingThisChat(Map<String, dynamic> message) {
+    final chatId = _parseInt(message['chat_id']);
+    if (chatId == null) return false;
+    return (isChatOpen?.call(chatId) ?? false) || isChatOpenNow(chatId);
+  }
+
   void _onInboxMessage(Map<String, dynamic> message) {
     final type = message['type']?.toString();
 
@@ -366,6 +411,10 @@ class ChatsController extends ChangeNotifier {
     }
 
     if (type == 'group_call_invite') {
+      // Иначе первым сработает inbox → VoiceCallRing «съест» id, а UI в открытом чате не покажется.
+      if (_isUserViewingThisChat(message)) {
+        return;
+      }
       if (onGroupCallInvite != null) {
         unawaited(onGroupCallInvite!(message));
       }
@@ -381,6 +430,9 @@ class ChatsController extends ChangeNotifier {
     }
 
     if (type == 'call_e2e_init') {
+      if (_isUserViewingThisChat(message)) {
+        return;
+      }
       if (onPrivateCallInvite != null) {
         unawaited(onPrivateCallInvite!(message));
       }
@@ -400,7 +452,8 @@ class ChatsController extends ChangeNotifier {
         requestOpenChatMessagesSync(chatId);
       }
       final notificationsEnabled = await NotificationPreferences.areEnabled();
-      if (!viewingThis && notificationsEnabled && LocalNotificationsService.supported) {
+      final mutedForChat = isChatNotificationsMuted(chatId);
+      if (!viewingThis && notificationsEnabled && !mutedForChat && LocalNotificationsService.supported) {
         final sender = (message['sender_name'] ?? '').toString().trim();
         final preview = (message['preview'] ?? '').toString().trim();
         final avatarUrl = (message['chat_avatar_url'] ?? '').toString().trim();
@@ -543,6 +596,7 @@ class ChatsController extends ChangeNotifier {
         currentUserId: _state.currentUserId!,
         limit: 50,
         cursor: cursor,
+        archived: _listFetchArchived(),
       );
       final localReads = await _localChatStateService.getAllLastReadMessageIds();
 

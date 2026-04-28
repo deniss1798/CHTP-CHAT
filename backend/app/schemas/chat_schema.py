@@ -56,8 +56,17 @@ class ChatResponse(BaseModel):
     # Для личных чатов — last_seen собеседника (индикатор «в сети» в списке).
     peer_last_seen_at: datetime | None = None
 
+    # Персонификация на участника (вы).
+    is_archived: bool = False
+    notifications_muted: bool = False
+
     class Config:
         from_attributes = True
+
+
+class ChatMemberPreferencesPayload(BaseModel):
+    is_archived: bool | None = None
+    notifications_muted: bool | None = None
 
 
 class ChatListPage(BaseModel):

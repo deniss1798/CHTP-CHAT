@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -8,9 +9,10 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../../app/app.dart';
 import 'open_chat_from_push.dart';
+import 'present_incoming_call_from_invite.dart';
 
 /// Локальные уведомления (foreground FCM). Только Android: плагин для Windows
-/// (flutter_local_notifications ≥19) ломает AOT-сборку (`NativeLaunchDetails` / gen_snapshot).
+/// (flutter_local_notifications ≥19) ломает AOT-сборку (`NativeLaunchDetails` / gen_snapshot`).
 class LocalNotificationsService {
   LocalNotificationsService._();
   static final LocalNotificationsService instance = LocalNotificationsService._();
@@ -35,15 +37,25 @@ class LocalNotificationsService {
       onDidReceiveNotificationResponse: _onNotificationResponse,
     );
 
-    const channel = AndroidNotificationChannel(
+    final androidImpl = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+
+    const channelMessages = AndroidNotificationChannel(
       'chat_messages',
       'Сообщения',
       description: 'Входящие сообщения',
       importance: Importance.high,
     );
-    final androidImpl = _plugin.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
-    await androidImpl?.createNotificationChannel(channel);
+    const channelIncomingCall = AndroidNotificationChannel(
+      'incoming_calls_v1',
+      'Звонки',
+      description: 'Входящие голосовые и групповые звонки',
+      importance: Importance.max,
+      playSound: true,
+    );
+
+    await androidImpl?.createNotificationChannel(channelMessages);
+    await androidImpl?.createNotificationChannel(channelIncomingCall);
 
     _initialized = true;
   }
@@ -53,6 +65,14 @@ class LocalNotificationsService {
     if (raw == null || raw.isEmpty) return;
     try {
       final map = jsonDecode(raw) as Map<String, dynamic>;
+      final kind = map['kind']?.toString();
+      if (kind == 'incoming_call') {
+        final ij = map['invite_json']?.toString();
+        if (ij == null || ij.isEmpty) return;
+        final invite = jsonDecode(ij) as Map<String, dynamic>;
+        unawaited(presentIncomingCallFromInviteMap(invite));
+        return;
+      }
       final cid = int.tryParse(map['c']?.toString() ?? '');
       if (cid == null) return;
       final av = map['a']?.toString();
@@ -95,6 +115,7 @@ class LocalNotificationsService {
     if (!supported || !_initialized) return;
 
     final payload = jsonEncode({
+      'kind': 'chat',
       'c': chatId,
       if (avatarUrlForOpen != null && avatarUrlForOpen.isNotEmpty) 'a': avatarUrlForOpen,
     });
@@ -121,6 +142,40 @@ class LocalNotificationsService {
       notificationId,
       title,
       body,
+      details,
+      payload: payload,
+    );
+  }
+
+  /// Свой трей-превью, когда приложение было в фоне и FCM доставило только через isolate.
+  Future<void> showIncomingCallTrayFromFcmStrings({
+    required String title,
+    required String subtitle,
+    required String inviteJson,
+  }) async {
+    if (!supported || !_initialized) return;
+    final id = inviteJson.hashCode.abs() % 2000000000;
+    final payload = jsonEncode({
+      'kind': 'incoming_call',
+      'invite_json': inviteJson,
+    });
+    final details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        'incoming_calls_v1',
+        'Звонки',
+        channelDescription: 'Входящие голосовые и групповые звонки',
+        importance: Importance.max,
+        priority: Priority.max,
+        category: AndroidNotificationCategory.call,
+        playSound: true,
+        visibility: NotificationVisibility.public,
+        styleInformation: BigTextStyleInformation(subtitle.isNotEmpty ? subtitle : title),
+      ),
+    );
+    await _plugin.show(
+      id,
+      title,
+      subtitle.isNotEmpty ? subtitle : title,
       details,
       payload: payload,
     );

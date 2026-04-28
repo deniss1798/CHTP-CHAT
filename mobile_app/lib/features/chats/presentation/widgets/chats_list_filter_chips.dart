@@ -36,6 +36,12 @@ class ChatsListFilterChips extends StatelessWidget {
             selected: value == ChatsListFilter.groups,
             onTap: () => onChanged(ChatsListFilter.groups),
           ),
+          const SizedBox(width: 8),
+          _Chip(
+            label: 'Архив',
+            selected: value == ChatsListFilter.archive,
+            onTap: () => onChanged(ChatsListFilter.archive),
+          ),
         ],
       ),
     );

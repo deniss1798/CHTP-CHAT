@@ -11,6 +11,7 @@ class ChatsList extends StatelessWidget {
     required this.embedded,
     required this.onRefresh,
     required this.onTap,
+    this.onLongPress,
     this.bottomPadding,
   });
 
@@ -18,6 +19,7 @@ class ChatsList extends StatelessWidget {
   final bool embedded;
   final Future<void> Function() onRefresh;
   final ValueChanged<ChatListItemModel> onTap;
+  final void Function(ChatListItemModel item)? onLongPress;
   final double? bottomPadding;
 
   @override
@@ -39,6 +41,8 @@ class ChatsList extends StatelessWidget {
           return ChatListItem(
             item: item,
             onTap: () => onTap(item),
+            onLongPress:
+                onLongPress != null ? () => onLongPress!(item) : null,
           );
         },
       ),

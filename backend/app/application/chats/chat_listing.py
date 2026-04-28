@@ -122,6 +122,8 @@ def _build_chat_responses_batch(
 
         membership = membership_by_chat.get(chat_id)
         my_last_read = (membership.last_read_message_id or 0) if membership else 0
+        is_archived = bool(getattr(membership, "is_archived", False)) if membership else False
+        notifications_muted = bool(getattr(membership, "notifications_muted", False)) if membership else False
 
         responses.append(
             ChatResponse(
@@ -143,6 +145,8 @@ def _build_chat_responses_batch(
                 my_last_read_message_id=my_last_read,
                 unread_count=unread_by_chat.get(chat_id, 0),
                 peer_last_seen_at=peer_last_seen_at,
+                is_archived=is_archived,
+                notifications_muted=notifications_muted,
             )
         )
 
@@ -161,6 +165,7 @@ def list_my_chats_page(
     *,
     limit: int,
     cursor: str | None,
+    archived: bool = False,
 ) -> ChatListPage:
     """Список чатов по активности (последнее сообщение), курсорная пагинация."""
     lim = max(1, min(limit, 200))
@@ -181,6 +186,7 @@ def list_my_chats_page(
         .join(ChatMember, ChatMember.chat_id == Chat.id)
         .outerjoin(last_sub, last_sub.c.chat_id == Chat.id)
         .filter(ChatMember.user_id == current_user.id)
+        .filter(ChatMember.is_archived.is_(archived))
     )
 
     if cursor:

@@ -12,6 +12,7 @@ class ChatsService {
     required int currentUserId,
     int limit = 50,
     String? cursor,
+    bool archived = false,
   }) async {
     final token = await SecureStorageService.getAccessToken();
 
@@ -23,6 +24,7 @@ class ChatsService {
       '/chats/',
       queryParameters: {
         'limit': limit,
+        if (archived) 'archived': true,
         if (cursor != null && cursor.isNotEmpty) 'cursor': cursor,
       },
       options: Options(
@@ -60,6 +62,38 @@ class ChatsService {
     }
 
     throw Exception('Неожиданный формат ответа /chats/');
+  }
+
+  Future<ChatSummary> patchChatMemberPreferences({
+    required int chatId,
+    bool? isArchived,
+    bool? notificationsMuted,
+  }) async {
+    if (isArchived == null && notificationsMuted == null) {
+      throw ArgumentError('Нет полей для обновления');
+    }
+    final token = await SecureStorageService.getAccessToken();
+    if (token == null || token.isEmpty) {
+      throw Exception('Токен не найден');
+    }
+    final response = await _dio.patch(
+      '/chats/$chatId/member-preferences',
+      data: {
+        if (isArchived != null) 'is_archived': isArchived,
+        if (notificationsMuted != null) 'notifications_muted': notificationsMuted,
+      },
+      options: Options(
+        headers: {'Authorization': 'Bearer $token'},
+      ),
+    );
+    final data = response.data;
+    if (data is Map<String, dynamic>) {
+      return ChatSummary.fromApi(data);
+    }
+    if (data is Map) {
+      return ChatSummary.fromApi(Map<String, dynamic>.from(data));
+    }
+    throw Exception('Неожиданный ответ PATCH member-preferences');
   }
 
   ChatListPageResult _chatListPageFromMap(Map<String, dynamic> data) {

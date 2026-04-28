@@ -1,4 +1,4 @@
-from sqlalchemy import BigInteger, Column, ForeignKey, Index, String, TIMESTAMP, func, UniqueConstraint
+from sqlalchemy import BigInteger, Boolean, Column, false as sa_false, ForeignKey, Index, String, TIMESTAMP, func, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from app.db.database import Base
@@ -24,6 +24,8 @@ class ChatMember(Base):
         nullable=True,
         index=True,
     )
+    is_archived = Column(Boolean, nullable=False, server_default=sa_false())
+    notifications_muted = Column(Boolean, nullable=False, server_default=sa_false())
 
     __table_args__ = (
         UniqueConstraint("chat_id", "user_id", name="uq_chat_members_chat_user"),

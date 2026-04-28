@@ -43,10 +43,12 @@ class ChatListItem extends StatelessWidget {
     super.key,
     required this.item,
     required this.onTap,
+    this.onLongPress,
   });
 
   final ChatListItemModel item;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -57,11 +59,15 @@ class ChatListItem extends StatelessWidget {
         ? AppColors.accentBright
         : (isUnread ? AppColors.textPrimary : AppColors.textSecondary);
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
+    return GestureDetector(
+      onSecondaryTap: onLongPress,
+      behavior: HitTestBehavior.translucent,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          onLongPress: onLongPress,
+          borderRadius: BorderRadius.circular(14),
         child: Container(
           decoration: BoxDecoration(
             gradient: selected
@@ -113,16 +119,32 @@ class ChatListItem extends StatelessWidget {
                       Row(
                         children: [
                           Expanded(
-                            child: Text(
-                              item.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: AppColors.textPrimary,
-                                fontSize: 15,
-                                fontWeight: isUnread ? FontWeight.w800 : FontWeight.w700,
-                                letterSpacing: -0.25,
-                              ),
+                            child: Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    item.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: AppColors.textPrimary,
+                                      fontSize: 15,
+                                      fontWeight: isUnread
+                                          ? FontWeight.w800
+                                          : FontWeight.w700,
+                                      letterSpacing: -0.25,
+                                    ),
+                                  ),
+                                ),
+                                if (item.notificationsMuted) ...[
+                                  const SizedBox(width: 6),
+                                  Icon(
+                                    Icons.notifications_off_outlined,
+                                    size: 16,
+                                    color: AppColors.textMuted,
+                                  ),
+                                ],
+                              ],
                             ),
                           ),
                           if (item.timeLabel.isNotEmpty)
@@ -237,6 +259,7 @@ class ChatListItem extends StatelessWidget {
             ),
           ),
         ),
+      ),
       ),
     );
   }

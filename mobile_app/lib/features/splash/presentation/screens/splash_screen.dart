@@ -9,6 +9,7 @@ import '../../../../app/theme/design_tokens.dart';
 import '../../../../app/widgets/app_screen_background.dart';
 import '../../../../app/widgets/app_surface.dart';
 import '../../../../core/push/open_chat_from_push.dart';
+import '../../../../core/push/present_incoming_call_from_invite.dart';
 import '../../../../core/storage/secure_storage_service.dart';
 import '../../../auth/data/services/auth_service.dart';
 import '../../../calls/data/ice_config_service.dart';
@@ -56,13 +57,19 @@ class _SplashScreenState extends State<SplashScreen> {
         MaterialPageRoute(builder: (_) => buildHomeChatsScreen()),
       );
 
-      final push = pendingPush;
-      if (push != null) {
+      if (pendingPush?.incomingCallInvite != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          Future<void>.delayed(
-            const Duration(milliseconds: 120),
-            () => openChatFromPushPayload(push),
-          );
+          Future.delayed(const Duration(milliseconds: 120), () {
+            unawaited(
+              presentIncomingCallFromInviteMap(pendingPush!.incomingCallInvite!),
+            );
+          });
+        });
+      } else if (pendingPush != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Future.delayed(const Duration(milliseconds: 120), () {
+            openChatFromPushPayload(pendingPush);
+          });
         });
       }
     } else {

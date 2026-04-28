@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.application.realtime.event_payload import realtime_event
 from app.core.rate_limit import WS_CONNECT_RULE, rate_limiter, websocket_client_ip
+from app.core.push_service import send_incoming_call_fallback_push_to_user
 from app.core.security import decode_ws_or_access_token
 from app.core.ws_manager import inbox_manager, manager
 from app.db.database import SessionLocal
@@ -135,6 +136,13 @@ async def websocket_chat(
                 # SDP/ICE не дублируем в inbox: при открытом чате + inbox — двойная доставка
                 # ломает WebRTC (setRemoteDescription, обрыв медиа).
                 if msg_type not in ("group_call_sdp", "group_call_ice"):
+                    caller_row_for_push = db.query(User).filter(User.id == user_id).first()
+                    caller_display_name = ""
+                    if caller_row_for_push is not None:
+                        caller_display_name = (caller_row_for_push.username or "").strip()
+                    if not caller_display_name:
+                        caller_display_name = str(user_id)
+
                     member_ids = (
                         db.query(ChatMember.user_id)
                         .filter(ChatMember.chat_id == chat_id)
@@ -142,7 +150,30 @@ async def websocket_chat(
                     )
                     for (member_uid,) in member_ids:
                         if member_uid != user_id:
-                            await inbox_manager.send_json(member_uid, call_payload)
+                            inbox_ok = await inbox_manager.send_json(
+                                member_uid, call_payload
+                            )
+                            if msg_type not in ("call_e2e_init", "group_call_invite"):
+                                continue
+                            if inbox_ok:
+                                continue
+                            try:
+                                send_incoming_call_fallback_push_to_user(
+                                    db,
+                                    recipient_user_id=member_uid,
+                                    chat_id=chat_id,
+                                    call_signal_type=msg_type,
+                                    caller_display_name=caller_display_name,
+                                    call_payload=dict(call_payload),
+                                )
+                            except Exception as exc:
+                                logger.warning(
+                                    "push fallback call_signal chat_id=%s type=%s to=%s: %s",
+                                    chat_id,
+                                    msg_type,
+                                    member_uid,
+                                    exc,
+                                )
     except WebSocketDisconnect:
         manager.disconnect(chat_id, websocket)
     finally:

@@ -21,7 +21,8 @@ class InboxConnectionManager:
         if self._user_id_to_ws.get(user_id) is websocket:
             del self._user_id_to_ws[user_id]
 
-    async def send_json(self, user_id: int, message: dict) -> None:
+    async def send_json(self, user_id: int, message: dict) -> bool:
+        """True, если сообщение ушло по WebSocket; False, если соединения не было."""
         ws = self._user_id_to_ws.get(user_id)
         if not ws:
             t = message.get("type")
@@ -33,11 +34,13 @@ class InboxConnectionManager:
                     user_id,
                     t,
                 )
-            return
+            return False
         try:
             await ws.send_json(message)
+            return True
         except Exception:
             self.disconnect(user_id, ws)
+            return False
 
 
 class ConnectionManager:

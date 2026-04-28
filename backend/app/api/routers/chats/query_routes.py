@@ -21,8 +21,14 @@ def get_my_chats(
         default=None,
         description="Курсор следующей страницы (next_cursor с предыдущего ответа)",
     ),
+    archived: bool = Query(
+        default=False,
+        description="true — только архивные чаты",
+    ),
 ):
-    return list_my_chats_page(db, current_user, limit=limit, cursor=cursor)
+    return list_my_chats_page(
+        db, current_user, limit=limit, cursor=cursor, archived=archived
+    )
 
 
 @router.post("/", response_model=ChatResponse)

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -12,6 +13,7 @@ import 'core/notifiers/open_chat_state_notifier.dart';
 import 'core/push/local_notifications_service.dart';
 import 'core/push/notification_preferences.dart';
 import 'core/push/open_chat_from_push.dart';
+import 'core/push/present_incoming_call_from_invite.dart';
 import 'firebase_options.dart';
 
 bool get _firebasePushSupported {
@@ -31,7 +33,25 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
   await NotificationPreferences.load();
-  print('Background message: ${message.messageId}');
+  if (LocalNotificationsService.supported) {
+    await LocalNotificationsService.instance.init();
+    final data = message.data;
+    if (data['type']?.toString() == 'incoming_call') {
+      final ij = data['invite_json']?.toString();
+      if (ij != null && ij.isNotEmpty) {
+        final title = (message.notification?.title ??
+                data['caller_name']?.toString() ??
+                'Звонок')
+            .trim();
+        final sub = (message.notification?.body ?? '').trim();
+        await LocalNotificationsService.instance.showIncomingCallTrayFromFcmStrings(
+          title: title.isNotEmpty ? title : 'Звонок',
+          subtitle: sub,
+          inviteJson: ij,
+        );
+      }
+    }
+  }
 }
 
 Future<void> main() async {
@@ -81,44 +101,73 @@ Future<void> _initPush() async {
 
   FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
     requestChatsListRefresh();
-    if (defaultTargetPlatform == TargetPlatform.android) {
-      if (!await NotificationPreferences.areEnabled()) {
-        return;
-      }
-      final data = message.data;
-      final chatId = _extractChatId(data);
-      if (chatId != null) {
-        if (isChatOpenNow(chatId)) {
-          return;
-        }
-        final n = message.notification;
-        final titleRaw = (n?.title ?? '').trim();
-        final bodyRaw = (n?.body ?? '').trim();
-        final title = titleRaw.isNotEmpty
-            ? n!.title!
-            : (data['sender_name']?.toString() ?? 'Чат');
-        final body =
-            bodyRaw.isNotEmpty ? n!.body! : 'Новое сообщение';
-        final av = _extractChatAvatarUrl(data);
+    if (defaultTargetPlatform != TargetPlatform.android) {
+      return;
+    }
+    if (!await NotificationPreferences.areEnabled()) {
+      return;
+    }
+    final data = message.data;
+
+    if (data['type']?.toString() == 'incoming_call') {
+      final ij = data['invite_json']?.toString();
+      if (ij != null && ij.isNotEmpty) {
+        final title = (message.notification?.title ??
+                data['caller_name']?.toString() ??
+                'Звонок')
+            .trim();
+        final sub = (message.notification?.body ?? '').trim();
         unawaited(
-          LocalNotificationsService.instance.showChatMessage(
-            notificationId: chatId,
-            title: title,
-            body: body,
-            avatarUrl: av,
-            chatId: chatId,
-            avatarUrlForOpen: av,
+          LocalNotificationsService.instance.showIncomingCallTrayFromFcmStrings(
+            title: title.isNotEmpty ? title : 'Звонок',
+            subtitle: sub,
+            inviteJson: ij,
           ),
         );
       }
+      return;
+    }
+
+    final chatId = _extractChatId(data);
+    if (chatId != null) {
+      if (isChatOpenNow(chatId)) {
+        return;
+      }
+      final n = message.notification;
+      final titleRaw = (n?.title ?? '').trim();
+      final bodyRaw = (n?.body ?? '').trim();
+      final title = titleRaw.isNotEmpty
+          ? n!.title!
+          : (data['sender_name']?.toString() ?? 'Чат');
+      final body = bodyRaw.isNotEmpty ? n!.body! : 'Новое сообщение';
+      final av = _extractChatAvatarUrl(data);
+      unawaited(
+        LocalNotificationsService.instance.showChatMessage(
+          notificationId: chatId,
+          title: title,
+          body: body,
+          avatarUrl: av,
+          chatId: chatId,
+          avatarUrlForOpen: av,
+        ),
+      );
     }
   });
 
   FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
     final payload = _pendingPushFromMessageData(message.data);
-    if (payload != null) {
-      openChatFromPushPayload(payload);
+    if (payload == null) return;
+    if (payload.incomingCallInvite != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Future<void>.delayed(const Duration(milliseconds: 80), () {
+          unawaited(
+            presentIncomingCallFromInviteMap(payload.incomingCallInvite!),
+          );
+        });
+      });
+      return;
     }
+    openChatFromPushPayload(payload);
   });
 }
 
@@ -136,6 +185,24 @@ String? _extractChatAvatarUrl(Map<String, dynamic> data) {
 }
 
 PendingPushPayload? _pendingPushFromMessageData(Map<String, dynamic> data) {
+  if (data['type']?.toString() == 'incoming_call') {
+    final ij = data['invite_json']?.toString();
+    if (ij == null || ij.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(ij);
+      if (decoded is! Map) return null;
+      final invite = Map<String, dynamic>.from(decoded);
+      final chatId = incomingCallInviteChatId(invite) ?? _extractChatId(data);
+      if (chatId == null) return null;
+      return PendingPushPayload(
+        chatId: chatId,
+        incomingCallInvite: invite,
+        avatarUrl: _extractChatAvatarUrl(data),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
   final chatId = _extractChatId(data);
   if (chatId == null) return null;
   return PendingPushPayload(

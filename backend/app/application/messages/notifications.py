@@ -2,6 +2,9 @@ import logging
 
 from sqlalchemy.orm import Session
 
+from app.application.messages.chat_recipients import (
+    filter_recipients_excluding_chat_muted,
+)
 from app.application.messages.inbox_delivery import notify_inbox_new_message
 from app.core.push_service import send_chat_message_push
 
@@ -16,12 +19,15 @@ async def deliver_new_message_notifications(
     preview: str,
     recipient_user_ids: list[int],
 ) -> None:
+    push_recipients = filter_recipients_excluding_chat_muted(
+        db, chat_id, recipient_user_ids
+    )
     try:
         send_chat_message_push(
             db=db,
             chat_id=chat_id,
             sender_name=sender_name,
-            recipient_user_ids=recipient_user_ids,
+            recipient_user_ids=push_recipients,
             message_text=preview,
         )
     except Exception:
