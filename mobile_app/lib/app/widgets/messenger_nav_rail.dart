@@ -41,7 +41,7 @@ class MessengerNavRail extends StatelessWidget {
     }
 
     // Без Column+Spacer: на web/отдельных кадрах Spacer схлопывался.
-    // Сверху — логотип и три пункта, снизу — профиль; при малой высоте — скролл.
+    // Сверху — пункты навигации, снизу — профиль; при малой высоте — скролл.
     if (h < 240) {
       return Container(
         width: _width,
@@ -58,9 +58,7 @@ class MessengerNavRail extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 12),
-              _brandHeader(),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
               _navItems(),
               const SizedBox(height: 12),
               const _NavProfileFooter(),
@@ -92,9 +90,7 @@ class MessengerNavRail extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(height: 12),
-                _brandHeader(),
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
                 _navItems(),
               ],
             ),
@@ -140,50 +136,6 @@ class MessengerNavRail extends StatelessWidget {
     );
   }
 
-  Widget _brandHeader() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 4),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.navRailActiveAccent,
-          width: 1.2,
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
-            decoration: BoxDecoration(
-              color: AppColors.navRailActiveAccent,
-              borderRadius: BorderRadius.circular(5),
-            ),
-            child: const Text(
-              'ЧТП',
-              style: TextStyle(
-                color: Color(0xFF1A0A00),
-              fontSize: 9.5,
-                fontWeight: FontWeight.w900,
-                height: 1,
-              ),
-            ),
-          ),
-          const SizedBox(width: 5),
-          const Text(
-            'ЧАТ',
-            style: TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              height: 1,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
 }
 
 class _NavProfileFooter extends StatelessWidget {
@@ -201,7 +153,7 @@ class _NavProfileFooter extends StatelessWidget {
           if (n.isNotEmpty) display = n;
         }
 
-        const avatarSize = 40.0;
+        const avatarSize = 44.0;
         final raw = u?['avatar_url'] ?? u?['avatarUrl'];
         final imageUrl = UrlHelper.absoluteMediaUrl(raw);
         final safe = (imageUrl ?? '').trim();
@@ -244,18 +196,36 @@ class _NavProfileFooter extends StatelessWidget {
 
         return Padding(
           key: ValueKey<int>(value),
-          padding: const EdgeInsets.symmetric(horizontal: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 6),
           child: Material(
             color: Colors.transparent,
             child: InkWell(
               onTap: open,
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
+              borderRadius: BorderRadius.circular(14),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
                 width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(6, 10, 6, 10),
+                padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
                 decoration: BoxDecoration(
-                  color: AppColors.chatListCard,
-                  borderRadius: BorderRadius.circular(12),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      AppColors.chatListCard.withValues(alpha: 0.94),
+                      AppColors.chatListCard.withValues(alpha: 0.76),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: AppColors.strokeSoft.withValues(alpha: 0.55),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.35),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -263,48 +233,46 @@ class _NavProfileFooter extends StatelessWidget {
                     Stack(
                       clipBehavior: Clip.none,
                       children: [
-                        avatar,
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: AppColors.navRailActiveAccent.withValues(alpha: 0.35),
+                              width: 1.8,
+                            ),
+                          ),
+                          child: avatar,
+                        ),
                         Positioned(
                           right: -0.5,
                           bottom: -0.5,
                           child: Container(
-                            width: 11,
-                            height: 11,
+                            width: 12,
+                            height: 12,
                             decoration: BoxDecoration(
                               color: const Color(0xFF2ECC71),
                               shape: BoxShape.circle,
                               border: Border.all(
                                 color: AppColors.navRailBackground,
-                                width: 1.5,
+                                width: 2,
                               ),
                             ),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            display,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.start,
-                            style: const TextStyle(
-                              color: AppColors.textPrimary,
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w600,
-                              height: 1.1,
-                            ),
-                          ),
-                        ),
-                        Icon(
-                          Icons.chevron_right_rounded,
-                          size: 18,
-                          color: AppColors.textSecondary.withValues(alpha: 0.9),
-                        ),
-                      ],
+                    const SizedBox(height: 8),
+                    Text(
+                      display,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        height: 1.12,
+                      ),
                     ),
                   ],
                 ),

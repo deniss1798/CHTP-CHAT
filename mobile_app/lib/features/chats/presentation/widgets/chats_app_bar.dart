@@ -2,101 +2,88 @@ import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_icons.dart';
-import '../../../../app/theme/design_tokens.dart';
 import '../../../../app/widgets/app_surface.dart';
 
 class ChatsAppBar extends StatelessWidget {
   const ChatsAppBar({
     super.key,
     this.onOpenSettings,
-    this.shellListMode = false,
   });
 
   final Future<void> Function()? onOpenSettings;
-  final bool shellListMode;
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+    final hasSettingsAction = onOpenSettings != null;
 
-    final hasHeaderActions = onOpenSettings != null;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (!shellListMode) ...[
-                    Row(
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: AppColors.accent,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.accent.withAlpha(120),
-                                blurRadius: 14,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        const Text(
-                          'ЧТП ЧАТ',
-                          style: TextStyle(
-                            color: AppColors.textPrimary,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.6,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                  Text(
-                    'Сообщения',
-                    style: textTheme.headlineLarge?.copyWith(
-                      color: AppColors.textPrimary,
-                      fontSize: shellListMode ? 32 : 54,
-                      fontWeight: FontWeight.w800,
-                      height: 1.0,
-                      letterSpacing: -1.2,
-                    ),
+        const _BrandBadge(),
+        const Spacer(),
+        if (hasSettingsAction)
+          AppIconButtonSurface(
+            icon: AppIcons.settings,
+            tooltip: 'Настройки',
+            onTap: onOpenSettings!,
+          ),
+      ],
+    );
+  }
+}
+
+/// Бейдж «ЧТП ЧАТ» в шапке списка чатов.
+class _BrandBadge extends StatelessWidget {
+  const _BrandBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 2),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(11),
+          border: Border.all(
+            color: AppColors.navRailActiveAccent.withValues(alpha: 0.85),
+            width: 1.1,
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.navRailActiveAccent,
+                  borderRadius: BorderRadius.circular(5),
+                ),
+                child: const Text(
+                  'ЧТП',
+                  style: TextStyle(
+                    color: Color(0xFF1A0A00),
+                    fontSize: 9,
+                    fontWeight: FontWeight.w900,
+                    height: 1,
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Все переписки и звонки в одном месте.',
-                    style: TextStyle(
-                      color: AppColors.textSecondary.withAlpha(210),
-                      fontSize: shellListMode ? 14 : 16,
-                      fontWeight: FontWeight.w500,
-                      height: 1.45,
-                      letterSpacing: 0.1,
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
-            if (hasHeaderActions) ...[
-              const SizedBox(width: AppSpacing.md),
-              AppIconButtonSurface(
-                icon: AppIcons.settings,
-                tooltip: 'Настройки',
-                onTap: onOpenSettings!,
+              const SizedBox(width: 6),
+              const Text(
+                'ЧАТ',
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  height: 1,
+                  letterSpacing: 0.3,
+                ),
               ),
             ],
-          ],
+          ),
         ),
-      ],
+      ),
     );
   }
 }

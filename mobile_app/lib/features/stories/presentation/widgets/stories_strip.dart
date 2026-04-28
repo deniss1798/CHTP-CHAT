@@ -226,13 +226,21 @@ class _StoryBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final gradient = entry.hasUnseen && !entry.isSelf
+    /// Оранжево-розовое кольцо: непрочитанные чужие или своя активная цепочка.
+    final useGradientRing =
+        entry.storyCount > 0 && (entry.hasUnseen || entry.isSelf);
+
+    final gradient = useGradientRing
         ? const LinearGradient(
             colors: [Color(0xFFFF9F0A), Color(0xFFFF375F)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           )
         : null;
+
+    final ringBorder = !useGradientRing && entry.storyCount > 0
+        ? Border.all(color: Colors.white.withValues(alpha: 0.42), width: 2)
+        : (!useGradientRing ? Border.all(color: Colors.white24, width: 2) : null);
 
     return InkWell(
       onTap: onTap,
@@ -247,9 +255,7 @@ class _StoryBubble extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: gradient,
-                border: gradient == null
-                    ? Border.all(color: Colors.white24, width: 2)
-                    : null,
+                border: ringBorder,
               ),
               child: Container(
                 padding: const EdgeInsets.all(2),

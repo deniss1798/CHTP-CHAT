@@ -1,9 +1,12 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+    show kIsWeb, defaultTargetPlatform;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/app_icons.dart';
 import '../../../../app/theme/app_shadows.dart';
 import '../../../../app/theme/design_tokens.dart';
 import '../../../../app/widgets/app_screen_background.dart';
@@ -61,10 +64,36 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
   late final StoriesFeedController _storiesFeedController = StoriesFeedController();
 
   final FocusNode _searchFocus = FocusNode();
+  bool _searchExpanded = false;
+
+  void _expandSearchFocus() {
+    setState(() => _searchExpanded = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _searchFocus.requestFocus();
+    });
+  }
+
+  void _collapseSearchClear() {
+    _searchFocus.unfocus();
+    _controller.setSearchQuery('');
+    setState(() => _searchExpanded = false);
+  }
+
+  void _onSearchFocusChange() {
+    if (!_searchExpanded) return;
+    if (_searchFocus.hasFocus) return;
+    Future.delayed(const Duration(milliseconds: 80), () {
+      if (!mounted) return;
+      if (_searchExpanded && !_searchFocus.hasFocus) {
+        _collapseSearchClear();
+      }
+    });
+  }
 
   @override
   void initState() {
     super.initState();
+    _searchFocus.addListener(_onSearchFocusChange);
     WidgetsBinding.instance.addObserver(this);
     unawaited(_controller.initialize());
     unawaited(_storiesFeedController.load());
@@ -72,6 +101,7 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _searchFocus.removeListener(_onSearchFocusChange);
     _searchFocus.dispose();
     WidgetsBinding.instance.removeObserver(this);
     _storiesFeedController.dispose();
@@ -96,6 +126,7 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _openChatFromItem(ChatListItemModel item) async {
+    if (_searchExpanded) _collapseSearchClear();
     if (widget.embedded && widget.onChatSelected != null) {
       widget.onChatSelected!(
         chatId: item.chatId,
@@ -324,7 +355,6 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             ChatsAppBar(
-                              shellListMode: widget.shellListMode,
                               onOpenSettings: widget.shellListMode
                                   ? null
                                   : _openSettings,
@@ -359,10 +389,70 @@ class _ChatsScreenState extends State<ChatsScreen> with WidgetsBindingObserver {
                                 ),
                               ),
                             ],
-                            ChatsSearchField(
-                              focusNode: _searchFocus,
-                              showShortcutHint: useDesktopListChrome,
-                              onChanged: _controller.setSearchQuery,
+                            Padding(
+                              padding:
+                                  const EdgeInsets.only(top: 2, bottom: 2),
+                              child: CallbackShortcuts(
+                                bindings: {
+                                  const SingleActivator(
+                                    LogicalKeyboardKey.keyK,
+                                    control: true,
+                                  ): _expandSearchFocus,
+                                  const SingleActivator(
+                                    LogicalKeyboardKey.keyK,
+                                    meta: true,
+                                  ): _expandSearchFocus,
+                                  const SingleActivator(
+                                    LogicalKeyboardKey.escape,
+                                  ): () {
+                                    if (!_searchExpanded) return;
+                                    _collapseSearchClear();
+                                  },
+                                },
+                                child: _searchExpanded
+                                    ? Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Expanded(
+                                            child: ChatsSearchField(
+                                              focusNode: _searchFocus,
+                                              showShortcutHint:
+                                                  useDesktopListChrome,
+                                              onTapOutside:
+                                                  _collapseSearchClear,
+                                              onChanged: _controller
+                                                  .setSearchQuery,
+                                            ),
+                                          ),
+                                        ],
+                                      )
+                                    : Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: IconButton(
+                                          tooltip: useDesktopListChrome &&
+                                                  !kIsWeb &&
+                                                  defaultTargetPlatform !=
+                                                      TargetPlatform.android &&
+                                                  defaultTargetPlatform !=
+                                                      TargetPlatform.iOS
+                                              ? 'Поиск по чатам (Ctrl+K)'
+                                              : 'Поиск по чатам',
+                                          onPressed: _expandSearchFocus,
+                                          icon: const Icon(
+                                            AppIcons.search,
+                                            color: AppColors.textMuted,
+                                            size: 26,
+                                          ),
+                                          style: IconButton.styleFrom(
+                                            backgroundColor: AppColors.surface
+                                                .withValues(alpha: 0.9),
+                                            padding:
+                                                const EdgeInsets.all(12),
+                                          ),
+                                        ),
+                                      ),
+                              ),
                             ),
                             if (useDesktopListChrome) ...[
                               const SizedBox(height: 14),

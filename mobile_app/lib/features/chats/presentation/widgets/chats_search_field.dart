@@ -12,11 +12,14 @@ class ChatsSearchField extends StatelessWidget {
     required this.onChanged,
     this.focusNode,
     this.showShortcutHint = false,
+    this.onTapOutside,
   });
 
   final ValueChanged<String> onChanged;
   final FocusNode? focusNode;
   final bool showShortcutHint;
+  /// Тап вне поля (как в Telegram) — закрыть строку поиска.
+  final VoidCallback? onTapOutside;
 
   String _shortcutLabel() {
     if (kIsWeb) return 'Ctrl+K';
@@ -46,6 +49,7 @@ class ChatsSearchField extends StatelessWidget {
       child: TextField(
         focusNode: focusNode,
         onChanged: onChanged,
+        onTapOutside: (_) => onTapOutside?.call(),
         style: const TextStyle(
           color: AppColors.textPrimary,
           fontWeight: FontWeight.w600,

@@ -33,7 +33,7 @@ class ChatsList extends StatelessWidget {
           bottomPadding ?? (embedded ? 96 : 110),
         ),
         itemCount: items.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 10),
+        separatorBuilder: (_, __) => const SizedBox(height: 5),
         itemBuilder: (context, index) {
           final item = items[index];
           return ChatListItem(
