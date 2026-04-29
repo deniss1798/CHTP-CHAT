@@ -69,10 +69,12 @@ mixin _ChatDetailComposerAndActionsLogic
         }
         _isSending = false;
       });
-      unawaited(_localChatStateService.cacheMessages(
-        chatId: widget.chatId,
-        messages: _messages,
-      ));
+      unawaited(
+        _localChatStateService.cacheMessages(
+          chatId: widget.chatId,
+          messages: _messages,
+        ),
+      );
 
       await _markCurrentChatAsRead();
 
@@ -93,10 +95,12 @@ mixin _ChatDetailComposerAndActionsLogic
         );
         _isSending = false;
       });
-      unawaited(_localChatStateService.cacheMessages(
-        chatId: widget.chatId,
-        messages: _messages,
-      ));
+      unawaited(
+        _localChatStateService.cacheMessages(
+          chatId: widget.chatId,
+          messages: _messages,
+        ),
+      );
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -114,8 +118,8 @@ mixin _ChatDetailComposerAndActionsLogic
 
   Future<void> _retryFailedMessage(Map<String, dynamic> message) async {
     final clientTempId = message['client_temp_id']?.toString();
-    final clientMessageId =
-        (message['client_message_id'] ?? clientTempId)?.toString();
+    final clientMessageId = (message['client_message_id'] ?? clientTempId)
+        ?.toString();
     final text = (message['text'] ?? '').toString().trim();
     if (clientTempId == null || clientTempId.isEmpty || text.isEmpty) return;
 
@@ -143,10 +147,12 @@ mixin _ChatDetailComposerAndActionsLogic
           replacement: createdMessage,
         );
       });
-      unawaited(_localChatStateService.cacheMessages(
-        chatId: widget.chatId,
-        messages: _messages,
-      ));
+      unawaited(
+        _localChatStateService.cacheMessages(
+          chatId: widget.chatId,
+          messages: _messages,
+        ),
+      );
       await _markCurrentChatAsRead();
     } catch (e) {
       if (!mounted) return;
@@ -160,27 +166,31 @@ mixin _ChatDetailComposerAndActionsLogic
           ),
         );
       });
-      unawaited(_localChatStateService.cacheMessages(
-        chatId: widget.chatId,
-        messages: _messages,
-      ));
+      unawaited(
+        _localChatStateService.cacheMessages(
+          chatId: widget.chatId,
+          messages: _messages,
+        ),
+      );
     }
   }
 
   @override
   Future<void> _drainTextOutbox() async {
     if (_isDrainingOutbox || _messages.isEmpty) return;
-    final pending = _messages.where((message) {
-      final status = message['delivery_status']?.toString();
-      final type = (message['message_type'] ?? 'text').toString();
-      final text = (message['text'] ?? '').toString().trim();
-      final clientTempId = message['client_temp_id']?.toString();
-      return (status == 'failed' || status == 'sending') &&
-          type == 'text' &&
-          text.isNotEmpty &&
-          clientTempId != null &&
-          clientTempId.isNotEmpty;
-    }).toList(growable: false);
+    final pending = _messages
+        .where((message) {
+          final status = message['delivery_status']?.toString();
+          final type = (message['message_type'] ?? 'text').toString();
+          final text = (message['text'] ?? '').toString().trim();
+          final clientTempId = message['client_temp_id']?.toString();
+          return (status == 'failed' || status == 'sending') &&
+              type == 'text' &&
+              text.isNotEmpty &&
+              clientTempId != null &&
+              clientTempId.isNotEmpty;
+        })
+        .toList(growable: false);
     if (pending.isEmpty) return;
 
     _isDrainingOutbox = true;
@@ -233,9 +243,9 @@ mixin _ChatDetailComposerAndActionsLogic
     );
     if (!validation.isOk) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(validation.errorMessage!)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(validation.errorMessage!)));
       return;
     }
 
@@ -259,6 +269,12 @@ mixin _ChatDetailComposerAndActionsLogic
         _replyingTo = null;
         _isSendingDocument = false;
       });
+      unawaited(
+        _localChatStateService.cacheMessages(
+          chatId: widget.chatId,
+          messages: _messages,
+        ),
+      );
 
       await _markCurrentChatAsRead();
       requestChatsListRefresh();
@@ -277,10 +293,7 @@ mixin _ChatDetailComposerAndActionsLogic
         SnackBar(
           backgroundColor: AppColors.surfaceSoft,
           content: Text(
-            chatDetailExtractErrorMessage(
-              e,
-              fallback: 'Failed to send file',
-            ),
+            chatDetailExtractErrorMessage(e, fallback: 'Failed to send file'),
           ),
         ),
       );
@@ -288,15 +301,19 @@ mixin _ChatDetailComposerAndActionsLogic
   }
 
   Future<void> _onDesktopDocumentsDropped(DropDoneDetails detail) async {
-    if (_isSendingDocument || _isSending || _isSendingImage || _isSendingVideo) {
+    if (_isSendingDocument ||
+        _isSending ||
+        _isSendingImage ||
+        _isSendingVideo) {
       return;
     }
 
     for (final file in detail.files) {
       final path = file.path;
       if (path.isEmpty) continue;
-      final name =
-          file.name.isNotEmpty ? file.name : path.split(RegExp(r'[/\\]')).last;
+      final name = file.name.isNotEmpty
+          ? file.name
+          : path.split(RegExp(r'[/\\]')).last;
       await _sendDocumentFromLocalPath(path, displayName: name);
     }
   }
@@ -355,6 +372,12 @@ mixin _ChatDetailComposerAndActionsLogic
         _replyingTo = null;
         _isSendingImage = false;
       });
+      unawaited(
+        _localChatStateService.cacheMessages(
+          chatId: widget.chatId,
+          messages: _messages,
+        ),
+      );
 
       await _markCurrentChatAsRead();
 
@@ -372,10 +395,7 @@ mixin _ChatDetailComposerAndActionsLogic
         SnackBar(
           backgroundColor: AppColors.surfaceSoft,
           content: Text(
-            chatDetailExtractErrorMessage(
-              e,
-              fallback: 'Failed to send photo',
-            ),
+            chatDetailExtractErrorMessage(e, fallback: 'Failed to send photo'),
           ),
         ),
       );
@@ -413,6 +433,12 @@ mixin _ChatDetailComposerAndActionsLogic
         _replyingTo = null;
         _isSendingVideo = false;
       });
+      unawaited(
+        _localChatStateService.cacheMessages(
+          chatId: widget.chatId,
+          messages: _messages,
+        ),
+      );
 
       await _markCurrentChatAsRead();
 
@@ -430,10 +456,7 @@ mixin _ChatDetailComposerAndActionsLogic
         SnackBar(
           backgroundColor: AppColors.surfaceSoft,
           content: Text(
-            chatDetailExtractErrorMessage(
-              e,
-              fallback: 'Failed to send video',
-            ),
+            chatDetailExtractErrorMessage(e, fallback: 'Failed to send video'),
           ),
         ),
       );
@@ -484,6 +507,12 @@ mixin _ChatDetailComposerAndActionsLogic
         _replyingTo = null;
         _isSendingVideo = false;
       });
+      unawaited(
+        _localChatStateService.cacheMessages(
+          chatId: widget.chatId,
+          messages: _messages,
+        ),
+      );
 
       await _markCurrentChatAsRead();
 
@@ -532,9 +561,11 @@ mixin _ChatDetailComposerAndActionsLogic
       action = await showGeneralDialog<String>(
         context: context,
         barrierDismissible: true,
-        barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+        barrierLabel: MaterialLocalizations.of(
+          context,
+        ).modalBarrierDismissLabel,
         barrierColor: Colors.transparent,
-        pageBuilder: (ctx, _, __) {
+        pageBuilder: (ctx, animation, secondaryAnimation) {
           return Stack(
             children: [
               Positioned.fill(
@@ -613,9 +644,9 @@ mixin _ChatDetailComposerAndActionsLogic
     if (action == 'copy' && text.isNotEmpty) {
       await Clipboard.setData(ClipboardData(text: text));
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Текст скопирован')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Текст скопирован')));
       return;
     }
 
@@ -711,9 +742,9 @@ mixin _ChatDetailComposerAndActionsLogic
         });
         requestChatsListRefresh();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Сообщение переслано')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Сообщение переслано')));
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => ChatDetailScreen(
@@ -763,6 +794,7 @@ mixin _ChatDetailComposerAndActionsLogic
           _messageController.clear();
         }
       });
+      unawaited(_localChatStateService.deleteCachedMessage(messageId));
     } catch (e) {
       if (!mounted) return;
 
@@ -814,10 +846,7 @@ mixin _ChatDetailComposerAndActionsLogic
 
     try {
       final updated = ChatDetailMessageMaps.normalizeMessageMap(
-        await _messagesService.updateMessage(
-          messageId: messageId,
-          text: text,
-        ),
+        await _messagesService.updateMessage(messageId: messageId, text: text),
       );
 
       if (!mounted) return;
@@ -831,6 +860,12 @@ mixin _ChatDetailComposerAndActionsLogic
         _messageController.clear();
         _isSending = false;
       });
+      unawaited(
+        _localChatStateService.cacheMessages(
+          chatId: widget.chatId,
+          messages: _messages,
+        ),
+      );
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _scrollToBottom();
@@ -918,6 +953,12 @@ mixin _ChatDetailComposerAndActionsLogic
           _messages[idx] = updated;
         }
       });
+      unawaited(
+        _localChatStateService.cacheMessages(
+          chatId: widget.chatId,
+          messages: _messages,
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1041,6 +1082,12 @@ mixin _ChatDetailComposerAndActionsLogic
         _replyingTo = null;
         _isSendingVoice = false;
       });
+      unawaited(
+        _localChatStateService.cacheMessages(
+          chatId: widget.chatId,
+          messages: _messages,
+        ),
+      );
       await _markCurrentChatAsRead();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _scrollToBottom();
@@ -1091,10 +1138,8 @@ mixin _ChatDetailComposerAndActionsLogic
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         fullscreenDialog: true,
-        builder: (ctx) => ChatDetailFullscreenVideoPage(
-          url: url,
-          isVideoNote: isVideoNote,
-        ),
+        builder: (ctx) =>
+            ChatDetailFullscreenVideoPage(url: url, isVideoNote: isVideoNote),
       ),
     );
   }

@@ -1,6 +1,7 @@
 part of 'chat_detail_screen.dart';
 
-mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetailStateHelpers {
+mixin _ChatDetailRealtimeAndCallsLogic
+    on _ChatDetailScreenStateBase, _ChatDetailStateHelpers {
   @override
   Future<void> _connectSocket() async {
     await _socketSubscription?.cancel();
@@ -65,22 +66,33 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
       return;
     }
 
-    final deletedMessageId = _chatSocketEventController.deletedMessageId(incoming);
+    final deletedMessageId = _chatSocketEventController.deletedMessageId(
+      incoming,
+    );
     if (deletedMessageId != null) {
       if (!mounted) return;
 
       setState(() {
         _messageListController.markDeleted(_messages, deletedMessageId);
-        if (_editingMessage != null && _editingMessage!['id'] == deletedMessageId) {
+        if (_editingMessage != null &&
+            _editingMessage!['id'] == deletedMessageId) {
           _editingMessage = null;
           _messageController.clear();
         }
       });
+      unawaited(
+        _localChatStateService.cacheMessages(
+          chatId: widget.chatId,
+          messages: _messages,
+        ),
+      );
 
       return;
     }
 
-    final reactionUpdate = _chatSocketEventController.reactionUpdateEvent(incoming);
+    final reactionUpdate = _chatSocketEventController.reactionUpdateEvent(
+      incoming,
+    );
     if (reactionUpdate != null) {
       if (!mounted) return;
       setState(() {
@@ -90,6 +102,12 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
           reactions: reactionUpdate.reactions,
         );
       });
+      unawaited(
+        _localChatStateService.cacheMessages(
+          chatId: widget.chatId,
+          messages: _messages,
+        ),
+      );
       return;
     }
 
@@ -108,6 +126,12 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
       setState(() {
         _messageListController.replaceUpdated(_messages, work);
       });
+      unawaited(
+        _localChatStateService.cacheMessages(
+          chatId: widget.chatId,
+          messages: _messages,
+        ),
+      );
 
       return;
     }
@@ -131,13 +155,14 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
     final callId = init['call_id']?.toString() ?? '';
     final callerId = ChatDetailMessageMaps.intFromDynamic(init['user_id']);
     if (callerId == null || _currentUserId == null) return;
-    final startedBy = ChatDetailMessageMaps.intFromDynamic(init['started_by']) ?? callerId;
+    final startedBy =
+        ChatDetailMessageMaps.intFromDynamic(init['started_by']) ?? callerId;
     final withVideo = init['video'] == true;
     final name = (_memberNames[callerId] ?? '').trim();
-    final visibleTitle = _chatTitle.trim().isNotEmpty ? _chatTitle : widget.title;
-    final callerLabel =
-        name.isNotEmpty ? name : 'Участник $callerId';
-
+    final visibleTitle = _chatTitle.trim().isNotEmpty
+        ? _chatTitle
+        : widget.title;
+    final callerLabel = name.isNotEmpty ? name : 'Участник $callerId';
 
     await IncomingCallRingtone.instance.start();
     if (!mounted) {
@@ -149,7 +174,6 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
         context: context,
         barrierDismissible: false,
         builder: (ctx) => AlertDialog(
-
           backgroundColor: AppColors.surface,
           title: const Text(
             'Групповой звонок',
@@ -233,13 +257,13 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
 
   Future<void> _showIncomingCallDialog(Map<String, dynamic> init) async {
     final callId = init['call_id']?.toString() ?? '';
-    final visibleTitle =
-        _chatTitle.trim().isNotEmpty ? _chatTitle : widget.title;
+    final visibleTitle = _chatTitle.trim().isNotEmpty
+        ? _chatTitle
+        : widget.title;
     await IncomingCallRingtone.instance.start();
     if (!mounted) {
       await IncomingCallRingtone.instance.stop();
       return;
-
     }
     try {
       await showDialog<void>(
@@ -250,58 +274,60 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
             if (Navigator.of(ctx).canPop()) Navigator.of(ctx).pop();
           });
           return AlertDialog(
-          backgroundColor: AppColors.surface,
-          title: const Text(
-            'Входящий звонок',
+            backgroundColor: AppColors.surface,
+            title: const Text(
+              'Входящий звонок',
 
-            style: TextStyle(color: AppColors.textPrimary),
-          ),
-          content: Text(
-            '$visibleTitle звонит вам',
-            style: const TextStyle(color: AppColors.textSecondary),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                VoiceCallRing.end(callId);
-                _chatSocketService.sendJson({
-                  'type': 'call_e2e_hangup',
-                  'call_id': callId,
-                });
-                Navigator.of(ctx).pop();
-              },
-              child: const Text('Отклонить'),
+              style: TextStyle(color: AppColors.textPrimary),
             ),
-            TextButton(
-              onPressed: () {
-                VoiceCallRing.end(callId);
-                Navigator.of(ctx).pop();
-                final peer = _privatePeerUserId();
-                final me = _currentUserId;
-                if (peer == null || me == null) return;
-                unawaited(
-                  Navigator.of(context).push<void>(
-                    MaterialPageRoute<void>(
-                      builder: (_) => VoiceCallScreen(
-                        chatId: widget.chatId,
-                        peerTitle: visibleTitle,
-                        peerUserId: peer,
-                        myUserId: me,
-                        existingSocket: _chatSocketService,
-                        incomingInit: init,
-                        peerAvatarUrl:
-                            chatDetailNormalizedAvatarUrl(_memberAvatarUrls[peer]),
-                        myAvatarUrl:
-                            chatDetailNormalizedAvatarUrl(_memberAvatarUrls[me]),
+            content: Text(
+              '$visibleTitle звонит вам',
+              style: const TextStyle(color: AppColors.textSecondary),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  VoiceCallRing.end(callId);
+                  _chatSocketService.sendJson({
+                    'type': 'call_e2e_hangup',
+                    'call_id': callId,
+                  });
+                  Navigator.of(ctx).pop();
+                },
+                child: const Text('Отклонить'),
+              ),
+              TextButton(
+                onPressed: () {
+                  VoiceCallRing.end(callId);
+                  Navigator.of(ctx).pop();
+                  final peer = _privatePeerUserId();
+                  final me = _currentUserId;
+                  if (peer == null || me == null) return;
+                  unawaited(
+                    Navigator.of(context).push<void>(
+                      MaterialPageRoute<void>(
+                        builder: (_) => VoiceCallScreen(
+                          chatId: widget.chatId,
+                          peerTitle: visibleTitle,
+                          peerUserId: peer,
+                          myUserId: me,
+                          existingSocket: _chatSocketService,
+                          incomingInit: init,
+                          peerAvatarUrl: chatDetailNormalizedAvatarUrl(
+                            _memberAvatarUrls[peer],
+                          ),
+                          myAvatarUrl: chatDetailNormalizedAvatarUrl(
+                            _memberAvatarUrls[me],
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                );
-              },
-              child: const Text('Принять'),
-            ),
-          ],
-        );
+                  );
+                },
+                child: const Text('Принять'),
+              ),
+            ],
+          );
         },
       );
     } finally {
@@ -326,12 +352,12 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
     if (!mounted) return;
     final callId =
         '${DateTime.now().microsecondsSinceEpoch}_gc${widget.chatId}_$me';
-    final visibleTitle =
-        _chatTitle.trim().isNotEmpty ? _chatTitle : widget.title;
+    final visibleTitle = _chatTitle.trim().isNotEmpty
+        ? _chatTitle
+        : widget.title;
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (_) => GroupCallScreen(
-
           chatId: widget.chatId,
           chatTitle: visibleTitle,
           myUserId: me,
@@ -354,9 +380,7 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
     if (kIsWeb) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Звонки в браузере не поддерживаются'),
-        ),
+        const SnackBar(content: Text('Звонки в браузере не поддерживаются')),
       );
       return;
     }
@@ -365,8 +389,9 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
     if (peer == null || me == null) return;
     await _ensureSocketConnected();
     if (!mounted) return;
-    final visibleTitle =
-        _chatTitle.trim().isNotEmpty ? _chatTitle : widget.title;
+    final visibleTitle = _chatTitle.trim().isNotEmpty
+        ? _chatTitle
+        : widget.title;
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (_) => VoiceCallScreen(
@@ -388,14 +413,17 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
     if (raw == null) return;
     var normalized = Map<String, dynamic>.from(raw);
     final incomingId = ChatDetailMessageMaps.intFromDynamic(normalized['id']);
-    final senderId = ChatDetailMessageMaps.intFromDynamic(normalized['sender_id']);
+    final senderId = ChatDetailMessageMaps.intFromDynamic(
+      normalized['sender_id'],
+    );
     if (_isMine(normalized)) {
       final mid = ChatDetailMessageMaps.intFromDynamic(normalized['id']);
       if (mid != null) {
         normalized['delivery_status'] = _computeDeliveryForOutgoing(mid);
       }
     }
-    final exists = incomingId != null &&
+    final exists =
+        incomingId != null &&
         _messages.any(
           (m) => ChatDetailMessageMaps.intFromDynamic(m['id']) == incomingId,
         );
@@ -405,13 +433,10 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
 
     setState(() {
       if (senderId != null && senderId == _typingUserId) {
-
         _typingUserId = null;
         _remoteTypingHideTimer?.cancel();
       }
-      if (senderId != null &&
-          senderId != _currentUserId &&
-          !_isGroupChat) {
+      if (senderId != null && senderId != _currentUserId && !_isGroupChat) {
         _memberLastSeen[senderId] = DateTime.now().toUtc();
       }
       _messageListController.appendIfMissing(_messages, normalized);
@@ -422,10 +447,12 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
       });
     });
 
-    unawaited(_localChatStateService.cacheMessages(
-      chatId: widget.chatId,
-      messages: _messages,
-    ));
+    unawaited(
+      _localChatStateService.cacheMessages(
+        chatId: widget.chatId,
+        messages: _messages,
+      ),
+    );
 
     await _markCurrentChatAsRead();
 
@@ -463,13 +490,14 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
       final normalized = page.messages
           .map(ChatDetailMessageMaps.normalizeMessageMap)
           .map((message) {
-        if (_currentUserId == null || !_isMine(message)) return message;
-        final mid = ChatDetailMessageMaps.intFromDynamic(message['id']);
-        if (mid == null) return message;
-        final copy = Map<String, dynamic>.from(message);
-        copy['delivery_status'] = _computeDeliveryForOutgoing(mid);
-        return copy;
-      }).toList();
+            if (_currentUserId == null || !_isMine(message)) return message;
+            final mid = ChatDetailMessageMaps.intFromDynamic(message['id']);
+            if (mid == null) return message;
+            final copy = Map<String, dynamic>.from(message);
+            copy['delivery_status'] = _computeDeliveryForOutgoing(mid);
+            return copy;
+          })
+          .toList();
 
       setState(() {
         for (final message in normalized) {
@@ -482,10 +510,12 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
         });
       });
 
-      unawaited(_localChatStateService.cacheMessages(
-        chatId: widget.chatId,
-        messages: _messages,
-      ));
+      unawaited(
+        _localChatStateService.cacheMessages(
+          chatId: widget.chatId,
+          messages: _messages,
+        ),
+      );
 
       await _markCurrentChatAsRead();
     } catch (_) {
@@ -499,7 +529,9 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
     if (_messages.isEmpty) return;
 
     final lastMessage = _messages.last;
-    final lastMessageId = ChatDetailMessageMaps.intFromDynamic(lastMessage['id']);
+    final lastMessageId = ChatDetailMessageMaps.intFromDynamic(
+      lastMessage['id'],
+    );
     if (lastMessageId == null) return;
 
     try {

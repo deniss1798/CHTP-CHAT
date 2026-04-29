@@ -1,6 +1,10 @@
 part of 'chat_detail_screen.dart';
 
-mixin _ChatDetailLifecycleLogic on _ChatDetailScreenStateBase, _ChatDetailStateHelpers, _ChatDetailRealtimeAndCallsLogic {
+mixin _ChatDetailLifecycleLogic
+    on
+        _ChatDetailScreenStateBase,
+        _ChatDetailStateHelpers,
+        _ChatDetailRealtimeAndCallsLogic {
   Future<void> _pickAndUploadChatAvatar() async {
     if (!_isGroupChat || _isUploadingChatAvatar) return;
 
@@ -34,11 +38,9 @@ mixin _ChatDetailLifecycleLogic on _ChatDetailScreenStateBase, _ChatDetailStateH
       await _loadChatDetails();
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Аватар группы обновлен'),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Аватар группы обновлен')));
     } catch (e) {
       if (!mounted) return;
 
@@ -59,7 +61,6 @@ mixin _ChatDetailLifecycleLogic on _ChatDetailScreenStateBase, _ChatDetailStateH
     }
   }
 
-
   void _startPresenceHeartbeat() {
     _presenceTimer?.cancel();
     _presenceService.ping();
@@ -72,7 +73,6 @@ mixin _ChatDetailLifecycleLogic on _ChatDetailScreenStateBase, _ChatDetailStateH
       } catch (_) {}
     });
   }
-
 
   void _startSocketReconnectLoop() {
     _socketReconnectTimer?.cancel();
@@ -99,7 +99,6 @@ mixin _ChatDetailLifecycleLogic on _ChatDetailScreenStateBase, _ChatDetailStateH
       unawaited(_drainTextOutbox());
     });
   }
-
 
   Future<void> _initChat() async {
     setState(() {
@@ -159,12 +158,14 @@ mixin _ChatDetailLifecycleLogic on _ChatDetailScreenStateBase, _ChatDetailStateH
       }
 
       setState(() {
-        _error = chatDetailExtractErrorMessage(e, fallback: 'Не удалось открыть чат');
+        _error = chatDetailExtractErrorMessage(
+          e,
+          fallback: 'Не удалось открыть чат',
+        );
         _isLoading = false;
       });
     }
   }
-
 
   Future<void> _loadChatDetails() async {
     final detail = await _chatsService.fetchChatDetail(widget.chatId);
@@ -192,7 +193,6 @@ mixin _ChatDetailLifecycleLogic on _ChatDetailScreenStateBase, _ChatDetailStateH
     _memberLastSeen.clear();
 
     for (final member in rows) {
-
       if (member.username.isNotEmpty) {
         _memberNames[member.id] = member.username;
       }
@@ -225,10 +225,7 @@ mixin _ChatDetailLifecycleLogic on _ChatDetailScreenStateBase, _ChatDetailStateH
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Участник успешно добавлен'),
-
-        ),
+        const SnackBar(content: Text('Участник успешно добавлен')),
       );
     } catch (e) {
       if (!mounted) return;
@@ -263,16 +260,19 @@ mixin _ChatDetailLifecycleLogic on _ChatDetailScreenStateBase, _ChatDetailStateH
       await _loadChatDetails();
       requestChatsListRefresh();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Название обновлено')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Название обновлено')));
       }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            chatDetailExtractErrorMessage(e, fallback: 'Не удалось сохранить название'),
+            chatDetailExtractErrorMessage(
+              e,
+              fallback: 'Не удалось сохранить название',
+            ),
           ),
         ),
       );
@@ -313,7 +313,10 @@ mixin _ChatDetailLifecycleLogic on _ChatDetailScreenStateBase, _ChatDetailStateH
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            chatDetailExtractErrorMessage(e, fallback: 'Не удалось выйти из группы'),
+            chatDetailExtractErrorMessage(
+              e,
+              fallback: 'Не удалось выйти из группы',
+            ),
           ),
         ),
       );
@@ -396,6 +399,12 @@ mixin _ChatDetailLifecycleLogic on _ChatDetailScreenStateBase, _ChatDetailStateH
         _hasMoreMessages = page.hasMore;
         _isLoadingOlder = false;
       });
+      unawaited(
+        _localChatStateService.cacheMessages(
+          chatId: widget.chatId,
+          messages: _messages,
+        ),
+      );
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || !_scrollController.hasClients) return;
@@ -432,7 +441,9 @@ mixin _ChatDetailLifecycleLogic on _ChatDetailScreenStateBase, _ChatDetailStateH
 
         for (final r in rows) {
           final uid = ChatDetailMessageMaps.intFromDynamic(r['user_id']);
-          final lr = ChatDetailMessageMaps.intFromDynamic(r['last_read_message_id']);
+          final lr = ChatDetailMessageMaps.intFromDynamic(
+            r['last_read_message_id'],
+          );
           if (uid != null) {
             _lastReadByUserId[uid] = lr ?? 0;
           }
@@ -467,10 +478,12 @@ mixin _ChatDetailLifecycleLogic on _ChatDetailScreenStateBase, _ChatDetailStateH
         _isLoading = false;
       });
 
-      unawaited(_localChatStateService.cacheMessages(
-        chatId: widget.chatId,
-        messages: normalizedMessages,
-      ));
+      unawaited(
+        _localChatStateService.cacheMessages(
+          chatId: widget.chatId,
+          messages: normalizedMessages,
+        ),
+      );
 
       await _markCurrentChatAsRead();
 
@@ -495,7 +508,9 @@ mixin _ChatDetailLifecycleLogic on _ChatDetailScreenStateBase, _ChatDetailStateH
   }
 
   Future<bool> _loadCachedMessagesForOffline() async {
-    final cached = await _localChatStateService.getCachedMessages(widget.chatId);
+    final cached = await _localChatStateService.getCachedMessages(
+      widget.chatId,
+    );
     if (!mounted || cached.isEmpty) return false;
 
     var normalizedMessages = cached
@@ -525,5 +540,4 @@ mixin _ChatDetailLifecycleLogic on _ChatDetailScreenStateBase, _ChatDetailStateH
     });
     return true;
   }
-
 }
