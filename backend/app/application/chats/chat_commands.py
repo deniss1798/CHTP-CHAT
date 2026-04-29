@@ -1,6 +1,7 @@
 import hashlib
 
 from fastapi import HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
@@ -15,6 +16,11 @@ from app.schemas.chat_schema import ChatCreate, ChatResponse
 
 def _private_chat_pair(user_a: int, user_b: int) -> tuple[int, int]:
     return tuple(sorted((user_a, user_b)))
+
+
+def _private_pair_key(user_a: int, user_b: int) -> str:
+    pair = _private_chat_pair(user_a, user_b)
+    return f"{pair[0]}:{pair[1]}"
 
 
 def _private_chat_lock_key(user_a: int, user_b: int) -> int:
@@ -34,6 +40,11 @@ def _lock_private_chat_pair(db: Session, user_a: int, user_b: int) -> None:
 
 
 def _find_private_chat_between(db: Session, user_a: int, user_b: int) -> Chat | None:
+    key = _private_pair_key(user_a, user_b)
+    keyed = db.query(Chat).filter(Chat.private_pair_key == key).first()
+    if keyed is not None:
+        return keyed
+
     pair = set(_private_chat_pair(user_a, user_b))
     rows = (
         db.query(Chat)
@@ -124,6 +135,7 @@ def create_chat(db: Session, current_user: User, payload: ChatCreate) -> ChatRes
             )
 
         other_user_id = other_ids[0]
+        private_pair_key = _private_pair_key(current_user.id, other_user_id)
 
         existing_chat = _find_private_chat_between(db, current_user.id, other_user_id)
         if existing_chat:
@@ -152,6 +164,7 @@ def create_chat(db: Session, current_user: User, payload: ChatCreate) -> ChatRes
         title = other_user.username if other_user else "Private chat"
         avatar_url = other_user.avatar_url if other_user else None
     else:
+        private_pair_key = None
         if not title or not title.strip():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -164,6 +177,7 @@ def create_chat(db: Session, current_user: User, payload: ChatCreate) -> ChatRes
         title=title,
         avatar_url=avatar_url,
         created_by=current_user.id,
+        private_pair_key=private_pair_key,
     )
     db.add(chat)
     db.flush()
@@ -178,8 +192,25 @@ def create_chat(db: Session, current_user: User, payload: ChatCreate) -> ChatRes
             )
         )
 
-    db.commit()
-    db.refresh(chat)
+    try:
+        db.commit()
+        db.refresh(chat)
+    except IntegrityError:
+        db.rollback()
+        if payload.type == "private":
+            existing_chat = _find_private_chat_between(
+                db,
+                current_user.id,
+                other_user_id,
+            )
+            if existing_chat:
+                return _private_chat_response(
+                    db,
+                    existing_chat,
+                    current_user.id,
+                    other_user_id,
+                )
+        raise
 
     peer_last_seen_at = None
     if payload.type == "private":

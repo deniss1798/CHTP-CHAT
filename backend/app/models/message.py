@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, BigInteger, Index, Text, String
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, BigInteger, Index, Text, String, UniqueConstraint
 from sqlalchemy.sql import func
 
 from app.db.database import Base
@@ -32,6 +32,7 @@ class Message(Base):
     )
 
     text = Column(Text, nullable=False)
+    client_message_id = Column(String(128), nullable=True)
 
     message_type = Column(String, nullable=False, default="text")
     media_key = Column(Text, nullable=True)
@@ -45,6 +46,11 @@ class Message(Base):
     is_deleted = Column(Boolean, nullable=False, default=False)
 
     __table_args__ = (
+        UniqueConstraint(
+            "sender_id",
+            "client_message_id",
+            name="uq_messages_sender_client_message_id",
+        ),
         Index("ix_messages_chat_id_id", "chat_id", "id"),
         Index("ix_messages_chat_id_created_at_id", "chat_id", "created_at", "id"),
     )

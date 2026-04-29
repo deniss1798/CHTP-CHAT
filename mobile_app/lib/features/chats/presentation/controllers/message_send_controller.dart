@@ -15,12 +15,14 @@ class MessageSendController {
     required int chatId,
     required String text,
     int? replyToMessageId,
+    String? clientMessageId,
   }) async {
     return _normalize(
       await _messagesService.sendMessage(
         chatId: chatId,
         text: text,
         replyToMessageId: replyToMessageId,
+        clientMessageId: clientMessageId,
       ),
     );
   }

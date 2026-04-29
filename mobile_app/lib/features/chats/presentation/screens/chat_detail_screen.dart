@@ -131,6 +131,7 @@ abstract class _ChatDetailScreenStateBase extends State<ChatDetailScreen> {
 
   Timer? _presenceTimer;
   Timer? _socketReconnectTimer;
+  Timer? _socketPingTimer;
   /// Обновление подписи «N мин/ч назад» в шапке личного чата.
   Timer? _lastSeenSubtitleTimer;
 
@@ -185,6 +186,7 @@ class _ChatDetailScreenState extends _ChatDetailScreenStateBase
     clearOpenChat(widget.chatId);
     openChatSyncNotifier.removeListener(_onOpenChatSyncRequest);
     _socketReconnectTimer?.cancel();
+    _socketPingTimer?.cancel();
     _lastSeenSubtitleTimer?.cancel();
     _presenceTimer?.cancel();
     _typingDebounce?.cancel();

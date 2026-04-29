@@ -58,3 +58,26 @@ def test_create_private_chat_rejects_multiple_other_members(db_session) -> None:
         assert "exactly one other participant" in getattr(exc, "detail")
     else:
         raise AssertionError("private chat creation should reject extra members")
+
+
+def test_create_private_chat_stores_unique_pair_key(db_session) -> None:
+    alice = _user(1, "alice")
+    bob = _user(2, "bob")
+    db_session.add_all([alice, bob])
+    db_session.commit()
+
+    first = create_chat(
+        db_session,
+        alice,
+        ChatCreate(type="private", member_ids=[2]),
+    )
+    second = create_chat(
+        db_session,
+        bob,
+        ChatCreate(type="private", member_ids=[1]),
+    )
+
+    chat = db_session.query(Chat).filter(Chat.id == first.id).one()
+    assert second.id == first.id
+    assert chat.private_pair_key == "1:2"
+    assert db_session.query(Chat).filter(Chat.type == "private").count() == 1

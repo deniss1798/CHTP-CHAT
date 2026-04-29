@@ -84,6 +84,14 @@ mixin _ChatDetailLifecycleLogic on _ChatDetailScreenStateBase, _ChatDetailStateH
     });
   }
 
+  void _startSocketHeartbeat() {
+    _socketPingTimer?.cancel();
+    _socketPingTimer = Timer.periodic(const Duration(seconds: 25), (_) {
+      if (!mounted) return;
+      _chatSocketService.sendPing();
+    });
+  }
+
 
   Future<void> _initChat() async {
     setState(() {
@@ -108,6 +116,7 @@ mixin _ChatDetailLifecycleLogic on _ChatDetailScreenStateBase, _ChatDetailStateH
       await _loadMessages();
       await _connectSocket();
       _startSocketReconnectLoop();
+      _startSocketHeartbeat();
       _startPresenceHeartbeat();
       if (mounted && _messageController.text.trim().isNotEmpty) {
         _onMessageTextChanged();

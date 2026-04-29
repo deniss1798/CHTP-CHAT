@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/design_tokens.dart';
+import '../../../../app/widgets/app_surface.dart';
 import '../controller/chats_controller.dart';
 import '../models/chat_list_item_model.dart';
 import '../models/chats_list_filter.dart';
@@ -12,7 +13,8 @@ String _shortSnack(String message) {
   return '${t.substring(0, 177)}…';
 }
 
-/// Нижняя шторка действий над диалогом (архив / закрепление / уведомления), в духе Telegram.
+/// Нижняя шторка действий над диалогом (архив / закрепление / уведомления).
+/// Визуально в одном стиле с [ChatComposerAttachmentSheet].
 Future<void> showChatDialogueActionsSheet({
   required BuildContext context,
   required ChatsController controller,
@@ -130,97 +132,146 @@ class _ChatDialogueActionsSheetInnerState
     setState(() => muted = nextMuted);
   }
 
+  String get _archiveTitle => archived ? 'Вернуть из архива' : 'В архив';
+  String get _archiveSubtitle => archived
+      ? 'Чат снова появится в основном списке.'
+      : 'Скрыть чат из основного списка.';
+
+  String get _pinTitle => pinned ? 'Открепить' : 'Закрепить';
+  String get _pinSubtitle => pinned
+      ? 'Убрать из закреплённых сверху списка.'
+      : 'Показывать рядом с другими закреплёнными чатами.';
+
+  String get _muteTitle => muted ? 'Включить уведомления' : 'Отключить уведомления';
+  String get _muteSubtitle => muted
+      ? 'Снова получать push и отображать на экране блокировки.'
+      : 'Без звука и без всплывающих уведомлений по этому чату.';
+
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: Container(
-        margin: EdgeInsets.only(
-          left: AppSpacing.sm,
-          right: AppSpacing.sm,
-          bottom: MediaQuery.paddingOf(context).bottom + AppSpacing.sm,
-        ),
-        decoration: BoxDecoration(
-          color: AppColors.surfaceRaised,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(color: AppColors.strokeSoft),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.45),
-              blurRadius: 24,
-              offset: const Offset(0, 12),
-            ),
-          ],
-        ),
+    final title = widget.initial.title.trim().isEmpty
+        ? 'Чат'
+        : widget.initial.title;
+
+    final actionsDisabled =
+        workingArchive || workingMute || workingPin;
+
+    return SafeArea(
+      minimum: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+      child: AppSurface(
+        tone: AppSurfaceTone.elevated,
+        radius: AppRadius.xxl,
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
-            const SizedBox(height: 10),
-            Container(
-              width: 38,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.textMuted.withValues(alpha: 0.55),
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-            const SizedBox(height: 14),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      widget.initial.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.2,
-                      ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.accentBright.withValues(alpha: 0.35),
+                        AppColors.accent.withValues(alpha: 0.2),
+                      ],
+                    ),
+                    border: Border.all(
+                      color: AppColors.accentBorder.withValues(alpha: 0.5),
                     ),
                   ),
-                ],
-              ),
+                  child: const Icon(
+                    Icons.chat_bubble_rounded,
+                    color: AppColors.accentBright,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 17,
+                          letterSpacing: 0.2,
+                          height: 1.25,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        'Архив, закрепление и уведомления',
+                        style: TextStyle(
+                          color: AppColors.textMuted.withValues(alpha: 0.95),
+                          fontSize: 13,
+                          height: 1.25,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            Divider(
-              height: 26,
-              thickness: 0.5,
-              color: AppColors.strokeMedium.withValues(alpha: 0.65),
-              indent: AppSpacing.md,
-              endIndent: AppSpacing.md,
-            ),
-            _SheetAction(
-              enabled: !workingArchive && !workingMute && !workingPin,
+            const SizedBox(height: 18),
+            _DialogueActionRow(
+              icon: archived ? Icons.unarchive_rounded : Icons.archive_rounded,
+              title: _archiveTitle,
+              subtitle: _archiveSubtitle,
               busy: workingArchive,
-              icon: archived ? Icons.unarchive_outlined : Icons.archive_outlined,
-              label:
-                  archived ? 'Вернуть из архива' : 'В архив',
+              enabled: !actionsDisabled || workingArchive,
               onTap: _onArchive,
             ),
-            _SheetAction(
-              enabled: !workingArchive && !workingMute && !workingPin,
+            const SizedBox(height: 10),
+            _DialogueActionRow(
+              icon: pinned ? Icons.push_pin : Icons.push_pin_outlined,
+              title: _pinTitle,
+              subtitle: _pinSubtitle,
               busy: workingPin,
-              icon: pinned
-                  ? Icons.push_pin
-                  : Icons.push_pin_outlined,
-              label:
-                  pinned ? 'Открепить' : 'Закрепить',
+              enabled: !actionsDisabled || workingPin,
               onTap: _onPin,
             ),
-            _SheetAction(
-              enabled: !workingArchive && !workingMute && !workingPin,
-              busy: workingMute,
+            const SizedBox(height: 10),
+            _DialogueActionRow(
               icon: muted
-                  ? Icons.notifications_active_outlined
-                  : Icons.notifications_off_outlined,
-              label:
-                  muted ? 'Включить уведомления' : 'Отключить уведомления',
+                  ? Icons.notifications_active_rounded
+                  : Icons.notifications_off_rounded,
+              title: _muteTitle,
+              subtitle: _muteSubtitle,
+              busy: workingMute,
+              enabled: !actionsDisabled || workingMute,
               onTap: _onMute,
             ),
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Icon(
+                  Icons.cloud_done_outlined,
+                  size: 15,
+                  color: AppColors.textMuted.withValues(alpha: 0.85),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Настройки сохраняются на сервере и доступны со всех устройств.',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      height: 1.35,
+                      color: AppColors.textMuted.withValues(alpha: 0.9),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
@@ -228,72 +279,107 @@ class _ChatDialogueActionsSheetInnerState
   }
 }
 
-class _SheetAction extends StatelessWidget {
-  const _SheetAction({
-    required this.enabled,
-    required this.busy,
+class _DialogueActionRow extends StatelessWidget {
+  const _DialogueActionRow({
     required this.icon,
-    required this.label,
+    required this.title,
+    required this.subtitle,
+    required this.busy,
+    required this.enabled,
     required this.onTap,
   });
 
-  final bool enabled;
-  final bool busy;
   final IconData icon;
-  final String label;
+  final String title;
+  final String subtitle;
+  final bool busy;
+  final bool enabled;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final effective = enabled && !busy;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: effective ? onTap : null,
-        splashColor: AppColors.accent.withValues(alpha: 0.12),
-        highlightColor: AppColors.surfaceHighlight.withValues(alpha: 0.35),
-        child: Padding(
-          padding:
-              const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 6),
-          child: SizedBox(
-            height: AppSizes.btnSmHeight + 2,
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 44,
-                  child: Center(
-                    child: busy
-                        ? const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.2,
-                              color: AppColors.accent,
-                            ),
-                          )
-                        : Icon(
-                            icon,
-                            size: AppSizes.iconLg + 2,
-                            color: effective
-                                ? AppColors.textPrimary
-                                : AppColors.textMuted,
-                          ),
-                  ),
-                ),
-                Expanded(
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      color: effective
-                          ? AppColors.textPrimary
-                          : AppColors.textMuted,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
-                    ),
-                  ),
-                ),
-              ],
+        borderRadius: BorderRadius.circular(AppRadius.md + 4),
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadius.md + 4),
+            color: AppColors.surface.withValues(alpha: 0.92),
+            border: Border.all(
+              color: AppColors.strokeAccent.withValues(alpha: 0.55),
+              width: 1,
             ),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: 44,
+                height: 44,
+                child: Center(
+                  child: busy
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.2,
+                            color: AppColors.accentBright,
+                          ),
+                        )
+                      : Icon(
+                          icon,
+                          color: effective
+                              ? AppColors.accentBright
+                              : AppColors.textMuted,
+                          size: 26,
+                        ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: effective
+                            ? AppColors.textPrimary
+                            : AppColors.textMuted,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15.5,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        color: AppColors.textSecondary.withValues(
+                          alpha: effective ? 0.95 : 0.55,
+                        ),
+                        fontSize: 12.5,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (busy)
+                const SizedBox(width: 24)
+              else
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppColors.textMuted.withValues(
+                    alpha: effective ? 0.85 : 0.4,
+                  ),
+                  size: 24,
+                ),
+            ],
           ),
         ),
       ),

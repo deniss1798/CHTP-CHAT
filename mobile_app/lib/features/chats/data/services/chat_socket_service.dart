@@ -119,6 +119,14 @@ class ChatSocketService {
     } catch (_) {}
   }
 
+  void sendPing() {
+    final ch = _channel;
+    if (ch == null) return;
+    try {
+      ch.sink.add(jsonEncode({'type': 'ping'}));
+    } catch (_) {}
+  }
+
   /// Произвольный JSON по открытому WebSocket (сигналинг WebRTC и т.п.).
   void sendJson(Map<String, dynamic> payload) {
     final ch = _channel;

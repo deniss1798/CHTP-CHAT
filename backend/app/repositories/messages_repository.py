@@ -10,6 +10,21 @@ class MessagesRepository:
     def get_by_id(self, message_id: int) -> Message | None:
         return self._db.query(Message).filter(Message.id == message_id).first()
 
+    def get_by_client_message_id(
+        self,
+        *,
+        sender_id: int,
+        client_message_id: str,
+    ) -> Message | None:
+        return (
+            self._db.query(Message)
+            .filter(
+                Message.sender_id == sender_id,
+                Message.client_message_id == client_message_id,
+            )
+            .first()
+        )
+
     def list_for_chat_ordered(self, chat_id: int) -> list[Message]:
         return (
             self._db.query(Message)

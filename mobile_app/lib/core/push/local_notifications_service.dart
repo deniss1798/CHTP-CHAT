@@ -29,7 +29,7 @@ class LocalNotificationsService {
     if (!supported || _initialized) return;
 
     const initSettings = InitializationSettings(
-      android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+      android: AndroidInitializationSettings('@drawable/ic_stat_chtp'),
     );
 
     await _plugin.initialize(
@@ -133,6 +133,7 @@ class LocalNotificationsService {
         channelDescription: 'Входящие сообщения',
         importance: Importance.high,
         priority: Priority.high,
+        icon: 'ic_stat_chtp',
         largeIcon: iconBytes != null ? ByteArrayAndroidBitmap(iconBytes) : null,
         styleInformation: BigTextStyleInformation(body),
       ),
@@ -166,6 +167,7 @@ class LocalNotificationsService {
         channelDescription: 'Входящие голосовые и групповые звонки',
         importance: Importance.max,
         priority: Priority.max,
+        icon: 'ic_stat_chtp',
         category: AndroidNotificationCategory.call,
         playSound: true,
         visibility: NotificationVisibility.public,

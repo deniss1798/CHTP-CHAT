@@ -33,3 +33,13 @@ def test_ready_200_and_503_depends_on_db_check(monkeypatch) -> None:
     monkeypatch.setattr(main_app, "_db_ready", lambda: False)
     assert c.get("/ready").status_code == 503
     assert c.get("/api/ready").status_code == 503
+
+
+def test_realtime_metrics_endpoint_shape() -> None:
+    c = TestClient(app)
+    r = c.get("/metrics/realtime")
+    assert r.status_code == 200
+    data = r.json()
+    assert "chat_connections" in data
+    assert "inbox_connections" in data
+    assert "send_error_total" in data

@@ -1,10 +1,8 @@
 import 'dart:async';
-
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
-import '../../../../core/formatting/server_time.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/notifiers/chats_list_refresh_notifier.dart';
 import '../../../../core/notifiers/open_chat_sync_notifier.dart';
@@ -68,6 +66,7 @@ class ChatsController extends ChangeNotifier {
   Timer? _inboxPingTimer;
   final Map<int, Timer> _typingInboxTimers = {};
   bool _isDisposed = false;
+  bool _refreshInFlight = false;
 
   void _handleChatsRefresh() {
     if (_state.currentUserId == null) return;
@@ -268,21 +267,36 @@ class ChatsController extends ChangeNotifier {
   }
 
   Future<void> refresh({bool silent = false}) async {
-    if (_state.currentUserId == null) return;
+    if (_state.currentUserId == null) {
+      if (!silent) {
+        _setState(_state.copyWith(
+          isLoading: false,
+          error: 'Сессия не найдена. Войдите снова.',
+        ));
+      }
+      return;
+    }
+
+    if (_refreshInFlight && silent) return;
 
     if (!silent) {
       _setState(_state.copyWith(isLoading: true, clearError: true));
     }
 
+    _refreshInFlight = true;
     try {
-      final page = await _chatsService.getChatsPage(
-        currentUserId: _state.currentUserId!,
-        limit: 50,
-        cursor: null,
-        archived: _listFetchArchived(),
-      );
+      final page = await _chatsService
+          .getChatsPage(
+            currentUserId: _state.currentUserId!,
+            limit: 50,
+            cursor: null,
+            archived: _listFetchArchived(),
+          )
+          .timeout(const Duration(seconds: 35));
       var chats = page.chats;
-      final localReads = await _localChatStateService.getAllLastReadMessageIds();
+      final localReads = await _localChatStateService
+          .getAllLastReadMessageIds()
+          .timeout(const Duration(seconds: 8), onTimeout: () => <int, int>{});
 
       chats = chats.map((chat) {
         final localRead = localReads[chat.id];
@@ -316,13 +330,16 @@ class ChatsController extends ChangeNotifier {
         ),
       );
     } catch (error) {
-      if (silent) return;
-      _setState(
-        _state.copyWith(
-          error: _extractLoadChatsErrorMessage(error),
-          isLoading: false,
-        ),
-      );
+      if (!silent) {
+        _setState(
+          _state.copyWith(
+            error: _extractLoadChatsErrorMessage(error),
+            isLoading: false,
+          ),
+        );
+      }
+    } finally {
+      _refreshInFlight = false;
     }
   }
 
@@ -338,7 +355,9 @@ class ChatsController extends ChangeNotifier {
 
   Future<void> _init() async {
     try {
-      final me = await _authService.getMe();
+      final me = await _authService
+          .getMe()
+          .timeout(const Duration(seconds: 25));
       final currentUserId = _parseInt(me['id']);
 
       _setState(
@@ -348,9 +367,13 @@ class ChatsController extends ChangeNotifier {
         ),
       );
 
+      if (currentUserId == null) {
+        throw Exception('Сервер не вернул id пользователя');
+      }
+
       await refresh();
       if (_state.currentUserId != null) {
-        await _connectInboxWithRetry();
+        unawaited(_connectInboxWithRetry());
       }
     } catch (error, stack) {
       if (kDebugMode) {
@@ -548,6 +571,11 @@ class ChatsController extends ChangeNotifier {
   }
 
   String _extractInitErrorMessage(Object error) {
+    if (error is TimeoutException) {
+      return 'Превышено время ожидания ответа. Проверьте сеть и адрес API '
+          '(${ApiClient.baseUrl}). Для Android APK укажите '
+          '--dart-define=API_BASE_URL=https://ваш-сервер/api при сборке.';
+    }
     final base = _extractLoadChatsErrorMessage(error);
     if (error is DioException) {
       switch (error.type) {
@@ -555,7 +583,8 @@ class ChatsController extends ChangeNotifier {
         case DioExceptionType.connectionTimeout:
           return 'Нет связи с сервером ($base). '
               'Сейчас база API: ${ApiClient.baseUrl}. '
-              'Сборка: --dart-define=API_BASE_URL=... или файл api_base_url.txt рядом с exe (одна строка, напр. https://домен/api).';
+              'Windows/macOS/Linux: файл api_base_url.txt рядом с exe. '
+              'Android/iOS: при сборке передавайте --dart-define=API_BASE_URL=...';
         case DioExceptionType.receiveTimeout:
         case DioExceptionType.sendTimeout:
           return 'Таймаут запроса к серверу. $base';
@@ -612,13 +641,16 @@ class ChatsController extends ChangeNotifier {
     _setState(_state.copyWith(chatsLoadingMore: true));
 
     try {
-      final page = await _chatsService.getChatsPage(
+      final page = await _chatsService
+          .getChatsPage(
         currentUserId: _state.currentUserId!,
         limit: 50,
         cursor: cursor,
         archived: _listFetchArchived(),
-      );
-      final localReads = await _localChatStateService.getAllLastReadMessageIds();
+      ).timeout(const Duration(seconds: 35));
+      final localReads = await _localChatStateService
+          .getAllLastReadMessageIds()
+          .timeout(const Duration(seconds: 8), onTimeout: () => <int, int>{});
 
       final byId = {for (final c in _state.allChats) c.id: c};
       for (final c in page.chats) {

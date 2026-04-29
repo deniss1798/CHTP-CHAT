@@ -63,6 +63,7 @@ class ChatDetailMessageMaps {
       'sender_id': raw['sender_id'],
       'text': (raw['text'] ?? '').toString(),
       'message_type': (raw['message_type'] ?? 'text').toString(),
+      'client_message_id': raw['client_message_id']?.toString(),
       'media_key': raw['media_key']?.toString(),
       'media_url': UrlHelper.absoluteMediaUrl(raw['media_url']) ??
           raw['media_url']?.toString(),

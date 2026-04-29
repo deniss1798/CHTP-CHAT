@@ -1,10 +1,13 @@
 from dataclasses import dataclass
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 
 import json
+import logging
 
 from firebase_admin import messaging
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.firebase_admin import get_firebase_app
 from app.application.realtime.event_payload import realtime_event
 from app.models.chat import Chat
@@ -12,6 +15,19 @@ from app.models.chat_member import ChatMember
 from app.models.device_token import DeviceToken
 from app.models.notification_setting import NotificationSetting
 from app.models.user import User
+
+logger = logging.getLogger(__name__)
+_push_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="fcm-send")
+
+
+def _send_fcm_with_timeout(message: messaging.Message) -> str:
+    timeout = get_settings().push_send_timeout_seconds
+    future = _push_executor.submit(messaging.send, message)
+    try:
+        return future.result(timeout=timeout)
+    except FutureTimeoutError as exc:
+        logger.warning("FCM send timed out after %.2fs", timeout)
+        raise TimeoutError(f"FCM send timed out after {timeout}s") from exc
 
 
 def _is_invalid_fcm_token_error(exc: BaseException) -> bool:
@@ -114,7 +130,7 @@ def send_chat_message_push(
         for row in db.query(NotificationSetting.user_id)
         .filter(
             NotificationSetting.user_id.in_(recipient_user_ids),
-            NotificationSetting.notifications_enabled == False,
+            NotificationSetting.notifications_enabled.is_(False),
         )
         .all()
     }
@@ -128,7 +144,7 @@ def send_chat_message_push(
         db.query(DeviceToken)
         .filter(
             DeviceToken.user_id.in_(enabled_recipient_user_ids),
-            DeviceToken.is_active == True,
+            DeviceToken.is_active.is_(True),
         )
         .all()
     )
@@ -195,7 +211,7 @@ def send_chat_message_push(
                 android=android_cfg,
                 apns=apns_cfg,
             )
-            messaging.send(msg)
+            _send_fcm_with_timeout(msg)
         except Exception as e:
             print(f"Push send failed for token id={item.id}: {e}")
             if _is_invalid_fcm_token_error(e):
@@ -272,7 +288,7 @@ def send_incoming_call_fallback_push_to_user(
                     ),
                 ),
             )
-            messaging.send(msg)
+            _send_fcm_with_timeout(msg)
         except Exception as e:
             print(f"Incoming-call push failed for token id={item.id}: {e}")
             if _is_invalid_fcm_token_error(e):

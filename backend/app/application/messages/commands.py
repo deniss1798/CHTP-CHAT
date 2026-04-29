@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from fastapi import HTTPException, UploadFile, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.application.media.constants import PRIVATE_MEDIA_MESSAGE_TYPES
@@ -84,10 +85,28 @@ async def send_text_message(
             detail="Call events cannot reply to messages",
         )
 
+    client_message_id = (
+        payload.client_message_id.strip() if payload.client_message_id else None
+    )
+    if client_message_id:
+        existing = repo.get_by_client_message_id(
+            sender_id=current_user.id,
+            client_message_id=client_message_id,
+        )
+        if existing is not None:
+            require_chat_member(db, existing.chat_id, current_user)
+            if existing.chat_id != payload.chat_id:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="client_message_id already belongs to another chat",
+                )
+            return message_to_response(existing, db, viewer_user_id=current_user.id)
+
     new_message = Message(
         chat_id=payload.chat_id,
         sender_id=current_user.id,
         text=payload.text,
+        client_message_id=client_message_id,
         message_type=message_type,
         media_key=None,
         media_url=None,
@@ -97,7 +116,19 @@ async def send_text_message(
         reply_to_message_id=payload.reply_to_message_id,
     )
     repo.add(new_message)
-    repo.commit_refresh(new_message)
+    try:
+        repo.commit_refresh(new_message)
+    except IntegrityError:
+        db.rollback()
+        if not client_message_id:
+            raise
+        existing = repo.get_by_client_message_id(
+            sender_id=current_user.id,
+            client_message_id=client_message_id,
+        )
+        if existing is None:
+            raise
+        return message_to_response(existing, db, viewer_user_id=current_user.id)
 
     await _notify_new_message(
         db,

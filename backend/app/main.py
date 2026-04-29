@@ -20,6 +20,7 @@ from app.core.config import get_settings
 from app.core.log_redaction import install_log_redaction
 from app.core.perf_middleware import RequestTimingMiddleware
 from app.core.request_id_middleware import RequestIdMiddleware
+from app.core.ws_manager import realtime_stats
 from app.db.database import engine
 
 settings = get_settings()
@@ -92,6 +93,20 @@ def ready():
     if not _db_ready():
         raise HTTPException(status_code=503, detail="not_ready")
     return {"status": "ready"}
+
+
+@app.get("/metrics/realtime")
+@app.get("/api/metrics/realtime")
+def realtime_metrics():
+    return {
+        "chat_connections": realtime_stats.chat_connections,
+        "inbox_connections": realtime_stats.inbox_connections,
+        "chat_connect_total": realtime_stats.chat_connect_total,
+        "inbox_connect_total": realtime_stats.inbox_connect_total,
+        "chat_disconnect_total": realtime_stats.chat_disconnect_total,
+        "inbox_disconnect_total": realtime_stats.inbox_disconnect_total,
+        "send_error_total": realtime_stats.send_error_total,
+    }
 
 
 @app.get("/db-check")

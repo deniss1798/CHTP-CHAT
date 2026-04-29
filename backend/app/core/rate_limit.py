@@ -6,6 +6,13 @@ from dataclasses import dataclass
 
 from fastapi import HTTPException, Request, status
 
+from app.core.config import get_settings
+
+try:
+    import redis
+except Exception:  # pragma: no cover - optional production dependency
+    redis = None
+
 
 @dataclass(frozen=True)
 class RateLimitRule:
@@ -38,7 +45,43 @@ class InMemoryRateLimiter:
         self._hits.clear()
 
 
-rate_limiter = InMemoryRateLimiter()
+class RedisRateLimiter:
+    def __init__(self, url: str) -> None:
+        settings = get_settings()
+        if redis is None:
+            raise RuntimeError("redis package is not installed")
+        self._client = redis.Redis.from_url(
+            url,
+            decode_responses=True,
+            socket_timeout=settings.redis_socket_timeout_seconds,
+            socket_connect_timeout=settings.redis_socket_connect_timeout_seconds,
+        )
+
+    def check(self, key: str, rule: RateLimitRule) -> None:
+        bucket_key = f"rate-limit:{rule.name}:{key}"
+        pipe = self._client.pipeline()
+        pipe.incr(bucket_key)
+        pipe.expire(bucket_key, rule.window_seconds, nx=True)
+        count, _ = pipe.execute()
+        if int(count) > rule.max_attempts:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Too many requests. Please try again later.",
+            )
+
+    def clear(self) -> None:
+        # Test helper only. Avoid scanning production Redis by default.
+        pass
+
+
+def _build_rate_limiter():
+    redis_url = get_settings().redis_url
+    if redis_url:
+        return RedisRateLimiter(redis_url)
+    return InMemoryRateLimiter()
+
+
+rate_limiter = _build_rate_limiter()
 
 AUTH_LOGIN_RULE = RateLimitRule("auth_login", max_attempts=5, window_seconds=600)
 AUTH_REQUEST_CODE_RULE = RateLimitRule(

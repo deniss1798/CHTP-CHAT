@@ -11,6 +11,7 @@ from app.application.media.constants import (
     MAX_VIDEO_SIZE,
     MAX_VOICE_SIZE,
 )
+from app.core.config import get_settings
 from app.application.messages.document_rules import (
     sanitize_document_filename,
     validate_document_file,
@@ -263,7 +264,10 @@ def upload_private_message_voice(
 def presign_media_url(media_key: str | None) -> str | None:
     if not media_key:
         return None
-    return S3StorageService().generate_private_file_url(object_key=media_key)
+    return S3StorageService().generate_private_file_url(
+        object_key=media_key,
+        expires_in=get_settings().private_media_url_ttl_seconds,
+    )
 
 
 def presign_story_media_url(media_key: str | None) -> str | None:
@@ -272,7 +276,7 @@ def presign_story_media_url(media_key: str | None) -> str | None:
         return None
     return S3StorageService().generate_private_file_url(
         object_key=media_key,
-        expires_in=7200,
+        expires_in=get_settings().story_media_url_ttl_seconds,
     )
 
 

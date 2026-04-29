@@ -14,6 +14,7 @@ class MessageCreate(BaseModel):
     text: str = Field(..., min_length=1)
     reply_to_message_id: int | None = None
     message_type: str = Field(default="text", max_length=32)
+    client_message_id: str | None = Field(default=None, min_length=1, max_length=128)
 
 
 class ReactionGroup(BaseModel):
@@ -56,6 +57,7 @@ class MessageResponse(BaseModel):
 
     text: str
     message_type: str
+    client_message_id: str | None = None
 
     media_key: str | None = None
     media_url: str | None = None

@@ -252,15 +252,23 @@ class MessagesService {
     required String text,
     int? replyToMessageId,
     String messageType = 'text',
+    String? clientMessageId,
   }) async {
+    final requestData = <String, dynamic>{
+      'chat_id': chatId,
+      'text': text,
+      'message_type': messageType,
+    };
+    if (clientMessageId != null && clientMessageId.isNotEmpty) {
+      requestData['client_message_id'] = clientMessageId;
+    }
+    if (replyToMessageId != null) {
+      requestData['reply_to_message_id'] = replyToMessageId;
+    }
+
     final response = await _dio.post(
       '/messages/',
-      data: {
-        'chat_id': chatId,
-        'text': text,
-        'message_type': messageType,
-        if (replyToMessageId != null) 'reply_to_message_id': replyToMessageId,
-      },
+      data: requestData,
       options: await _authorizedOptions(),
     );
 

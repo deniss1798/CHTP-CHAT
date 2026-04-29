@@ -93,7 +93,9 @@ async def websocket_chat(
             if not isinstance(data, dict):
                 continue
             msg_type = data.get("type")
-            if msg_type == "typing":
+            if msg_type == "ping":
+                await websocket.send_json(realtime_event({"type": "pong"}))
+            elif msg_type == "typing":
                 sender_row = db.query(User).filter(User.id == user_id).first()
                 typing_payload = realtime_event({
                     "type": "typing",

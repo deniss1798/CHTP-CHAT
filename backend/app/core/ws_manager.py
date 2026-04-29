@@ -1,10 +1,25 @@
 import logging
 from collections import defaultdict
 from collections.abc import Callable
+from dataclasses import dataclass
 
 from fastapi import WebSocket
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class RealtimeStats:
+    chat_connections: int = 0
+    inbox_connections: int = 0
+    chat_connect_total: int = 0
+    inbox_connect_total: int = 0
+    chat_disconnect_total: int = 0
+    inbox_disconnect_total: int = 0
+    send_error_total: int = 0
+
+
+realtime_stats = RealtimeStats()
 
 
 class InboxConnectionManager:
@@ -15,11 +30,21 @@ class InboxConnectionManager:
 
     async def connect(self, user_id: int, websocket: WebSocket) -> None:
         await websocket.accept()
+        old_ws = self._user_id_to_ws.get(user_id)
+        if old_ws is not None and old_ws is not websocket:
+            try:
+                await old_ws.close(code=1000)
+            except Exception:
+                pass
         self._user_id_to_ws[user_id] = websocket
+        realtime_stats.inbox_connect_total += 1
+        realtime_stats.inbox_connections = len(self._user_id_to_ws)
 
     def disconnect(self, user_id: int, websocket: WebSocket) -> None:
         if self._user_id_to_ws.get(user_id) is websocket:
             del self._user_id_to_ws[user_id]
+            realtime_stats.inbox_disconnect_total += 1
+            realtime_stats.inbox_connections = len(self._user_id_to_ws)
 
     async def send_json(self, user_id: int, message: dict) -> bool:
         """True, если сообщение ушло по WebSocket; False, если соединения не было."""
@@ -39,6 +64,7 @@ class InboxConnectionManager:
             await ws.send_json(message)
             return True
         except Exception:
+            realtime_stats.send_error_total += 1
             self.disconnect(user_id, ws)
             return False
 
@@ -50,7 +76,18 @@ class ConnectionManager:
 
     async def connect(self, chat_id: int, websocket: WebSocket, user_id: int):
         await websocket.accept()
+        for old_ws, old_uid in list(self.active_connections.get(chat_id, [])):
+            if old_uid == user_id and old_ws is not websocket:
+                self.disconnect(chat_id, old_ws)
+                try:
+                    await old_ws.close(code=1000)
+                except Exception:
+                    pass
         self.active_connections[chat_id].append((websocket, user_id))
+        realtime_stats.chat_connect_total += 1
+        realtime_stats.chat_connections = sum(
+            len(items) for items in self.active_connections.values()
+        )
 
     def disconnect(self, chat_id: int, websocket: WebSocket):
         conns = self.active_connections.get(chat_id)
@@ -61,11 +98,16 @@ class ConnectionManager:
         ]
         if not self.active_connections[chat_id]:
             del self.active_connections[chat_id]
+        realtime_stats.chat_disconnect_total += 1
+        realtime_stats.chat_connections = sum(
+            len(items) for items in self.active_connections.values()
+        )
 
     async def _send_json_safe(self, chat_id: int, websocket: WebSocket, message: dict) -> None:
         try:
             await websocket.send_json(message)
         except Exception:
+            realtime_stats.send_error_total += 1
             self.disconnect(chat_id, websocket)
 
     async def broadcast(self, chat_id: int, message: dict):

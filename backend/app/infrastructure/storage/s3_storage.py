@@ -52,7 +52,12 @@ class S3StorageService:
             region_name=region,
             aws_access_key_id=settings.s3_access_key_id,
             aws_secret_access_key=settings.s3_secret_access_key,
-            config=Config(signature_version="s3v4"),
+            config=Config(
+                signature_version="s3v4",
+                connect_timeout=settings.s3_connect_timeout_seconds,
+                read_timeout=settings.s3_read_timeout_seconds,
+                retries={"max_attempts": 3, "mode": "standard"},
+            ),
         )
 
     def _build_public_url(self, object_key: str) -> str:

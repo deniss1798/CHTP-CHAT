@@ -6,6 +6,7 @@ from app.application.media.constants import PRIVATE_MEDIA_MESSAGE_TYPES
 from app.models.chat_member import ChatMember
 from app.models.message import Message
 from app.application.messages.reaction_service import reaction_groups_for_messages
+from app.core.config import get_settings
 from app.schemas.message_schema import MessageReplyPreview, MessageResponse, ReactionGroup
 from app.infrastructure.storage.s3_storage import S3StorageService, is_private_s3_ready
 
@@ -62,7 +63,10 @@ def reply_preview_for_parent(
         and ptype in PRIVATE_MEDIA_MESSAGE_TYPES
         and parent.media_key
     ):
-        media_url = get_storage().generate_private_file_url(object_key=parent.media_key)
+        media_url = get_storage().generate_private_file_url(
+            object_key=parent.media_key,
+            expires_in=get_settings().private_media_url_ttl_seconds,
+        )
     return MessageReplyPreview(
         id=parent.id,
         sender_id=parent.sender_id,
@@ -144,7 +148,10 @@ def message_to_response(
         and mtype_single in PRIVATE_MEDIA_MESSAGE_TYPES
         and message.media_key
     ):
-        media_url = get_storage().generate_private_file_url(object_key=message.media_key)
+        media_url = get_storage().generate_private_file_url(
+            object_key=message.media_key,
+            expires_in=get_settings().private_media_url_ttl_seconds,
+        )
 
     delivery_status = None
     if viewer_user_id is not None:
@@ -163,6 +170,7 @@ def message_to_response(
         sender_id=message.sender_id,
         text=safe_message_text(message),
         message_type=mtype_single,
+        client_message_id=message.client_message_id,
         media_key=None,
         media_url=media_url,
         media_mime_type=None if bool(getattr(message, "is_deleted", False)) else message.media_mime_type,
@@ -203,7 +211,10 @@ def message_to_response_batched(
         and mtype in PRIVATE_MEDIA_MESSAGE_TYPES
         and message.media_key
     ):
-        media_url = get_storage().generate_private_file_url(object_key=message.media_key)
+        media_url = get_storage().generate_private_file_url(
+            object_key=message.media_key,
+            expires_in=get_settings().private_media_url_ttl_seconds,
+        )
 
     if delivery_status is None:
         delivery_status = compute_delivery_status(
@@ -216,6 +227,7 @@ def message_to_response_batched(
         sender_id=message.sender_id,
         text=safe_message_text(message),
         message_type=mtype,
+        client_message_id=message.client_message_id,
         media_key=None,
         media_url=media_url,
         media_mime_type=None if bool(getattr(message, "is_deleted", False)) else message.media_mime_type,
@@ -253,7 +265,10 @@ def build_message_payload(
         and mtype_payload in PRIVATE_MEDIA_MESSAGE_TYPES
         and message.media_key
     ):
-        media_url = get_storage().generate_private_file_url(object_key=message.media_key)
+        media_url = get_storage().generate_private_file_url(
+            object_key=message.media_key,
+            expires_in=get_settings().private_media_url_ttl_seconds,
+        )
 
     return {
         "id": message.id,
@@ -261,6 +276,7 @@ def build_message_payload(
         "sender_id": message.sender_id,
         "text": safe_message_text(message),
         "message_type": mtype_payload,
+        "client_message_id": message.client_message_id,
         "media_key": None,
         "media_url": media_url,
         "media_mime_type": None if is_deleted else message.media_mime_type,
@@ -286,7 +302,8 @@ def apply_private_media_urls(messages: list[Message]) -> list[Message]:
         mtype = safe_message_type(message)
         if not bool(getattr(message, "is_deleted", False)) and mtype in PRIVATE_MEDIA_MESSAGE_TYPES and message.media_key:
             message.media_url = get_storage().generate_private_file_url(
-                object_key=message.media_key
+                object_key=message.media_key,
+                expires_in=get_settings().private_media_url_ttl_seconds,
             )
 
     return messages
@@ -302,5 +319,6 @@ def apply_private_media_urls_map(messages: list[Message]) -> None:
         mtype = safe_message_type(message)
         if not bool(getattr(message, "is_deleted", False)) and mtype in PRIVATE_MEDIA_MESSAGE_TYPES and message.media_key:
             message.media_url = get_storage().generate_private_file_url(
-                object_key=message.media_key
+                object_key=message.media_key,
+                expires_in=get_settings().private_media_url_ttl_seconds,
             )

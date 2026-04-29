@@ -21,8 +21,10 @@ mixin _ChatDetailComposerAndActionsLogic
     final replyId = _pendingReplyToMessageId();
     final clientTempId =
         'tmp-${widget.chatId}-${DateTime.now().microsecondsSinceEpoch}';
+    final clientMessageId = clientTempId;
     final optimisticMessage = <String, dynamic>{
       'client_temp_id': clientTempId,
+      'client_message_id': clientMessageId,
       'chat_id': widget.chatId,
       'sender_id': _currentUserId,
       'sender_username': _memberNames[_currentUserId] ?? 'Вы',
@@ -51,6 +53,7 @@ mixin _ChatDetailComposerAndActionsLogic
         chatId: widget.chatId,
         text: text,
         replyToMessageId: replyId,
+        clientMessageId: clientMessageId,
       );
 
       if (!mounted) return;
@@ -103,6 +106,8 @@ mixin _ChatDetailComposerAndActionsLogic
 
   Future<void> _retryFailedMessage(Map<String, dynamic> message) async {
     final clientTempId = message['client_temp_id']?.toString();
+    final clientMessageId =
+        (message['client_message_id'] ?? clientTempId)?.toString();
     final text = (message['text'] ?? '').toString().trim();
     if (clientTempId == null || clientTempId.isEmpty || text.isEmpty) return;
 
@@ -120,6 +125,7 @@ mixin _ChatDetailComposerAndActionsLogic
         replyToMessageId: ChatDetailMessageMaps.intFromDynamic(
           message['reply_to_message_id'],
         ),
+        clientMessageId: clientMessageId,
       );
       if (!mounted) return;
       setState(() {

@@ -96,6 +96,43 @@ def test_foreign_user_cannot_send_edit_or_delete(api_client, monkeypatch) -> Non
     assert foreign_delete.status_code == 403
 
 
+def test_send_message_is_idempotent_by_client_message_id(api_client, monkeypatch) -> None:
+    alice = register_user(api_client, monkeypatch, "alice", "alice@example.com")
+    bob = register_user(api_client, monkeypatch, "bob", "bob@example.com")
+    bob_id = _me(api_client, bob)["id"]
+    chat_id = _private_chat(api_client, alice, bob_id)
+
+    payload = {
+        "chat_id": chat_id,
+        "text": "retry-safe",
+        "client_message_id": "client-msg-1",
+    }
+    first = api_client.post(
+        "/messages/",
+        json=payload,
+        headers=auth_header(alice),
+    )
+    second = api_client.post(
+        "/messages/",
+        json=payload,
+        headers=auth_header(alice),
+    )
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert second.json()["id"] == first.json()["id"]
+    assert second.json()["client_message_id"] == "client-msg-1"
+
+    page = api_client.get(
+        f"/messages/chat/{chat_id}",
+        headers=auth_header(alice),
+    )
+    assert page.status_code == 200
+    assert [
+        m["client_message_id"] for m in page.json()["messages"]
+    ] == ["client-msg-1"]
+
+
 def test_cannot_react_to_deleted_message(api_client, monkeypatch) -> None:
     alice = register_user(api_client, monkeypatch, "alice", "alice@example.com")
     bob = register_user(api_client, monkeypatch, "bob", "bob@example.com")
