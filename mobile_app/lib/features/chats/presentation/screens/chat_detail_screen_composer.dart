@@ -69,6 +69,10 @@ mixin _ChatDetailComposerAndActionsLogic
         }
         _isSending = false;
       });
+      unawaited(_localChatStateService.cacheMessages(
+        chatId: widget.chatId,
+        messages: _messages,
+      ));
 
       await _markCurrentChatAsRead();
 
@@ -89,6 +93,10 @@ mixin _ChatDetailComposerAndActionsLogic
         );
         _isSending = false;
       });
+      unawaited(_localChatStateService.cacheMessages(
+        chatId: widget.chatId,
+        messages: _messages,
+      ));
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -135,6 +143,10 @@ mixin _ChatDetailComposerAndActionsLogic
           replacement: createdMessage,
         );
       });
+      unawaited(_localChatStateService.cacheMessages(
+        chatId: widget.chatId,
+        messages: _messages,
+      ));
       await _markCurrentChatAsRead();
     } catch (e) {
       if (!mounted) return;
@@ -148,6 +160,37 @@ mixin _ChatDetailComposerAndActionsLogic
           ),
         );
       });
+      unawaited(_localChatStateService.cacheMessages(
+        chatId: widget.chatId,
+        messages: _messages,
+      ));
+    }
+  }
+
+  @override
+  Future<void> _drainTextOutbox() async {
+    if (_isDrainingOutbox || _messages.isEmpty) return;
+    final pending = _messages.where((message) {
+      final status = message['delivery_status']?.toString();
+      final type = (message['message_type'] ?? 'text').toString();
+      final text = (message['text'] ?? '').toString().trim();
+      final clientTempId = message['client_temp_id']?.toString();
+      return (status == 'failed' || status == 'sending') &&
+          type == 'text' &&
+          text.isNotEmpty &&
+          clientTempId != null &&
+          clientTempId.isNotEmpty;
+    }).toList(growable: false);
+    if (pending.isEmpty) return;
+
+    _isDrainingOutbox = true;
+    try {
+      for (final message in pending) {
+        if (!mounted) return;
+        await _retryFailedMessage(message);
+      }
+    } finally {
+      _isDrainingOutbox = false;
     }
   }
 

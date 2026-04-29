@@ -11,6 +11,7 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
       onMessage: _handleSocketEvent,
     );
     await _recoverMissedMessages();
+    unawaited(_drainTextOutbox());
   }
 
   void _handleSocketEvent(Map<String, dynamic> incoming) {
@@ -421,6 +422,11 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
       });
     });
 
+    unawaited(_localChatStateService.cacheMessages(
+      chatId: widget.chatId,
+      messages: _messages,
+    ));
+
     await _markCurrentChatAsRead();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -476,6 +482,11 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
         });
       });
 
+      unawaited(_localChatStateService.cacheMessages(
+        chatId: widget.chatId,
+        messages: _messages,
+      ));
+
       await _markCurrentChatAsRead();
     } catch (_) {
       // Best-effort recovery; the periodic reconnect loop will try again.
@@ -506,4 +517,3 @@ mixin _ChatDetailRealtimeAndCallsLogic on _ChatDetailScreenStateBase, _ChatDetai
     requestChatsListRefresh();
   }
 }
-

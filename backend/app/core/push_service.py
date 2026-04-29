@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.firebase_admin import get_firebase_app
+from app.core.observability import push_stats
 from app.application.realtime.event_payload import realtime_event
 from app.models.chat import Chat
 from app.models.chat_member import ChatMember
@@ -24,8 +25,11 @@ def _send_fcm_with_timeout(message: messaging.Message) -> str:
     timeout = get_settings().push_send_timeout_seconds
     future = _push_executor.submit(messaging.send, message)
     try:
-        return future.result(timeout=timeout)
+        result = future.result(timeout=timeout)
+        push_stats.send_success_total += 1
+        return result
     except FutureTimeoutError as exc:
+        push_stats.send_timeout_total += 1
         logger.warning("FCM send timed out after %.2fs", timeout)
         raise TimeoutError(f"FCM send timed out after {timeout}s") from exc
 
@@ -213,8 +217,10 @@ def send_chat_message_push(
             )
             _send_fcm_with_timeout(msg)
         except Exception as e:
+            push_stats.send_error_total += 1
             print(f"Push send failed for token id={item.id}: {e}")
             if _is_invalid_fcm_token_error(e):
+                push_stats.invalid_token_total += 1
                 item.is_active = False
                 db.commit()
 
@@ -290,7 +296,9 @@ def send_incoming_call_fallback_push_to_user(
             )
             _send_fcm_with_timeout(msg)
         except Exception as e:
+            push_stats.send_error_total += 1
             print(f"Incoming-call push failed for token id={item.id}: {e}")
             if _is_invalid_fcm_token_error(e):
+                push_stats.invalid_token_total += 1
                 item.is_active = False
                 db.commit()

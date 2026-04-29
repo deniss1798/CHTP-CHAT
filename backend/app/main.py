@@ -18,7 +18,9 @@ from app.api.webrtc_router import router as webrtc_router
 from app.api.ws_router import router as ws_router
 from app.core.config import get_settings
 from app.core.log_redaction import install_log_redaction
+from app.core.observability import db_health, push_stats, redis_health
 from app.core.perf_middleware import RequestTimingMiddleware
+from app.core.realtime_bus import bus_metrics, start_realtime_bus, stop_realtime_bus
 from app.core.request_id_middleware import RequestIdMiddleware
 from app.core.ws_manager import realtime_stats
 from app.db.database import engine
@@ -55,6 +57,16 @@ if origins:
 
 # Outermost in add_middleware stack: first to see the request, last on response.
 app.add_middleware(RequestIdMiddleware)
+
+
+@app.on_event("startup")
+async def startup_realtime_bus() -> None:
+    await start_realtime_bus()
+
+
+@app.on_event("shutdown")
+async def shutdown_realtime_bus() -> None:
+    await stop_realtime_bus()
 
 
 @app.middleware("http")
@@ -106,6 +118,23 @@ def realtime_metrics():
         "chat_disconnect_total": realtime_stats.chat_disconnect_total,
         "inbox_disconnect_total": realtime_stats.inbox_disconnect_total,
         "send_error_total": realtime_stats.send_error_total,
+        "redis_bus": bus_metrics(),
+    }
+
+
+@app.get("/metrics/system")
+@app.get("/api/metrics/system")
+def system_metrics():
+    return {
+        "db": db_health(),
+        "redis": redis_health(),
+        "realtime": realtime_metrics(),
+        "push": {
+            "send_success_total": push_stats.send_success_total,
+            "send_error_total": push_stats.send_error_total,
+            "send_timeout_total": push_stats.send_timeout_total,
+            "invalid_token_total": push_stats.invalid_token_total,
+        },
     }
 
 

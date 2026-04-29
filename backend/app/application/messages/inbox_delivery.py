@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 
 from app.core.push_service import build_inbox_new_message_event
+from app.core.realtime_bus import publish_inbox_event
 from app.core.ws_manager import inbox_manager
 
 
@@ -23,3 +24,4 @@ async def notify_inbox_new_message(
             preview=preview,
         )
         await inbox_manager.send_json(uid, payload)
+        await publish_inbox_event(uid, payload)

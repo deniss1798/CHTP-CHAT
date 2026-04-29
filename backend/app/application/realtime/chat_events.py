@@ -10,31 +10,29 @@ from app.application.realtime.ws_event_names import (
     WS_TYPE_READ_RECEIPT,
 )
 from app.core.ws_manager import manager
+from app.core.realtime_bus import publish_chat_event, publish_reactions_refresh
 
 
 async def publish_new_message(chat_id: int, message: dict) -> None:
-    await manager.broadcast(
-        chat_id,
-        realtime_event({"type": WS_TYPE_NEW_MESSAGE, "message": message}),
-    )
+    payload = realtime_event({"type": WS_TYPE_NEW_MESSAGE, "message": message})
+    await manager.broadcast(chat_id, payload)
+    await publish_chat_event(chat_id, payload)
 
 
 async def publish_message_updated(chat_id: int, message: dict) -> None:
-    await manager.broadcast(
-        chat_id,
-        realtime_event({"event": WS_EVENT_MESSAGE_UPDATED, "message": message}),
-    )
+    payload = realtime_event({"event": WS_EVENT_MESSAGE_UPDATED, "message": message})
+    await manager.broadcast(chat_id, payload)
+    await publish_chat_event(chat_id, payload)
 
 
 async def publish_message_deleted(chat_id: int, *, message_id: int) -> None:
-    await manager.broadcast(
-        chat_id,
-        realtime_event({
-            "event": WS_EVENT_MESSAGE_DELETED,
-            "id": message_id,
-            "chat_id": chat_id,
-        }),
-    )
+    payload = realtime_event({
+        "event": WS_EVENT_MESSAGE_DELETED,
+        "id": message_id,
+        "chat_id": chat_id,
+    })
+    await manager.broadcast(chat_id, payload)
+    await publish_chat_event(chat_id, payload)
 
 
 async def publish_read_receipt(
@@ -43,15 +41,14 @@ async def publish_read_receipt(
     user_id: int,
     last_read_message_id: int | None,
 ) -> None:
-    await manager.broadcast(
-        chat_id,
-        realtime_event({
-            "type": WS_TYPE_READ_RECEIPT,
-            "chat_id": chat_id,
-            "user_id": user_id,
-            "last_read_message_id": last_read_message_id,
-        }),
-    )
+    payload = realtime_event({
+        "type": WS_TYPE_READ_RECEIPT,
+        "chat_id": chat_id,
+        "user_id": user_id,
+        "last_read_message_id": last_read_message_id,
+    })
+    await manager.broadcast(chat_id, payload)
+    await publish_chat_event(chat_id, payload)
 
 
 async def publish_message_reactions_updated(
@@ -70,3 +67,4 @@ async def publish_message_reactions_updated(
         })
 
     await manager.broadcast_personalized(chat_id, build)
+    await publish_reactions_refresh(chat_id, message_id)

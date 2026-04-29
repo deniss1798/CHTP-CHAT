@@ -2,6 +2,7 @@ part of 'chat_detail_screen.dart';
 
 mixin _ChatDetailStateHelpers on _ChatDetailScreenStateBase {
   Future<void> _connectSocket();
+  Future<void> _drainTextOutbox();
 
   Future<void> _ensureSocketConnected() async {
     if (_chatSocketService.isConnected) return;

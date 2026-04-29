@@ -113,6 +113,7 @@ abstract class _ChatDetailScreenStateBase extends State<ChatDetailScreen> {
   bool _isLoading = true;
   bool _isSending = false;
   bool _isRecoveringRealtime = false;
+  bool _isDrainingOutbox = false;
   String? _error;
 
   int? _currentUserId;
@@ -132,6 +133,7 @@ abstract class _ChatDetailScreenStateBase extends State<ChatDetailScreen> {
   Timer? _presenceTimer;
   Timer? _socketReconnectTimer;
   Timer? _socketPingTimer;
+  Timer? _outboxRetryTimer;
   /// Обновление подписи «N мин/ч назад» в шапке личного чата.
   Timer? _lastSeenSubtitleTimer;
 
@@ -187,6 +189,7 @@ class _ChatDetailScreenState extends _ChatDetailScreenStateBase
     openChatSyncNotifier.removeListener(_onOpenChatSyncRequest);
     _socketReconnectTimer?.cancel();
     _socketPingTimer?.cancel();
+    _outboxRetryTimer?.cancel();
     _lastSeenSubtitleTimer?.cancel();
     _presenceTimer?.cancel();
     _typingDebounce?.cancel();

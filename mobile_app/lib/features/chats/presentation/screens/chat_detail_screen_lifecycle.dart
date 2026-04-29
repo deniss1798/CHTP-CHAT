@@ -92,12 +92,26 @@ mixin _ChatDetailLifecycleLogic on _ChatDetailScreenStateBase, _ChatDetailStateH
     });
   }
 
+  void _startOutboxRetryLoop() {
+    _outboxRetryTimer?.cancel();
+    _outboxRetryTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (!mounted) return;
+      unawaited(_drainTextOutbox());
+    });
+  }
+
 
   Future<void> _initChat() async {
     setState(() {
       _isLoading = true;
       _error = null;
     });
+
+    final cachedUserId = await _localChatStateService.getCachedCurrentUserId();
+    if (cachedUserId != null) {
+      _currentUserId = cachedUserId;
+    }
+    await _loadCachedMessagesForOffline();
 
     try {
       final me = await _authService.getMe();
@@ -108,21 +122,41 @@ mixin _ChatDetailLifecycleLogic on _ChatDetailScreenStateBase, _ChatDetailStateH
       } else {
         _currentUserId = int.tryParse(userId.toString());
       }
+      final current = _currentUserId;
+      if (current != null) {
+        unawaited(_localChatStateService.saveCurrentUserId(current));
+      }
 
-      await _loadChatDetails();
+      try {
+        await _loadChatDetails();
+      } catch (_) {}
 
-      await _loadChatMembers();
+      try {
+        await _loadChatMembers();
+      } catch (_) {}
 
       await _loadMessages();
       await _connectSocket();
       _startSocketReconnectLoop();
       _startSocketHeartbeat();
+      _startOutboxRetryLoop();
       _startPresenceHeartbeat();
       if (mounted && _messageController.text.trim().isNotEmpty) {
         _onMessageTextChanged();
       }
     } catch (e) {
       if (!mounted) return;
+      if (_messages.isNotEmpty) {
+        setState(() {
+          _isLoading = false;
+          _error = null;
+        });
+        _startSocketReconnectLoop();
+        _startSocketHeartbeat();
+        _startOutboxRetryLoop();
+        _startPresenceHeartbeat();
+        return;
+      }
 
       setState(() {
         _error = chatDetailExtractErrorMessage(e, fallback: 'Не удалось открыть чат');
@@ -433,6 +467,11 @@ mixin _ChatDetailLifecycleLogic on _ChatDetailScreenStateBase, _ChatDetailStateH
         _isLoading = false;
       });
 
+      unawaited(_localChatStateService.cacheMessages(
+        chatId: widget.chatId,
+        messages: normalizedMessages,
+      ));
+
       await _markCurrentChatAsRead();
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -442,6 +481,9 @@ mixin _ChatDetailLifecycleLogic on _ChatDetailScreenStateBase, _ChatDetailStateH
       if (!mounted) return;
       if (silentError) return;
 
+      final loadedFromCache = await _loadCachedMessagesForOffline();
+      if (loadedFromCache) return;
+
       setState(() {
         _error = chatDetailExtractErrorMessage(
           e,
@@ -450,6 +492,38 @@ mixin _ChatDetailLifecycleLogic on _ChatDetailScreenStateBase, _ChatDetailStateH
         _isLoading = false;
       });
     }
+  }
+
+  Future<bool> _loadCachedMessagesForOffline() async {
+    final cached = await _localChatStateService.getCachedMessages(widget.chatId);
+    if (!mounted || cached.isEmpty) return false;
+
+    var normalizedMessages = cached
+        .map(ChatDetailMessageMaps.normalizeMessageMap)
+        .toList();
+
+    normalizedMessages = normalizedMessages.map((m) {
+      if (_currentUserId == null) return m;
+      if (!_isMine(m)) return m;
+      final mid = ChatDetailMessageMaps.intFromDynamic(m['id']);
+      if (mid == null) return m;
+      final copy = Map<String, dynamic>.from(m);
+      copy['delivery_status'] = _computeDeliveryForOutgoing(mid);
+      return copy;
+    }).toList();
+
+    normalizedMessages.sort((a, b) {
+      final am = serverInstantMillis(a['created_at']?.toString());
+      final bm = serverInstantMillis(b['created_at']?.toString());
+      return (am ?? 0).compareTo(bm ?? 0);
+    });
+
+    setState(() {
+      _messages = normalizedMessages;
+      _isLoading = false;
+      _error = null;
+    });
+    return true;
   }
 
 }

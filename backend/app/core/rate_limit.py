@@ -7,11 +7,7 @@ from dataclasses import dataclass
 from fastapi import HTTPException, Request, status
 
 from app.core.config import get_settings
-
-try:
-    import redis
-except Exception:  # pragma: no cover - optional production dependency
-    redis = None
+from app.core.redis_client import redis
 
 
 @dataclass(frozen=True)

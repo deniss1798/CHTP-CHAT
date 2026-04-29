@@ -6,6 +6,7 @@ from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 
 from app.application.realtime.event_payload import realtime_event
+from app.core.realtime_bus import publish_chat_event, publish_inbox_event
 from app.core.rate_limit import WS_CONNECT_RULE, rate_limiter, websocket_client_ip
 from app.core.push_service import send_incoming_call_fallback_push_to_user
 from app.core.security import decode_ws_or_access_token
@@ -109,6 +110,7 @@ async def websocket_chat(
                     typing_payload,
                     exclude_user_id=user_id,
                 )
+                await publish_chat_event(chat_id, typing_payload)
                 member_ids = (
                     db.query(ChatMember.user_id)
                     .filter(ChatMember.chat_id == chat_id)
@@ -117,6 +119,7 @@ async def websocket_chat(
                 for (member_uid,) in member_ids:
                     if member_uid != user_id:
                         await inbox_manager.send_json(member_uid, typing_payload)
+                        await publish_inbox_event(member_uid, typing_payload)
             elif msg_type in _CALL_SIGNAL_TYPES:
                 call_payload = dict(data)
                 call_payload["type"] = msg_type
@@ -135,6 +138,7 @@ async def websocket_chat(
                     call_payload,
                     exclude_user_id=user_id,
                 )
+                await publish_chat_event(chat_id, call_payload)
                 # SDP/ICE не дублируем в inbox: при открытом чате + inbox — двойная доставка
                 # ломает WebRTC (setRemoteDescription, обрыв медиа).
                 if msg_type not in ("group_call_sdp", "group_call_ice"):
@@ -155,6 +159,7 @@ async def websocket_chat(
                             inbox_ok = await inbox_manager.send_json(
                                 member_uid, call_payload
                             )
+                            await publish_inbox_event(member_uid, call_payload)
                             if msg_type not in ("call_e2e_init", "group_call_invite"):
                                 continue
                             if inbox_ok:

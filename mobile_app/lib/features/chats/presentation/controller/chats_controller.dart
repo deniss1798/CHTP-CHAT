@@ -67,6 +67,7 @@ class ChatsController extends ChangeNotifier {
   final Map<int, Timer> _typingInboxTimers = {};
   bool _isDisposed = false;
   bool _refreshInFlight = false;
+  bool _inboxConnectInFlight = false;
 
   void _handleChatsRefresh() {
     if (_state.currentUserId == null) return;
@@ -329,8 +330,13 @@ class ChatsController extends ChangeNotifier {
           clearChatsNextCursor: !page.hasMore,
         ),
       );
+      unawaited(_localChatStateService.cacheChats(chats));
     } catch (error) {
       if (!silent) {
+        final loadedFromCache = await _loadCachedChatsForOffline();
+        if (loadedFromCache) {
+          return;
+        }
         _setState(
           _state.copyWith(
             error: _extractLoadChatsErrorMessage(error),
@@ -355,6 +361,17 @@ class ChatsController extends ChangeNotifier {
 
   Future<void> _init() async {
     try {
+      final cachedUserId = await _localChatStateService.getCachedCurrentUserId();
+      if (cachedUserId != null) {
+        _setState(
+          _state.copyWith(
+            currentUserId: cachedUserId,
+            keepCurrentUserId: false,
+          ),
+        );
+        await _loadCachedChatsForOffline();
+      }
+
       final me = await _authService
           .getMe()
           .timeout(const Duration(seconds: 25));
@@ -370,6 +387,7 @@ class ChatsController extends ChangeNotifier {
       if (currentUserId == null) {
         throw Exception('Сервер не вернул id пользователя');
       }
+      unawaited(_localChatStateService.saveCurrentUserId(currentUserId));
 
       await refresh();
       if (_state.currentUserId != null) {
@@ -381,7 +399,7 @@ class ChatsController extends ChangeNotifier {
       }
       _setState(
         _state.copyWith(
-          error: _extractInitErrorMessage(error),
+          error: _state.allChats.isEmpty ? _extractInitErrorMessage(error) : null,
           isLoading: false,
         ),
       );
@@ -401,41 +419,65 @@ class ChatsController extends ChangeNotifier {
     _chatsPollTimer = Timer.periodic(_chatsListPollInterval, (_) {
       if (_state.currentUserId == null) return;
       unawaited(refresh(silent: true));
+      if (!_inboxSocket.isConnected) {
+        unawaited(_connectInboxWithRetry());
+      }
     });
   }
 
-  Future<void> _connectInboxWithRetry() async {
-    await _inboxSubscription?.cancel();
-    _inboxSubscription = null;
-    _inboxPingTimer?.cancel();
-    _inboxPingTimer = null;
+  Future<bool> _loadCachedChatsForOffline() async {
+    final chats = await _localChatStateService.getCachedChats();
+    if (chats.isEmpty) return false;
+    _setState(
+      _state.copyWith(
+        allChats: chats,
+        filteredChats: _applySearchToList(chats, _state.searchQuery),
+        isLoading: false,
+        clearError: true,
+        clearChatsNextCursor: true,
+      ),
+    );
+    return true;
+  }
 
-    for (var attempt = 0; attempt < 5; attempt++) {
-      try {
-        await _inboxSocket.connect(baseHttpUrl: ApiClient.baseUrl);
-        _inboxSubscription = _inboxSocket.messagesStream.listen(_onInboxMessage);
-        _inboxPingTimer = Timer.periodic(const Duration(seconds: 25), (_) {
-          if (!_inboxSocket.isConnected) return;
-          _inboxSocket.sendPing();
-        });
-        if (kDebugMode) {
-          debugPrint('ChatsController: inbox WebSocket connected');
-        }
-        return;
-      } catch (error) {
-        if (kDebugMode) {
-          debugPrint(
-            'ChatsController: inbox connect attempt ${attempt + 1}/5: $error',
+  Future<void> _connectInboxWithRetry() async {
+    if (_inboxConnectInFlight) return;
+    _inboxConnectInFlight = true;
+    try {
+      await _inboxSubscription?.cancel();
+      _inboxSubscription = null;
+      _inboxPingTimer?.cancel();
+      _inboxPingTimer = null;
+
+      for (var attempt = 0; attempt < 5; attempt++) {
+        try {
+          await _inboxSocket.connect(baseHttpUrl: ApiClient.baseUrl);
+          _inboxSubscription = _inboxSocket.messagesStream.listen(_onInboxMessage);
+          _inboxPingTimer = Timer.periodic(const Duration(seconds: 25), (_) {
+            if (!_inboxSocket.isConnected) return;
+            _inboxSocket.sendPing();
+          });
+          if (kDebugMode) {
+            debugPrint('ChatsController: inbox WebSocket connected');
+          }
+          return;
+        } catch (error) {
+          if (kDebugMode) {
+            debugPrint(
+              'ChatsController: inbox connect attempt ${attempt + 1}/5: $error',
+            );
+          }
+          await Future<void>.delayed(
+            Duration(milliseconds: 400 + attempt * 350),
           );
         }
-        await Future<void>.delayed(
-          Duration(milliseconds: 400 + attempt * 350),
-        );
       }
-    }
 
-    if (kDebugMode) {
-      debugPrint('ChatsController: inbox WebSocket failed after retries');
+      if (kDebugMode) {
+        debugPrint('ChatsController: inbox WebSocket failed after retries');
+      }
+    } finally {
+      _inboxConnectInFlight = false;
     }
   }
 
