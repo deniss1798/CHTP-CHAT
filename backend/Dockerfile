@@ -1,30 +1,26 @@
-# Используем официальный образ Python
-FROM python:3.14-slim
-
-# ffmpeg: перекодирование видео в H.264/AAC для десктоп-клиентов (Windows video_player)
-RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg \
-    && rm -rf /var/lib/apt/lists/*
-
-# Устанавливаем рабочую директорию внутри контейнера
+FROM python:3.14-slim AS builder
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg gcc && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-
-# Копируем файл с зависимостями (этот слой кешируется, если requirements не менялся)
 COPY requirements.txt .
-
-# Устанавливаем зависимости
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Копируем весь код проекта
+RUN pip install --no-cache-dir -r requirements.txt pyinstaller
 COPY . .
+RUN ls -la /app && ls -la /app/app || echo "no /app/app folder"
+RUN pyinstaller --onefile \
+    --name app \
+    --hidden-import uvicorn \
+    --hidden-import uvicorn.loops \
+    --hidden-import uvicorn.loops.auto \
+    --hidden-import uvicorn.protocols \
+    --hidden-import uvicorn.protocols.http \
+    --hidden-import uvicorn.protocols.http.auto \
+    app/main.py
 
-# (Опционально) Создаём пользователя не-root для безопасности
-RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+FROM alpine:3.23.4
+RUN apk add --no-cache ffmpeg libstdc++
+WORKDIR /app
+COPY --from=builder /app/dist/app .
+RUN chmod +x ./app && adduser -D -u 1000 appuser && chown appuser:appuser /app
 USER appuser
-
 EXPOSE 8000
-
-# Команда для запуска приложения
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["./app"]
