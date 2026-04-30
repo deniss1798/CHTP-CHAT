@@ -23,7 +23,7 @@ RUN pyinstaller --onefile \
     --hidden-import uvicorn.protocols \
     --hidden-import uvicorn.protocols.http \
     --hidden-import uvicorn.protocols.http.auto \
-    app/main.py   # замените на ваш файл, содержащий объект app
+    main.py   # замените на ваш файл, содержащий объект app
 
 FROM alpine:3.23.4
 
