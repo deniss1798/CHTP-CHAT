@@ -5,6 +5,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt pyinstaller
 COPY . .
+RUN ls -la /app && ls -la /app/app || echo "no /app/app folder"
 RUN pyinstaller --onefile \
     --name app \
     --hidden-import uvicorn \
@@ -13,7 +14,7 @@ RUN pyinstaller --onefile \
     --hidden-import uvicorn.protocols \
     --hidden-import uvicorn.protocols.http \
     --hidden-import uvicorn.protocols.http.auto \
-    main.py   # предполагаем, что main.py в корне
+    app/main.py   # предполагаем, что main.py в корне
 
 FROM alpine:3.23.4
 RUN apk add --no-cache ffmpeg libstdc++
