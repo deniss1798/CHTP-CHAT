@@ -25,7 +25,7 @@ RUN pyinstaller --onefile \
     --hidden-import uvicorn.protocols.http.auto \
     app/main.py   # замените на ваш файл, содержащий объект app
 
-FROM alpine:3.23.4@sha256:4d889c14e7d5
+FROM alpine:3.23.4
 
 RUN apk add --no-cache ffmpeg libstdc++
 
