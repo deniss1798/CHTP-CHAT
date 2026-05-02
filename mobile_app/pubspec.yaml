@@ -31,6 +31,11 @@ dependencies:
   flutter_webrtc: ^1.4.1
   cryptography: ^2.9.0
   audioplayers: ^6.1.0
+  path_provider: ^2.1.5
+  path: ^1.9.1
+  sqlite3: ^2.9.4
+  sqlite3_flutter_libs: ^0.5.40
+  record: ^6.2.0
   flutter_linkify: ^6.0.0
   # 19+ тянет flutter_local_notifications_windows (FFI) — gen_snapshot падает на Windows AOT.
   flutter_local_notifications: ^18.0.1
@@ -42,17 +47,18 @@ dev_dependencies:
 
 flutter_launcher_icons:
   android: true
-  ios: false
-  image_path: "assets/icons/icon.png"
+  ios: true
+  image_path: "assets/icons/app_icon.png"
   adaptive_icon_background: "#000000"
-  adaptive_icon_foreground: "assets/icons/icon.png"
+  adaptive_icon_foreground: "assets/icons/app_icon.png"
   windows:
     generate: true
-    image_path: "assets/icons/icon.png"
+    image_path: "assets/icons/app_icon.png"
 
 flutter:
   uses-material-design: true
 
   assets:
-    - assets/icons/icon.png
+    - assets/icons/app_icon.png
+    - assets/icons/ic_notification.png
     - assets/sounds/incoming_call.mp3

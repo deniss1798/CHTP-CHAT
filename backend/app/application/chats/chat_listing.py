@@ -1,0 +1,250 @@
+import base64
+import json
+from datetime import datetime
+
+from sqlalchemy import Integer, and_, cast, desc, func, or_
+from sqlalchemy.orm import Session
+
+from app.application.chats.chat_queries import message_type_for_chat_list
+from app.application.messages.message_projection import DELETED_MESSAGE_TEXT
+from app.models.chat import Chat
+from app.models.chat_member import ChatMember
+from app.models.message import Message
+from app.models.user import User
+from app.schemas.chat_schema import ChatListPage, ChatResponse
+
+_EPOCH = datetime(1970, 1, 1)
+
+
+def _encode_chat_cursor(last_message_at: datetime | None, chat_id: int, *, pinned: bool) -> str:
+    """Курсор v2: pin (bool→int закрепление), активность по последнему сообщению."""
+    pin_ord = 1 if pinned else 0
+    payload = {
+        "v": 2,
+        "p": pin_ord,
+        "a": last_message_at.isoformat() if last_message_at else None,
+        "c": chat_id,
+    }
+    raw = json.dumps(payload, separators=(",", ":")).encode()
+    return base64.urlsafe_b64encode(raw).decode()
+
+
+def _decode_chat_cursor(
+    cursor: str,
+) -> tuple[int | None, datetime | None, int]:
+    """legacy: (_, la, cid) с pin=None; v2: (0|1 для cast(is_pinned), la, cid)."""
+    raw = json.loads(base64.urlsafe_b64decode(cursor.encode()).decode())
+    if raw.get("v") != 2:
+        la = datetime.fromisoformat(raw["a"]) if raw.get("a") else None
+        cid = int(raw["c"])
+        return None, la, cid
+    pin = int(raw["p"])
+    la = datetime.fromisoformat(raw["a"]) if raw.get("a") else None
+    cid = int(raw["c"])
+    return pin, la, cid
+
+
+def _build_chat_responses_batch(
+    db: Session,
+    chats: list[Chat],
+    current_user: User,
+) -> list[ChatResponse]:
+    if not chats:
+        return []
+
+    chat_ids = [chat.id for chat in chats]
+    chat_by_id = {chat.id: chat for chat in chats}
+
+    member_rows = (
+        db.query(ChatMember.chat_id, User)
+        .join(User, User.id == ChatMember.user_id)
+        .filter(ChatMember.chat_id.in_(chat_ids))
+        .order_by(ChatMember.chat_id.asc(), User.username.asc())
+        .all()
+    )
+    users_by_chat: dict[int, list[User]] = {chat_id: [] for chat_id in chat_ids}
+    for chat_id, user in member_rows:
+        users_by_chat.setdefault(chat_id, []).append(user)
+
+    current_memberships = (
+        db.query(ChatMember)
+        .filter(
+            ChatMember.chat_id.in_(chat_ids),
+            ChatMember.user_id == current_user.id,
+        )
+        .all()
+    )
+    membership_by_chat = {row.chat_id: row for row in current_memberships}
+
+    last_id_sub = (
+        db.query(Message.chat_id, func.max(Message.id).label("last_message_id"))
+        .filter(Message.chat_id.in_(chat_ids))
+        .group_by(Message.chat_id)
+        .subquery()
+    )
+    last_messages = (
+        db.query(Message)
+        .join(last_id_sub, Message.id == last_id_sub.c.last_message_id)
+        .all()
+    )
+    last_by_chat = {message.chat_id: message for message in last_messages}
+
+    unread_rows = (
+        db.query(Message.chat_id, func.count(Message.id))
+        .join(
+            ChatMember,
+            and_(
+                ChatMember.chat_id == Message.chat_id,
+                ChatMember.user_id == current_user.id,
+            ),
+        )
+        .filter(
+            Message.chat_id.in_(chat_ids),
+            Message.sender_id != current_user.id,
+            Message.id > func.coalesce(ChatMember.last_read_message_id, 0),
+        )
+        .group_by(Message.chat_id)
+        .all()
+    )
+    unread_by_chat = {chat_id: int(count) for chat_id, count in unread_rows}
+
+    responses: list[ChatResponse] = []
+    for chat_id in chat_ids:
+        chat = chat_by_id[chat_id]
+        users = users_by_chat.get(chat_id, [])
+        chat_title = chat.title
+        chat_avatar_url = chat.avatar_url
+        peer_last_seen_at = None
+
+        if chat.type == "private":
+            other_user = next((user for user in users if user.id != current_user.id), None)
+            if other_user:
+                chat_title = other_user.username
+                chat_avatar_url = other_user.avatar_url
+                peer_last_seen_at = other_user.last_seen_at
+
+        last_message = last_by_chat.get(chat_id)
+        last_message_sender_name: str | None = None
+        if last_message and last_message.sender_id is not None:
+            sender = next(
+                (u for u in users if u.id == int(last_message.sender_id)),
+                None,
+            )
+            if sender and str(sender.username or "").strip():
+                last_message_sender_name = str(sender.username).strip()
+
+        membership = membership_by_chat.get(chat_id)
+        my_last_read = (membership.last_read_message_id or 0) if membership else 0
+        is_archived = bool(getattr(membership, "is_archived", False)) if membership else False
+        notifications_muted = bool(getattr(membership, "notifications_muted", False)) if membership else False
+        is_pinned = bool(getattr(membership, "is_pinned", False)) if membership else False
+
+        responses.append(
+            ChatResponse(
+                id=chat.id,
+                type=chat.type,
+                title=chat_title,
+                avatar_url=chat_avatar_url,
+                created_by=chat.created_by,
+                last_message=(
+                    DELETED_MESSAGE_TEXT
+                    if last_message and bool(getattr(last_message, "is_deleted", False))
+                    else (last_message.text if last_message else None)
+                ),
+                last_message_type=message_type_for_chat_list(last_message),
+                last_message_at=last_message.created_at if last_message else None,
+                last_message_sender_id=last_message.sender_id if last_message else None,
+                last_message_sender_name=last_message_sender_name,
+                last_message_id=last_message.id if last_message else None,
+                my_last_read_message_id=my_last_read,
+                unread_count=unread_by_chat.get(chat_id, 0),
+                peer_last_seen_at=peer_last_seen_at,
+                is_archived=is_archived,
+                notifications_muted=notifications_muted,
+                is_pinned=is_pinned,
+            )
+        )
+
+    return responses
+
+
+def list_my_chats(db: Session, current_user: User) -> list[ChatResponse]:
+    """Полный список (для обратной совместимости внутри сервисов)."""
+    page = list_my_chats_page(db, current_user, limit=10_000, cursor=None)
+    return page.chats
+
+
+def list_my_chats_page(
+    db: Session,
+    current_user: User,
+    *,
+    limit: int,
+    cursor: str | None,
+    archived: bool = False,
+) -> ChatListPage:
+    """Закреплённые первыми, затем по активности (последнее сообщение); курсор v2 совместим с pin."""
+    lim = max(1, min(limit, 200))
+
+    last_sub = (
+        db.query(
+            Message.chat_id.label("chat_id"),
+            func.max(Message.created_at).label("last_at"),
+        )
+        .group_by(Message.chat_id)
+        .subquery()
+    )
+
+    sort_col = func.coalesce(last_sub.c.last_at, _EPOCH)
+    pin_ord = cast(ChatMember.is_pinned, Integer)
+
+    q = (
+        db.query(Chat, last_sub.c.last_at, ChatMember.is_pinned)
+        .join(ChatMember, ChatMember.chat_id == Chat.id)
+        .outerjoin(last_sub, last_sub.c.chat_id == Chat.id)
+        .filter(ChatMember.user_id == current_user.id)
+        .filter(ChatMember.is_archived.is_(archived))
+    )
+
+    if cursor:
+        pin_cursor, cursor_la, cursor_cid = _decode_chat_cursor(cursor)
+        cursor_sort = cursor_la or _EPOCH
+
+        if pin_cursor is None:
+            q = q.filter(
+                or_(
+                    sort_col < cursor_sort,
+                    and_(sort_col == cursor_sort, Chat.id < cursor_cid),
+                )
+            )
+        else:
+            q = q.filter(
+                or_(
+                    pin_ord < pin_cursor,
+                    and_(
+                        pin_ord == pin_cursor,
+                        or_(
+                            sort_col < cursor_sort,
+                            and_(sort_col == cursor_sort, Chat.id < cursor_cid),
+                        ),
+                    ),
+                )
+            )
+
+    rows = q.order_by(desc(pin_ord), desc(sort_col), desc(Chat.id)).limit(lim + 1).all()
+
+    has_more = len(rows) > lim
+    page_rows = rows[:lim]
+
+    chats = _build_chat_responses_batch(
+        db,
+        [chat for chat, _last_at, _p in page_rows],
+        current_user,
+    )
+
+    next_cursor: str | None = None
+    if has_more and page_rows:
+        last_chat, last_la, last_pin = page_rows[-1]
+        pinned_flag = bool(last_pin)
+        next_cursor = _encode_chat_cursor(last_la, last_chat.id, pinned=pinned_flag)
+
+    return ChatListPage(chats=chats, has_more=has_more, next_cursor=next_cursor)

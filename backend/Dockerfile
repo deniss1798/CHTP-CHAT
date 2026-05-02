@@ -14,7 +14,7 @@ RUN pyinstaller --onefile \
     --hidden-import uvicorn.protocols \
     --hidden-import uvicorn.protocols.http \
     --hidden-import uvicorn.protocols.http.auto \
-    app/main.py   # предполагаем, что main.py в корне
+    app/main.py
 
 FROM alpine:3.23.4
 RUN apk add --no-cache ffmpeg libstdc++

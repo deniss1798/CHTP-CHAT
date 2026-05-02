@@ -1,7 +1,7 @@
 from typing import Literal
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, EmailStr, Field
 
 
 class UserShort(BaseModel):
@@ -49,14 +49,48 @@ class ChatResponse(BaseModel):
     last_message_type: str | None = None
     last_message_at: datetime | None = None
     last_message_sender_id: int | None = None
+    last_message_sender_name: str | None = None
     last_message_id: int | None = None
     my_last_read_message_id: int | None = None
     unread_count: int = 0
     # Для личных чатов — last_seen собеседника (индикатор «в сети» в списке).
     peer_last_seen_at: datetime | None = None
 
+    # Персонификация на участника (вы).
+    is_archived: bool = False
+    notifications_muted: bool = False
+    is_pinned: bool = False
+
     class Config:
         from_attributes = True
+
+
+class ChatMemberPreferencesPayload(BaseModel):
+    """PATCH /chats/{id}/member-preferences: принимаем snake_case и camelCase."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    is_archived: bool | None = Field(
+        default=None,
+        validation_alias=AliasChoices("is_archived", "isArchived"),
+    )
+    notifications_muted: bool | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "notifications_muted",
+            "notificationsMuted",
+        ),
+    )
+    is_pinned: bool | None = Field(
+        default=None,
+        validation_alias=AliasChoices("is_pinned", "isPinned"),
+    )
+
+
+class ChatListPage(BaseModel):
+    chats: list[ChatResponse]
+    has_more: bool
+    next_cursor: str | None = None
 
 
 class ChatMemberResponse(BaseModel):

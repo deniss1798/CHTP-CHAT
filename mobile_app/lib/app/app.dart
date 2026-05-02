@@ -9,10 +9,13 @@ class PendingPushPayload {
   const PendingPushPayload({
     required this.chatId,
     this.avatarUrl,
+    this.incomingCallInvite,
   });
 
   final int chatId;
   final String? avatarUrl;
+  /// То же событие, что приходит из inbox WS (cold start после FCM tap).
+  final Map<String, dynamic>? incomingCallInvite;
 }
 
 PendingPushPayload? _pendingPush;

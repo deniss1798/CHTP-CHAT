@@ -1,13 +1,27 @@
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, BigInteger, String
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, BigInteger, Index, String
 from sqlalchemy.sql import func
 
 from app.db.database import Base
+from app.db.types import bigint_primary_key
 
 
 class DeviceToken(Base):
     __tablename__ = "device_tokens"
+    __table_args__ = (
+        Index(
+            "ix_device_tokens_user_updated_id",
+            "user_id",
+            "updated_at",
+            "id",
+        ),
+    )
 
-    id = Column(BigInteger, primary_key=True, index=True)
+    id = Column(
+        bigint_primary_key(),
+        primary_key=True,
+        autoincrement=True,
+        index=True,
+    )
     user_id = Column(
         BigInteger,
         ForeignKey("users.id", ondelete="CASCADE"),

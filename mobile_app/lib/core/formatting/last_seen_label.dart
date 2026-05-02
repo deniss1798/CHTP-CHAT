@@ -1,9 +1,10 @@
-/// Подпись «когда был в сети» для офлайн-пользователя.
+/// Фрагмент для строки **«был(а) в сети …»** в шапке чата.
+/// Сама приставка «был(а) в сети» задаётся снаружи; здесь без дублирования «был».
 ///
 /// - до 1 ч: «N мин назад» (меньше минуты — «только что»);
-/// - от 1 ч до 3 ч включительно: «N ч назад» (целые часы вниз);
-/// - более 3 ч, не старше суток: время «был в HH:mm»;
-/// - более суток: дата «был DD.MM.YYYY».
+/// - от 1 ч до 3 ч включительно: «N ч назад»;
+/// - более 3 ч, не старше суток: «HH:mm»;
+/// - более суток: «DD.MM.YYYY».
 abstract final class LastSeenLabel {
   LastSeenLabel._();
 
@@ -36,12 +37,12 @@ abstract final class LastSeenLabel {
     if (diff <= const Duration(hours: 24)) {
       final hh = seen.hour.toString().padLeft(2, '0');
       final mm = seen.minute.toString().padLeft(2, '0');
-      return 'был в $hh:$mm';
+      return '$hh:$mm';
     }
 
     final d = seen.day.toString().padLeft(2, '0');
     final mo = seen.month.toString().padLeft(2, '0');
     final y = seen.year;
-    return 'был $d.$mo.$y';
+    return '$d.$mo.$y';
   }
 }

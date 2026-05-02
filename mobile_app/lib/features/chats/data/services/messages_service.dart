@@ -5,6 +5,16 @@ import 'package:mime/mime.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/secure_storage_service.dart';
 
+class MessageListPageResult {
+  const MessageListPageResult({
+    required this.messages,
+    required this.hasMore,
+  });
+
+  final List<Map<String, dynamic>> messages;
+  final bool hasMore;
+}
+
 class MessagesService {
   final Dio _dio = ApiClient.dio;
 
@@ -123,36 +133,142 @@ class MessagesService {
     return [];
   }
 
-  Future<List<Map<String, dynamic>>> getMessages(int chatId) async {
+  Future<MessageListPageResult> getMessagesPage(
+    int chatId, {
+    int? beforeMessageId,
+    int? afterMessageId,
+    int limit = 50,
+  }) async {
     final response = await _dio.get(
       '/messages/chat/$chatId',
+      queryParameters: {
+        'limit': limit,
+        if (beforeMessageId != null) 'before_message_id': beforeMessageId,
+        if (afterMessageId != null) 'after_message_id': afterMessageId,
+      },
       options: await _authorizedOptions(),
     );
 
     final data = response.data;
 
+    if (data is Map) {
+      final map = Map<String, dynamic>.from(data);
+      final raw = map['messages'];
+      final list = <Map<String, dynamic>>[];
+      if (raw is List) {
+        for (final e in raw) {
+          if (e is Map<String, dynamic>) {
+            list.add(e);
+          } else if (e is Map) {
+            list.add(Map<String, dynamic>.from(e));
+          }
+        }
+      }
+      final hasMore = map['has_more'] == true;
+      return MessageListPageResult(messages: list, hasMore: hasMore);
+    }
+
     if (data is List) {
-      return data
+      final list = data
           .whereType<Map>()
           .map((e) => Map<String, dynamic>.from(e))
           .toList();
+      return MessageListPageResult(messages: list, hasMore: false);
     }
 
     throw Exception('Неожиданный формат ответа /messages/chat/{chat_id}');
+  }
+
+  Future<List<Map<String, dynamic>>> getMessages(int chatId) async {
+    final page = await getMessagesPage(chatId, limit: 50);
+    return page.messages;
+  }
+
+  Future<Map<String, dynamic>> addReaction({
+    required int messageId,
+    required String emoji,
+  }) async {
+    final auth = await _authorizedOptions();
+    final response = await _dio.post(
+      '/messages/$messageId/reactions',
+      data: <String, dynamic>{'emoji': emoji},
+      options: Options(
+        headers: {
+          ...?auth.headers,
+          Headers.contentTypeHeader: Headers.jsonContentType,
+        },
+      ),
+    );
+    return _responseMap(response);
+  }
+
+  Future<Map<String, dynamic>> removeReaction({
+    required int messageId,
+    required String emoji,
+  }) async {
+    final response = await _dio.delete(
+      '/messages/$messageId/reactions',
+      queryParameters: {'emoji': emoji},
+      options: await _authorizedOptions(),
+    );
+    return _responseMap(response);
+  }
+
+  Future<Map<String, dynamic>> sendVoiceMessage({
+    required int chatId,
+    required String filePath,
+    required String fileName,
+    int? replyToMessageId,
+  }) async {
+    final mimeType =
+        lookupMimeType(filePath) ?? lookupMimeType(fileName) ?? 'audio/mpeg';
+    final mimeParts = mimeType.split('/');
+
+    final response = await _postMultipartForm(
+      '/messages/voice',
+      () async => FormData.fromMap({
+        'chat_id': chatId.toString(),
+        if (replyToMessageId != null)
+          'reply_to_message_id': replyToMessageId.toString(),
+        'file': await MultipartFile.fromFile(
+          filePath,
+          filename: fileName,
+          contentType: mimeParts.length == 2
+              ? MediaType(mimeParts[0], mimeParts[1])
+              : MediaType('application', 'octet-stream'),
+        ),
+      }),
+    );
+
+    try {
+      return _responseMap(response);
+    } catch (_) {
+      throw Exception('Неожиданный формат ответа при отправке голосового');
+    }
   }
 
   Future<Map<String, dynamic>> sendMessage({
     required int chatId,
     required String text,
     int? replyToMessageId,
+    String messageType = 'text',
+    String? clientMessageId,
   }) async {
+    final requestData = <String, dynamic>{
+      'chat_id': chatId,
+      'text': text,
+      'message_type': messageType,
+    };
+    if (clientMessageId != null && clientMessageId.isNotEmpty) {
+      requestData['client_message_id'] = clientMessageId;
+    }
+    if (replyToMessageId != null) {
+      requestData['reply_to_message_id'] = replyToMessageId;
+    }
+
     final response = await _dio.post(
       '/messages/',
-      data: {
-        'chat_id': chatId,
-        'text': text,
-        if (replyToMessageId != null) 'reply_to_message_id': replyToMessageId,
-      },
+      data: requestData,
       options: await _authorizedOptions(),
     );
 

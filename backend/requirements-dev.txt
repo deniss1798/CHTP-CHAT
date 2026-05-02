@@ -1,2 +1,7 @@
+black
+bandit
+pre-commit
+pytest
+ruff
 # pip install -r requirements.txt -r requirements-dev.txt
 pytest>=8,<10

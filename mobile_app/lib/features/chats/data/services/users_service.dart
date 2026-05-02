@@ -22,7 +22,12 @@ class UsersService {
     );
 
     final data = response.data;
-
+    if (data is Map && data['users'] is List) {
+      return (data['users']! as List)
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+    }
     if (data is List) {
       return data
           .whereType<Map>()
@@ -36,7 +41,7 @@ class UsersService {
   /// Поиск по username (серверный `GET /users/?q=`). Пустой запрос — пустой список.
   Future<List<Map<String, dynamic>>> searchUsers(String query) async {
     final q = query.trim();
-    if (q.isEmpty) {
+    if (q.isEmpty || q.length < 2) {
       return [];
     }
 
@@ -57,7 +62,12 @@ class UsersService {
     );
 
     final data = response.data;
-
+    if (data is Map && data['users'] is List) {
+      return (data['users']! as List)
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+    }
     if (data is List) {
       return data
           .whereType<Map>()

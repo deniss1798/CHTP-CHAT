@@ -49,6 +49,30 @@ class Settings(BaseSettings):
     s3_public_bucket: str | None = Field(None, validation_alias="S3_PUBLIC_BUCKET")
     s3_private_bucket: str | None = Field(None, validation_alias="S3_PRIVATE_BUCKET")
     s3_public_base_url: str | None = Field(None, validation_alias="S3_PUBLIC_BASE_URL")
+    s3_connect_timeout_seconds: float = Field(3.0, alias="S3_CONNECT_TIMEOUT_SECONDS")
+    s3_read_timeout_seconds: float = Field(15.0, alias="S3_READ_TIMEOUT_SECONDS")
+    private_media_url_ttl_seconds: int = Field(
+        900,
+        ge=60,
+        le=86400,
+        alias="PRIVATE_MEDIA_URL_TTL_SECONDS",
+    )
+    story_media_url_ttl_seconds: int = Field(
+        7200,
+        ge=60,
+        le=86400,
+        alias="STORY_MEDIA_URL_TTL_SECONDS",
+    )
+
+    redis_url: str | None = Field(None, alias="REDIS_URL")
+    redis_socket_timeout_seconds: float = Field(2.0, alias="REDIS_SOCKET_TIMEOUT_SECONDS")
+    redis_socket_connect_timeout_seconds: float = Field(
+        2.0,
+        alias="REDIS_SOCKET_CONNECT_TIMEOUT_SECONDS",
+    )
+
+    smtp_timeout_seconds: float = Field(20.0, alias="SMTP_TIMEOUT_SECONDS")
+    push_send_timeout_seconds: float = Field(8.0, alias="PUSH_SEND_TIMEOUT_SECONDS")
 
     @field_validator(
         "s3_endpoint_url",
@@ -58,6 +82,7 @@ class Settings(BaseSettings):
         "s3_public_bucket",
         "s3_private_bucket",
         "s3_public_base_url",
+        "redis_url",
         mode="before",
     )
     @classmethod
@@ -92,6 +117,9 @@ class Settings(BaseSettings):
         "stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302",
         alias="WEBRTC_FALLBACK_STUN_URLS",
     )
+
+    # Log JSON with method/path/duration and set X-Response-Time-Ms (load tests / ops).
+    perf_log_requests: bool = Field(False, alias="PERF_LOG_REQUESTS")
 
     model_config = SettingsConfigDict(
         env_file=".env",

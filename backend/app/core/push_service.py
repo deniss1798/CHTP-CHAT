@@ -1,13 +1,37 @@
 from dataclasses import dataclass
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+
+import json
+import logging
 
 from firebase_admin import messaging
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.firebase_admin import get_firebase_app
+from app.core.observability import push_stats
+from app.application.realtime.event_payload import realtime_event
 from app.models.chat import Chat
 from app.models.chat_member import ChatMember
 from app.models.device_token import DeviceToken
+from app.models.notification_setting import NotificationSetting
 from app.models.user import User
+
+logger = logging.getLogger(__name__)
+_push_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="fcm-send")
+
+
+def _send_fcm_with_timeout(message: messaging.Message) -> str:
+    timeout = get_settings().push_send_timeout_seconds
+    future = _push_executor.submit(messaging.send, message)
+    try:
+        result = future.result(timeout=timeout)
+        push_stats.send_success_total += 1
+        return result
+    except FutureTimeoutError as exc:
+        push_stats.send_timeout_total += 1
+        logger.warning("FCM send timed out after %.2fs", timeout)
+        raise TimeoutError(f"FCM send timed out after {timeout}s") from exc
 
 
 def _is_invalid_fcm_token_error(exc: BaseException) -> bool:
@@ -82,13 +106,13 @@ def build_inbox_new_message_event(
     body = (preview or "").strip()
     if len(body) > 240:
         body = body[:240]
-    return {
+    return realtime_event({
         "type": "inbox_new_message",
         "chat_id": str(chat_id),
         "sender_name": sender_name,
         "preview": body or "Новое сообщение",
         "chat_avatar_url": avatar_url,
-    }
+    })
 
 
 def send_chat_message_push(
@@ -105,11 +129,26 @@ def send_chat_message_push(
         print(f"[push] Firebase not configured, skip: {e}")
         return
 
+    disabled_user_ids = {
+        row.user_id
+        for row in db.query(NotificationSetting.user_id)
+        .filter(
+            NotificationSetting.user_id.in_(recipient_user_ids),
+            NotificationSetting.notifications_enabled.is_(False),
+        )
+        .all()
+    }
+    enabled_recipient_user_ids = [
+        user_id for user_id in recipient_user_ids if user_id not in disabled_user_ids
+    ]
+    if not enabled_recipient_user_ids:
+        return
+
     tokens = (
         db.query(DeviceToken)
         .filter(
-            DeviceToken.user_id.in_(recipient_user_ids),
-            DeviceToken.is_active == True,
+            DeviceToken.user_id.in_(enabled_recipient_user_ids),
+            DeviceToken.is_active.is_(True),
         )
         .all()
     )
@@ -176,9 +215,90 @@ def send_chat_message_push(
                 android=android_cfg,
                 apns=apns_cfg,
             )
-            messaging.send(msg)
+            _send_fcm_with_timeout(msg)
         except Exception as e:
+            push_stats.send_error_total += 1
             print(f"Push send failed for token id={item.id}: {e}")
             if _is_invalid_fcm_token_error(e):
+                push_stats.invalid_token_total += 1
+                item.is_active = False
+                db.commit()
+
+
+def send_incoming_call_fallback_push_to_user(
+    db: Session,
+    *,
+    recipient_user_id: int,
+    chat_id: int,
+    call_signal_type: str,
+    caller_display_name: str,
+    call_payload: dict,
+) -> None:
+    """
+    FCM, если у пользователя нет активного /ws/inbox (приложение свёрнуто / убито).
+    Клиент без WebSocket может принять звонок по тем же данным, что раздаёт inbox.
+    """
+    try:
+        get_firebase_app()
+    except RuntimeError as e:
+        print(f"[push] Firebase not configured, skip incoming-call: {e}")
+        return
+
+    disabled = (
+        db.query(NotificationSetting.user_id)
+        .filter(
+            NotificationSetting.user_id == recipient_user_id,
+            NotificationSetting.notifications_enabled.is_(False),
+        )
+        .first()
+    )
+    if disabled is not None:
+        return
+
+    tokens = (
+        db.query(DeviceToken)
+        .filter(
+            DeviceToken.user_id == recipient_user_id,
+            DeviceToken.is_active.is_(True),
+        )
+        .all()
+    )
+    if not tokens:
+        return
+
+    body = caller_display_name.strip() or ("Собеседник" if call_signal_type == "call_e2e_init" else "Участник")
+
+    invite_json = json.dumps(call_payload, default=str)
+
+    base_data = {
+        "type": "incoming_call",
+        "call_signal_type": call_signal_type,
+        "chat_id": str(chat_id),
+        "caller_name": body[:160],
+        "invite_json": invite_json[:3800],
+    }
+
+    for item in tokens:
+        try:
+            data_flat = {k: str(v) for k, v in base_data.items()}
+            msg = messaging.Message(
+                token=item.token,
+                data=data_flat,
+                android=messaging.AndroidConfig(priority="high"),
+                apns=messaging.APNSConfig(
+                    payload=messaging.APNSPayload(
+                        aps=messaging.Aps(
+                            sound="default",
+                            content_available=True,
+                        ),
+                    ),
+                ),
+            )
+            _send_fcm_with_timeout(msg)
+        except Exception as e:
+            push_stats.send_error_total += 1
+            print(f"Incoming-call push failed for token id={item.id}: {e}")
+            if _is_invalid_fcm_token_error(e):
+                push_stats.invalid_token_total += 1
                 item.is_active = False
                 db.commit()

@@ -13,6 +13,18 @@ class MessageCreate(BaseModel):
     chat_id: int
     text: str = Field(..., min_length=1)
     reply_to_message_id: int | None = None
+    message_type: str = Field(default="text", max_length=32)
+    client_message_id: str | None = Field(default=None, min_length=1, max_length=128)
+
+
+class ReactionGroup(BaseModel):
+    emoji: str
+    count: int
+    reacted_by_me: bool
+    reactor_user_ids: list[int] = Field(
+        default_factory=list,
+        description="User ids who reacted with this emoji (for group tooltips).",
+    )
 
 
 class MessageReplyPreview(BaseModel):
@@ -27,6 +39,17 @@ class MessageUpdate(BaseModel):
     text: str = Field(..., min_length=1)
 
 
+class MessageReactionBody(BaseModel):
+    emoji: str = Field(..., min_length=1, max_length=32)
+
+
+class MessageListPage(BaseModel):
+    """Страница истории чата (курсор по id сообщения)."""
+
+    messages: list["MessageResponse"]
+    has_more: bool
+
+
 class MessageResponse(BaseModel):
     id: int
     chat_id: int
@@ -34,6 +57,7 @@ class MessageResponse(BaseModel):
 
     text: str
     message_type: str
+    client_message_id: str | None = None
 
     media_key: str | None = None
     media_url: str | None = None
@@ -43,6 +67,7 @@ class MessageResponse(BaseModel):
     created_at: datetime
     updated_at: datetime | None = None
     is_updated: bool | None = False
+    is_deleted: bool | None = False
 
     reply_to_message_id: int | None = None
     reply_to: MessageReplyPreview | None = None
@@ -52,5 +77,10 @@ class MessageResponse(BaseModel):
     # Только для исходящих сообщений текущего пользователя: sent / read
     delivery_status: Literal["sent", "read"] | None = None
 
+    reactions: list[ReactionGroup] = Field(default_factory=list)
+
     class Config:
         from_attributes = True
+
+
+MessageListPage.model_rebuild()

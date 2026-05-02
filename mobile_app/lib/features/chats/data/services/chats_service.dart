@@ -1,14 +1,17 @@
 import 'package:dio/dio.dart';
-import '../../../../core/formatting/server_time.dart';
+
 import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/secure_storage_service.dart';
-import '../../../../core/network/url_helper.dart';
+import '../models/chat_models.dart';
 
 class ChatsService {
   final Dio _dio = ApiClient.dio;
 
-  Future<List<Map<String, dynamic>>> getChats({
+  Future<ChatListPageResult> getChatsPage({
     required int currentUserId,
+    int limit = 50,
+    String? cursor,
+    bool archived = false,
   }) async {
     final token = await SecureStorageService.getAccessToken();
 
@@ -18,6 +21,11 @@ class ChatsService {
 
     final response = await _dio.get(
       '/chats/',
+      queryParameters: <String, dynamic>{
+        'limit': limit,
+        'archived': archived ? 'true' : 'false',
+        if (cursor != null && cursor.isNotEmpty) 'cursor': cursor,
+      },
       options: Options(
         headers: {
           'Authorization': 'Bearer $token',
@@ -27,74 +35,149 @@ class ChatsService {
 
     final data = response.data;
 
-    if (data is! List) {
-      throw Exception('Неожиданный формат ответа /chats/');
+    if (data is Map<String, dynamic>) {
+      return _chatListPageFromMap(data);
+    }
+    if (data is Map) {
+      return _chatListPageFromMap(Map<String, dynamic>.from(data));
     }
 
-    final chats = data
+    if (data is List) {
+      final chats = data
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .map(ChatSummary.fromApi)
+          .toList();
+      chats.sort(compareChatSummariesListOrder);
+      return ChatListPageResult(
+        chats: chats,
+        hasMore: false,
+        nextCursor: null,
+      );
+    }
+
+    throw Exception('Неожиданный формат ответа /chats/');
+  }
+
+  Future<ChatSummary> patchChatMemberPreferences({
+    required int chatId,
+    bool? isArchived,
+    bool? notificationsMuted,
+    bool? isPinned,
+  }) async {
+    if (isArchived == null && notificationsMuted == null && isPinned == null) {
+      throw ArgumentError('Нет полей для обновления');
+    }
+    final token = await SecureStorageService.getAccessToken();
+    if (token == null || token.isEmpty) {
+      throw Exception('Токен не найден');
+    }
+    final response = await _dio.patch(
+      '/chats/$chatId/member-preferences',
+      data: {
+        if (isArchived != null) 'is_archived': isArchived,
+        if (notificationsMuted != null) 'notifications_muted': notificationsMuted,
+        if (isPinned != null) 'is_pinned': isPinned,
+      },
+      options: Options(
+        headers: {
+          'Authorization': 'Bearer $token',
+          Headers.contentTypeHeader: Headers.jsonContentType,
+        },
+      ),
+    );
+    final data = response.data;
+    if (data is Map<String, dynamic>) {
+      return ChatSummary.fromApi(data);
+    }
+    if (data is Map) {
+      return ChatSummary.fromApi(Map<String, dynamic>.from(data));
+    }
+    throw Exception('Неожиданный ответ PATCH member-preferences');
+  }
+
+  ChatListPageResult _chatListPageFromMap(Map<String, dynamic> data) {
+    final raw = data['chats'];
+    final chats = <ChatSummary>[];
+    if (raw is List) {
+      for (final item in raw) {
+        if (item is Map<String, dynamic>) {
+          chats.add(ChatSummary.fromApi(item));
+        } else if (item is Map) {
+          chats.add(ChatSummary.fromApi(Map<String, dynamic>.from(item)));
+        }
+      }
+    }
+    chats.sort(compareChatSummariesListOrder);
+    final next = data['next_cursor']?.toString();
+    final hasMore = data['has_more'] == true;
+    return ChatListPageResult(
+      chats: chats,
+      hasMore: hasMore,
+      nextCursor: (next != null && next.isNotEmpty) ? next : null,
+    );
+  }
+
+  Future<List<ChatSummary>> getChats({
+    required int currentUserId,
+  }) async {
+    final out = <ChatSummary>[];
+    String? cursor;
+    do {
+      final page = await getChatsPage(
+        currentUserId: currentUserId,
+        limit: 100,
+        cursor: cursor,
+      );
+      out.addAll(page.chats);
+      cursor = page.hasMore ? page.nextCursor : null;
+    } while (cursor != null);
+
+    out.sort(compareChatSummariesListOrder);
+
+    return out;
+  }
+
+  Future<ChatDetail> fetchChatDetail(int chatId) async {
+    final token = await SecureStorageService.getAccessToken();
+    if (token == null || token.isEmpty) {
+      throw Exception('Токен не найден');
+    }
+    final response = await _dio.get(
+      '/chats/$chatId',
+      options: Options(
+        headers: {'Authorization': 'Bearer $token'},
+      ),
+    );
+    final data = response.data;
+    if (data is Map<String, dynamic>) return ChatDetail.fromApi(data);
+    if (data is Map) return ChatDetail.fromApi(Map<String, dynamic>.from(data));
+    throw Exception('Неожиданный формат ответа /chats/{id}');
+  }
+
+  Future<List<ChatMember>> fetchChatMembers(int chatId) async {
+    final token = await SecureStorageService.getAccessToken();
+    if (token == null || token.isEmpty) {
+      throw Exception('Токен не найден');
+    }
+    final response = await _dio.get(
+      '/chats/$chatId/members',
+      options: Options(
+        headers: {'Authorization': 'Bearer $token'},
+      ),
+    );
+    final data = response.data;
+    if (data is! List) {
+      throw Exception('Неожиданный формат ответа /chats/{id}/members');
+    }
+    return data
         .whereType<Map>()
         .map((e) => Map<String, dynamic>.from(e))
-        .map(_normalizeChat)
+        .map(ChatMember.fromApi)
         .toList();
-
-    chats.sort((a, b) {
-      final aMs = serverInstantMillis(a['last_message_at']?.toString()) ?? 0;
-      final bMs = serverInstantMillis(b['last_message_at']?.toString()) ?? 0;
-      return bMs.compareTo(aMs);
-    });
-
-    return chats;
   }
 
-  String? _normalizeAvatarUrl(dynamic value) {
-  if (value == null) return null;
-
-  final raw = value.toString().trim();
-  if (raw.isEmpty) return null;
-
-  if (raw.startsWith('http://') || raw.startsWith('https://')) {
-    return raw;
-  }
-
-  if (raw.startsWith('/')) {
-    return '${ApiClient.baseUrl}$raw';
-  }
-
-  return '${ApiClient.baseUrl}/$raw';
-}
-
-  Map<String, dynamic> _normalizeChat(Map<String, dynamic> raw) {
-  final chat = Map<String, dynamic>.from(raw);
-
-  chat['avatar_url'] = UrlHelper.absoluteMediaUrl(
-    raw['avatar_url'] ?? raw['avatarUrl'],
-  );
-  chat['last_message'] = raw['last_message'] ?? raw['lastMessage'];
-  chat['last_message_type'] =
-      raw['last_message_type'] ?? raw['lastMessageType'];
-  chat['last_message_at'] = raw['last_message_at'] ?? raw['lastMessageAt'];
-  chat['last_message_sender_id'] =
-      raw['last_message_sender_id'] ?? raw['lastMessageSenderId'];
-  chat['last_message_id'] = raw['last_message_id'] ?? raw['lastMessageId'];
-  chat['my_last_read_message_id'] =
-      raw['my_last_read_message_id'] ?? raw['myLastReadMessageId'];
-  chat['unread_count'] = _parseUnreadCount(
-    raw['unread_count'] ?? raw['unreadCount'],
-  );
-  chat['peer_last_seen_at'] =
-      raw['peer_last_seen_at'] ?? raw['peerLastSeenAt'];
-
-  return chat;
-}
-
-  int _parseUnreadCount(dynamic value) {
-    if (value == null) return 0;
-    if (value is int) return value;
-    if (value is double) return value.round();
-    return int.tryParse(value.toString()) ?? 0;
-  }
-
-  Future<Map<String, dynamic>> addMemberToChat({
+  Future<ChatMember> addMemberToChat({
     required int chatId,
     required int userId,
   }) async {
@@ -119,11 +202,11 @@ class ChatsService {
     final data = response.data;
 
     if (data is Map<String, dynamic>) {
-      return data;
+      return ChatMember.fromApi(data);
     }
 
     if (data is Map) {
-      return Map<String, dynamic>.from(data);
+      return ChatMember.fromApi(Map<String, dynamic>.from(data));
     }
 
     throw Exception('Неожиданный формат ответа при добавлении участника');
@@ -159,45 +242,17 @@ class ChatsService {
     );
   }
 
-  /// Имена и аватары участников (для UI группового звонка, если список не был загружен в чате).
   Future<({Map<int, String> names, Map<int, String?> avatars})>
       loadChatMembersRoster(int chatId) async {
-    final token = await SecureStorageService.getAccessToken();
-    if (token == null || token.isEmpty) {
-      throw Exception('Токен не найден');
-    }
-    final response = await _dio.get(
-      '/chats/$chatId/members',
-      options: Options(
-        headers: {'Authorization': 'Bearer $token'},
-      ),
-    );
     final names = <int, String>{};
     final avatars = <int, String?>{};
-    final data = response.data;
-    if (data is List) {
-      for (final item in data) {
-        if (item is! Map) continue;
-        final map = Map<String, dynamic>.from(item);
-        final rawId = map['id'];
-        int? userId;
-        if (rawId is int) {
-          userId = rawId;
-        } else {
-          userId = int.tryParse(rawId?.toString() ?? '');
-        }
-        if (userId == null) continue;
-        final username = (map['username'] ?? '').toString().trim();
-        names[userId] =
-            username.isNotEmpty ? username : 'Участник $userId';
-        final rawAvatar = (map['avatar_url'] ?? map['avatarUrl'] ?? '')
-            .toString()
-            .trim();
-        avatars[userId] = UrlHelper.absoluteMediaUrl(
-          rawAvatar.isNotEmpty ? rawAvatar : null,
-        );
-      }
+    final members = await fetchChatMembers(chatId);
+
+    for (final member in members) {
+      names[member.id] = member.username;
+      avatars[member.id] = member.avatarUrl;
     }
+
     return (names: names, avatars: avatars);
   }
 

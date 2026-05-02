@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -9,11 +9,17 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_icons.dart';
 import '../../../../app/theme/app_shadows.dart';
 import '../../../../app/theme/design_tokens.dart';
-import '../../../../core/network/api_client.dart';
+import '../../../../app/widgets/app_avatar.dart';
+import '../../../../app/widgets/app_button.dart';
+import '../../../../app/widgets/app_screen_background.dart';
+import '../../../../app/widgets/app_surface.dart';
+import '../../../../app/widgets/app_text_field.dart';
 import '../../../auth/data/services/auth_service.dart';
 import '../../data/services/chat_avatar_service.dart';
 import '../../data/services/create_chat_service.dart';
 import '../../data/services/users_service.dart';
+import '../controllers/user_presentation_helpers.dart';
+import '../controllers/user_selection_controller.dart';
 
 class GroupChatCreateScreen extends StatefulWidget {
   const GroupChatCreateScreen({super.key});
@@ -28,6 +34,7 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
   final ChatAvatarService _chatAvatarService = ChatAvatarService();
   final AuthService _authService = AuthService();
   final ImagePicker _imagePicker = ImagePicker();
+  final UserSelectionController _selectionController = UserSelectionController();
 
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
@@ -42,8 +49,6 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
 
   int? _currentUserId;
   List<Map<String, dynamic>> _searchResults = [];
-  final Map<int, Map<String, dynamic>> _selectedUsersCache = {};
-  final Set<int> _selectedUserIds = <int>{};
 
   File? _selectedAvatarFile;
 
@@ -87,7 +92,7 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
       if (!mounted) return;
 
       setState(() {
-        _error = _extractErrorMessage(
+        _error = extractFeatureErrorMessage(
           e,
           fallback: 'Не удалось загрузить профиль',
         );
@@ -101,6 +106,15 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
     final q = _searchController.text.trim();
 
     if (q.isEmpty) {
+      setState(() {
+        _searchResults = [];
+        _searchError = null;
+        _isSearching = false;
+      });
+      return;
+    }
+
+    if (q.length < 2) {
       setState(() {
         _searchResults = [];
         _searchError = null;
@@ -135,13 +149,7 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
       if (!mounted) return;
 
       final filtered = users.where((u) {
-        final rawUserId = u['id'];
-        int? userId;
-        if (rawUserId is int) {
-          userId = rawUserId;
-        } else {
-          userId = int.tryParse(rawUserId.toString());
-        }
+        final userId = userIdFromMap(u);
         return userId != null && userId != me;
       }).toList();
 
@@ -154,7 +162,7 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
       if (!mounted) return;
 
       setState(() {
-        _searchError = _extractErrorMessage(
+        _searchError = extractFeatureErrorMessage(
           e,
           fallback: 'Не удалось выполнить поиск',
         );
@@ -163,151 +171,14 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
     }
   }
 
-  String _extractErrorMessage(Object e, {required String fallback}) {
-    if (e is DioException) {
-      final data = e.response?.data;
-
-      if (data is Map<String, dynamic>) {
-        return data['detail']?.toString() ??
-            data['message']?.toString() ??
-            fallback;
-      }
-
-      if (data is String && data.isNotEmpty) {
-        return data;
-      }
-
-      if (e.message != null && e.message!.isNotEmpty) {
-        return e.message!;
-      }
-    }
-
-    return e.toString().replaceFirst('Exception: ', '');
-  }
-
   void _toggleUser(Map<String, dynamic> user) {
-    final rawId = user['id'];
-    int? parsedUserId;
-
-    if (rawId is int) {
-      parsedUserId = rawId;
-    } else {
-      parsedUserId = int.tryParse(rawId.toString());
-    }
-
-    if (parsedUserId == null) return;
-
-    final userId = parsedUserId;
-
     setState(() {
-      if (_selectedUserIds.contains(userId)) {
-        _selectedUserIds.remove(userId);
-        _selectedUsersCache.remove(userId);
-      } else {
-        _selectedUserIds.add(userId);
-        _selectedUsersCache[userId] = Map<String, dynamic>.from(user);
-      }
+      _selectionController.toggle(user);
     });
   }
 
   String _initials(String title) {
-    final parts =
-        title.split(' ').where((e) => e.trim().isNotEmpty).take(2).toList();
-
-    if (parts.isEmpty) return '?';
-
-    if (parts.length == 1) {
-      final word = parts.first.trim();
-      return word.isNotEmpty ? word[0].toUpperCase() : '?';
-    }
-
-    final first = parts[0].trim();
-    final second = parts[1].trim();
-
-    final firstChar = first.isNotEmpty ? first[0].toUpperCase() : '';
-    final secondChar = second.isNotEmpty ? second[0].toUpperCase() : '';
-
-    final result = '$firstChar$secondChar'.trim();
-    return result.isEmpty ? '?' : result;
-  }
-
-  String? _userAvatarUrl(Map<String, dynamic> user) {
-    final possible = [
-      user['avatar_url'],
-      user['avatarUrl'],
-    ];
-
-    for (final value in possible) {
-      if (value != null && value.toString().trim().isNotEmpty) {
-        final raw = value.toString().trim();
-
-        if (raw.startsWith('http://') || raw.startsWith('https://')) {
-          return raw;
-        }
-
-        return '${ApiClient.baseUrl}$raw';
-      }
-    }
-
-    return null;
-  }
-
-  Widget _buildUserAvatar({
-    required String title,
-    required String? avatarUrl,
-    double size = AppSizes.listAvatar,
-  }) {
-    final safeUrl = (avatarUrl ?? '').trim();
-    final r = size * 0.28;
-
-    if (safeUrl.isNotEmpty) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(r),
-        child: Image.network(
-          safeUrl,
-          width: size,
-          height: size,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) {
-            return Container(
-              width: size,
-              height: size,
-              decoration: BoxDecoration(
-                color: AppColors.accent,
-                borderRadius: BorderRadius.circular(r),
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                _initials(title),
-                style: TextStyle(
-                  color: Colors.black,
-                  fontSize: size * 0.36,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            );
-          },
-        ),
-      );
-    }
-
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: AppColors.accent,
-        borderRadius: BorderRadius.circular(r),
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        _initials(title),
-        style: TextStyle(
-          color: Colors.black,
-          fontSize: size * 0.36,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-    );
+    return initialsForTitle(title);
   }
 
   Future<void> _pickGroupAvatar() async {
@@ -330,38 +201,165 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
     });
   }
 
-  Widget _buildGroupAvatarPreview() {
-    final title = _titleController.text.trim().isNotEmpty
-        ? _titleController.text.trim()
-        : 'Группа';
+  /// Макет: тёмный квадрат со скруглением, пунктирное кольцо вокруг него, «+» на углу квадрата.
+  static const double _groupAvatarSize = 104;
+  static const double _groupAvatarR = 20;
+  /// Внешний холст: кольцо визуально обводит квадрат.
+  static const double _groupAvatarOrbit = 160;
 
+  Widget _buildGroupAvatarSquare(String title) {
+    final r = _groupAvatarR;
     if (_selectedAvatarFile != null) {
       return ClipRRect(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(r),
         child: Image.file(
           _selectedAvatarFile!,
-          width: 72,
-          height: 72,
+          width: _groupAvatarSize,
+          height: _groupAvatarSize,
           fit: BoxFit.cover,
         ),
       );
     }
 
     return Container(
-      width: 72,
-      height: 72,
+      width: _groupAvatarSize,
+      height: _groupAvatarSize,
       decoration: BoxDecoration(
-        color: AppColors.accent,
-        borderRadius: BorderRadius.circular(20),
+        color: AppColors.inputFill,
+        borderRadius: BorderRadius.circular(r),
       ),
       alignment: Alignment.center,
-      child: Text(
-        _initials(title),
-        style: const TextStyle(
-          color: Colors.black,
-          fontSize: 22,
-          fontWeight: FontWeight.w800,
-        ),
+      child: title.trim().isEmpty
+          ? Icon(
+              AppIcons.group,
+              size: 44,
+              color: AppColors.accent,
+            )
+          : Text(
+              _initials(title),
+              style: const TextStyle(
+                color: AppColors.accent,
+                fontSize: 32,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+    );
+  }
+
+  Widget _buildAvatarPanel(String title) {
+    return AppSurface(
+      tone: AppSurfaceTone.elevated,
+      radius: AppRadius.xl,
+      borderColor: AppColors.accent.withValues(alpha: 0.32),
+      padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
+      shadow: null,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          const Positioned.fill(
+            child: _FaintLineArtOverlay(),
+          ),
+          Column(
+            children: [
+              const SizedBox(height: 8),
+              Center(
+                child: SizedBox(
+                  width: _groupAvatarOrbit,
+                  height: _groupAvatarOrbit,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    alignment: Alignment.center,
+                    children: [
+                      CustomPaint(
+                        size: const Size(_groupAvatarOrbit, _groupAvatarOrbit),
+                        painter: _DashedRingPainter(
+                          color: AppColors.accent,
+                          strokeWidth: 2,
+                        ),
+                      ),
+                      SizedBox(
+                        width: _groupAvatarSize,
+                        height: _groupAvatarSize,
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          alignment: Alignment.center,
+                          children: [
+                            _buildGroupAvatarSquare(title),
+                            Positioned(
+                              right: -2,
+                              bottom: -2,
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  onTap: _isCreating ? null : _pickGroupAvatar,
+                                  customBorder: const CircleBorder(),
+                                  child: Container(
+                                    width: 40,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.accent,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: AppColors.background,
+                                        width: 2.5,
+                                      ),
+                                      boxShadow: AppShadows.lift,
+                                    ),
+                                    child: const Icon(
+                                      AppIcons.add,
+                                      color: AppColors.textOnAccent,
+                                      size: 24,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              OutlinedButton.icon(
+                onPressed: _isCreating ? null : _pickGroupAvatar,
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: AppColors.accent, width: 1.5),
+                  foregroundColor: AppColors.accent,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(26),
+                  ),
+                ),
+                icon: const Icon(AppIcons.photo, size: 20),
+                label: Text(
+                  _selectedAvatarFile == null
+                      ? 'Выбрать аватар'
+                      : 'Изменить аватар',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              if (_selectedAvatarFile != null) ...[
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: _isCreating ? null : _removeGroupAvatar,
+                  child: const Text(
+                    'Убрать фото',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -376,7 +374,7 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
       return;
     }
 
-    if (_selectedUserIds.isEmpty) {
+    if (_selectionController.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Выберите хотя бы одного участника')),
       );
@@ -390,7 +388,7 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
     try {
       final created = await _createChatService.createGroupChat(
         title: title,
-        memberIds: _selectedUserIds.toList(),
+        memberIds: _selectionController.toMemberIds(),
       );
 
       final rawChatId = created['id'];
@@ -425,7 +423,7 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            _extractErrorMessage(
+            extractFeatureErrorMessage(
               e,
               fallback: 'Не удалось создать групповой чат',
             ),
@@ -433,24 +431,19 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
         ),
       );
     } finally {
-      if (!mounted) return;
-
-      setState(() {
-        _isCreating = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isCreating = false;
+        });
+      }
     }
   }
 
   List<Map<String, dynamic>> _usersForList() {
-    final q = _searchController.text.trim();
-    if (q.isNotEmpty) {
-      return _searchResults;
-    }
-    final ids = _selectedUserIds.toList()..sort();
-    return ids
-        .map((id) => _selectedUsersCache[id])
-        .whereType<Map<String, dynamic>>()
-        .toList();
+    return _selectionController.visibleUsers(
+      query: _searchController.text.trim(),
+      searchResults: _searchResults,
+    );
   }
 
   Widget _buildBody() {
@@ -495,81 +488,28 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
       );
     }
 
+    final t = _titleController.text.trim();
+
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-          child: Column(
-            children: [
-              _buildGroupAvatarPreview(),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: _isCreating ? null : _pickGroupAvatar,
-                    icon: const Icon(AppIcons.photoLibrary),
-                    label: Text(
-                      _selectedAvatarFile == null
-                          ? 'Выбрать аватар'
-                          : 'Изменить аватар',
-                    ),
-                  ),
-                  if (_selectedAvatarFile != null) ...[
-                    const SizedBox(width: 10),
-                    OutlinedButton.icon(
-                      onPressed: _isCreating ? null : _removeGroupAvatar,
-                      icon: const Icon(AppIcons.close),
-                      label: const Text('Убрать'),
-                    ),
-                  ],
-                ],
-              ),
-            ],
-          ),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 10),
+          child: _buildAvatarPanel(t),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-          child: TextField(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 10),
+          child: AppTextField(
             controller: _titleController,
+            hintText: 'Название группы',
+            prefixIcon: AppIcons.personAdd,
             onChanged: (_) => setState(() {}),
-            style: const TextStyle(color: AppColors.textPrimary),
-            decoration: InputDecoration(
-              hintText: 'Название группы',
-              hintStyle: const TextStyle(color: AppColors.textMuted),
-              filled: true,
-              fillColor: AppColors.surfaceSoft,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: 14,
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppRadius.md),
-                borderSide: BorderSide.none,
-              ),
-            ),
           ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-          child: TextField(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+          child: AppSearchField(
             controller: _searchController,
-            style: const TextStyle(color: AppColors.textPrimary),
-            decoration: InputDecoration(
-              hintText: 'Поиск участников',
-              hintStyle: const TextStyle(color: AppColors.textMuted),
-              filled: true,
-              fillColor: AppColors.surfaceSoft,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: 14,
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppRadius.md),
-                borderSide: BorderSide.none,
-              ),
-              prefixIcon: const Icon(AppIcons.search, color: AppColors.textMuted),
-            ),
+            hintText: 'Поиск участников',
           ),
         ),
         Padding(
@@ -577,38 +517,32 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
           child: Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              'Выбрано: ${_selectedUserIds.length}',
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 13,
+              'Выбрано: ${_selectionController.selectedCount}',
+              style: TextStyle(
+                color: AppColors.textSecondary.withValues(alpha: 0.9),
+                fontSize: 12.5,
                 fontWeight: FontWeight.w600,
+                letterSpacing: 0.1,
               ),
             ),
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         Expanded(
           child: _buildUserListArea(),
         ),
+        const SizedBox(height: 20),
         SafeArea(
           top: false,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
             child: SizedBox(
               width: double.infinity,
-              child: ElevatedButton(
+              child: AppButton(
+                label: 'Создать группу',
+                icon: AppIcons.group,
+                isLoading: _isCreating,
                 onPressed: _isCreating ? null : _createGroupChat,
-                child: _isCreating
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Colors.black),
-                        ),
-                      )
-                    : const Text('Создать группу'),
               ),
             ),
           ),
@@ -621,26 +555,78 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
     final q = _searchController.text.trim();
 
     if (q.isEmpty) {
-      if (_selectedUserIds.isEmpty) {
-        return const Center(
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 32),
-            child: Text(
-              'Введите username или email, чтобы найти участников',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 16,
+      if (_selectionController.isEmpty) {
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(0, 0, 0, 8),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(4, 8, 4, 28),
+                    child: CustomPaint(
+                      painter: _DashedRRectPainter(
+                        color: AppColors.textSecondary.withValues(alpha: 0.45),
+                        borderRadius: 20,
+                        strokeWidth: 1.2,
+                        dash: 5,
+                        gap: 4,
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 32,
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.person_search_outlined,
+                              size: 44,
+                              color: AppColors.accent.withValues(alpha: 0.92),
+                            ),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'Информация о участниках появится здесь',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: AppColors.textPrimary,
+                                fontSize: 15.5,
+                                fontWeight: FontWeight.w800,
+                                height: 1.4,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              'Начните вводить имя или email для поиска',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: AppColors
+                                    .textSecondary
+                                    .withValues(alpha: 0.92),
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w600,
+                                height: 1.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ),
-            ),
-          ),
+            );
+          },
         );
       }
       final selectedOnly = _usersForList();
       return ListView.separated(
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
         itemCount: selectedOnly.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        separatorBuilder: (context, index) => const SizedBox(height: 12),
         itemBuilder: (context, index) {
           return _buildUserTile(selectedOnly[index]);
         },
@@ -697,7 +683,7 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
       itemCount: _searchResults.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      separatorBuilder: (context, index) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final user = _searchResults[index];
         return _buildUserTile(user);
@@ -708,41 +694,24 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
   Widget _buildUserTile(Map<String, dynamic> user) {
     final username = (user['username'] ?? '').toString();
     final email = (user['email'] ?? '').toString();
-    final avatarUrl = _userAvatarUrl(user);
-
-    final rawId = user['id'];
-    int? userId;
-    if (rawId is int) {
-      userId = rawId;
-    } else {
-      userId = int.tryParse(rawId.toString());
-    }
-
-    final isSelected =
-        userId != null && _selectedUserIds.contains(userId);
+    final avatarUrl = avatarUrlFromUserMap(user);
+    final isSelected = _selectionController.contains(userIdFromMap(user));
 
     return GestureDetector(
       onTap: () => _toggleUser(user),
-      child: Container(
+      child: AppSurface(
+        tone: isSelected ? AppSurfaceTone.selected : AppSurfaceTone.base,
+        radius: AppRadius.xl,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.accent.withAlpha(18)
-              : AppColors.surface,
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(
-            color: isSelected
-                ? AppColors.accent.withAlpha(180)
-                : Colors.white.withAlpha(10),
-            width: 1,
-          ),
-          boxShadow: AppShadows.lift,
-        ),
+        borderColor: isSelected
+            ? AppColors.accent.withAlpha(180)
+            : AppColors.strokeSoft,
+        shadow: isSelected ? [...AppShadows.lift, ...AppShadows.accentStroke] : AppShadows.lift,
         child: Row(
           children: [
-            _buildUserAvatar(
+            AppAvatar(
               title: username,
-              avatarUrl: avatarUrl,
+              imageUrl: avatarUrl,
               size: AppSizes.listAvatar,
             ),
             const SizedBox(width: 14),
@@ -777,7 +746,7 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
                   : AppIcons.radioOff,
               size: AppSizes.iconMd,
               color: isSelected
-                  ? AppColors.accent
+                  ? AppColors.accentBright
                   : AppColors.textMuted,
             ),
           ],
@@ -790,42 +759,191 @@ class _GroupChatCreateScreenState extends State<GroupChatCreateScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: AppGradients.background,
-        ),
+      body: AppScreenBackground(
         child: SafeArea(
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
-                child: Row(
-                  children: [
-                    IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(
-                        AppIcons.back,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const Expanded(
-                      child: Text(
-                        'Новая группа',
-                        style: TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: AppBreakpoints.formPanelMaxWidth,
               ),
-              Expanded(child: _buildBody()),
-            ],
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 14, 8, 8),
+                    child: Row(
+                      children: [
+                        AppIconButtonSurface(
+                          icon: AppIcons.back,
+                          tooltip: 'Назад',
+                          onTap: () => Navigator.of(context).pop(),
+                        ),
+                        const SizedBox(width: 10),
+                        const Expanded(
+                          child: Text(
+                            'Новая группа',
+                            style: TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 30,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -0.8,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: _buildBody(),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
     );
+  }
+}
+
+class _FaintLineArtOverlay extends StatelessWidget {
+  const _FaintLineArtOverlay();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.textPrimary.withValues(alpha: 0.08);
+    return IgnorePointer(
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Positioned(
+            left: 2,
+            top: 4,
+            child: Icon(
+              Icons.chat_bubble_outline_rounded,
+              size: 30,
+              color: c,
+            ),
+          ),
+          Positioned(
+            right: 8,
+            top: 10,
+            child: Icon(
+              Icons.star_outline_rounded,
+              size: 24,
+              color: AppColors.textPrimary.withValues(alpha: 0.06),
+            ),
+          ),
+          Positioned(
+            left: 12,
+            bottom: 8,
+            child: Icon(
+              Icons.near_me_outlined,
+              size: 26,
+              color: AppColors.textPrimary.withValues(alpha: 0.06),
+            ),
+          ),
+          Positioned(
+            right: 4,
+            bottom: 4,
+            child: Icon(
+              Icons.change_history_rounded,
+              size: 22,
+              color: AppColors.textPrimary.withValues(alpha: 0.05),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DashedRingPainter extends CustomPainter {
+  _DashedRingPainter({
+    required this.color,
+    this.strokeWidth = 2,
+  });
+  final Color color;
+  final double strokeWidth;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = Offset(size.width / 2, size.height / 2);
+    final r = math.min(size.width, size.height) / 2 - strokeWidth / 2;
+    const dash = 6.0;
+    const gap = 4.0;
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = strokeWidth
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    var distance = 0.0;
+    final circum = 2 * math.pi * r;
+    while (distance < circum) {
+      final startAngle = (distance / circum) * 2 * math.pi - math.pi / 2;
+      final endDist = math.min(distance + dash, circum);
+      final sweepAngle = ((endDist - distance) / circum) * 2 * math.pi;
+      canvas.drawArc(
+        Rect.fromCircle(center: c, radius: r),
+        startAngle,
+        sweepAngle,
+        false,
+        paint,
+      );
+      distance = endDist + gap;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedRingPainter oldDelegate) {
+    return oldDelegate.color != color || oldDelegate.strokeWidth != strokeWidth;
+  }
+}
+
+class _DashedRRectPainter extends CustomPainter {
+  _DashedRRectPainter({
+    required this.color,
+    required this.borderRadius,
+    required this.strokeWidth,
+    required this.dash,
+    required this.gap,
+  });
+  final Color color;
+  final double borderRadius;
+  final double strokeWidth;
+  final double dash;
+  final double gap;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final r = RRect.fromRectAndRadius(
+      Rect.fromLTWH(0, 0, size.width, size.height),
+      Radius.circular(borderRadius),
+    );
+    final path = Path()..addRRect(r);
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+    for (final m in path.computeMetrics()) {
+      var d = 0.0;
+      while (d < m.length) {
+        final e = d + dash;
+        canvas.drawPath(
+          m.extractPath(d, e > m.length ? m.length : e),
+          paint,
+        );
+        d = e + gap;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedRRectPainter oldDelegate) {
+    return oldDelegate.color != color ||
+        oldDelegate.borderRadius != borderRadius ||
+        oldDelegate.strokeWidth != strokeWidth ||
+        oldDelegate.dash != dash ||
+        oldDelegate.gap != gap;
   }
 }

@@ -9,7 +9,7 @@ from app.core.config import get_settings
 from app.core.dependencies import get_current_user
 from app.models.user import User
 from app.schemas.webrtc_schema import IceServerEntry, WebRtcIceResponse
-from app.services.turn_credentials import build_turn_rest_username_and_credential
+from app.infrastructure.turn.turn_credentials import build_turn_rest_username_and_credential
 
 router = APIRouter(prefix="/webrtc", tags=["WebRTC"])
 logger = logging.getLogger(__name__)

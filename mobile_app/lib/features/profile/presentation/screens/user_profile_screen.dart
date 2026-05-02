@@ -6,6 +6,7 @@ import '../../../../app/theme/app_icons.dart';
 import '../../../../app/theme/app_shadows.dart';
 import '../../../../app/theme/design_tokens.dart';
 import '../../../../app/widgets/app_screen_background.dart';
+import '../../../../app/widgets/app_surface.dart';
 import '../../../../core/network/url_helper.dart';
 import '../../data/services/profile_service.dart';
 
@@ -82,19 +83,10 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             Positioned(
               top: MediaQuery.paddingOf(context).top + 4,
               left: 8,
-              child: Material(
-                color: Colors.transparent,
-                child: IconButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.white.withAlpha(10),
-                    foregroundColor: AppColors.textPrimary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadius.sm),
-                    ),
-                  ),
-                  icon: const Icon(AppIcons.back, size: 18),
-                ),
+              child: AppIconButtonSurface(
+                icon: AppIcons.back,
+                tooltip: 'Назад',
+                onTap: () => Navigator.of(context).pop(),
               ),
             ),
             SafeArea(
@@ -135,14 +127,11 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   }
 
   Widget _errorBlock(bool isWide) {
-    return Container(
+    return AppSurface(
+      tone: AppSurfaceTone.elevated,
+      radius: AppRadius.xxl,
       padding: const EdgeInsets.all(AppSpacing.xxl),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.xl),
-        border: Border.all(color: Colors.white.withAlpha(14)),
-        boxShadow: AppShadows.card,
-      ),
+      borderColor: AppColors.accent.withValues(alpha: 0.22),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -173,54 +162,70 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     required double avatarSize,
     required bool isWide,
   }) {
-    return Container(
-      width: double.infinity,
+    return AppSurface(
+      tone: AppSurfaceTone.elevated,
+      radius: AppRadius.xxl,
+      borderColor: AppColors.accent.withValues(alpha: 0.28),
+      shadow: <BoxShadow>[
+        BoxShadow(
+          color: AppColors.accent.withValues(alpha: 0.12),
+          blurRadius: 24,
+          spreadRadius: 0,
+          offset: const Offset(0, 6),
+        ),
+        ...AppShadows.card,
+      ],
       padding: EdgeInsets.symmetric(
         horizontal: isWide ? AppSpacing.xxxl : AppSpacing.xxl,
-        vertical: isWide ? 40 : AppSpacing.xxxl,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.xl),
-        border: Border.all(
-          color: Colors.white.withAlpha(14),
-          width: 1,
-        ),
-        boxShadow: AppShadows.card,
+        vertical: isWide ? 36 : 30,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            'Профиль',
+            'ЧТП ЧАТ',
+            textAlign: TextAlign.center,
             style: TextStyle(
-              color: AppColors.textMuted,
-              fontSize: 13,
+              color: AppColors.textSecondary,
+              fontSize: isWide ? 12.5 : 12,
               fontWeight: FontWeight.w700,
-              letterSpacing: 1.2,
+              letterSpacing: 0.25,
             ),
           ),
-          SizedBox(height: isWide ? 28 : AppSpacing.xl),
-          _buildAvatar(username, avatarSize),
-          SizedBox(height: isWide ? 28 : AppSpacing.xl),
+          SizedBox(height: isWide ? 18 : 16),
+          _buildFramedAvatar(username, avatarSize),
+          SizedBox(height: isWide ? 26 : 22),
           Text(
             username,
             textAlign: TextAlign.center,
             style: TextStyle(
               color: AppColors.textPrimary,
               fontSize: isWide ? 22 : 20,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w800,
               height: 1.15,
+              letterSpacing: -0.4,
             ),
           ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            'Участник ЧТП ЧАТ',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: isWide ? 15 : 14,
-              fontWeight: FontWeight.w500,
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+              border: Border.all(
+                color: AppColors.accent.withValues(alpha: 0.35),
+                width: 1,
+              ),
+              color: AppColors.accent.withValues(alpha: 0.08),
+            ),
+            child: Text(
+              'Участник ЧТП ЧАТ',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: isWide ? 14.5 : 13.5,
+                fontWeight: FontWeight.w600,
+                height: 1.2,
+              ),
             ),
           ),
         ],
@@ -228,38 +233,53 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     );
   }
 
-  Widget _buildAvatar(String title, double size) {
-    final url = _avatarUrl();
-    final radius = size * 0.22;
-    if (url != null && url.isNotEmpty) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(radius),
-        child: Image.network(
-          url,
-          width: size,
-          height: size,
-          fit: BoxFit.cover,
-          errorBuilder: (_, _, _) => _fallbackAvatar(title, size, radius),
+  /// Кадр в стиле плиток эфира / карточек: тонкое оранжевое кольцо и лёгкое свечение.
+  Widget _buildFramedAvatar(String title, double size) {
+    return Container(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: AppColors.accentBright.withValues(alpha: 0.88),
+          width: 1.4,
         ),
-      );
-    }
-    return _fallbackAvatar(title, size, radius);
+        boxShadow: AppShadows.orbitGlow,
+      ),
+      padding: const EdgeInsets.all(2.5),
+      child: ClipOval(
+        child: _buildAvatarInner(title, size),
+      ),
+    );
   }
 
-  Widget _fallbackAvatar(String title, double size, double radius) {
+  Widget _buildAvatarInner(String title, double size) {
+    final url = _avatarUrl();
+    if (url != null && url.isNotEmpty) {
+      return Image.network(
+        url,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => _fallbackAvatar(title, size),
+      );
+    }
+    return _fallbackAvatar(title, size);
+  }
+
+  Widget _fallbackAvatar(String title, double size) {
     final ch = title.isNotEmpty ? title[0].toUpperCase() : '?';
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: AppColors.accent,
-        borderRadius: BorderRadius.circular(radius),
+        gradient: AppGradients.accentPanel,
+        shape: BoxShape.circle,
+        boxShadow: AppShadows.primaryButton,
       ),
       alignment: Alignment.center,
       child: Text(
         ch,
         style: TextStyle(
-          color: Colors.black,
+          color: AppColors.textOnAccent,
           fontSize: size * 0.36,
           fontWeight: FontWeight.w900,
         ),

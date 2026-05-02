@@ -5,6 +5,10 @@ import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_icons.dart';
+import '../../../../app/theme/app_shadows.dart';
+import '../../../../app/theme/design_tokens.dart';
+import '../../../../app/widgets/app_screen_background.dart';
+import '../../../../app/widgets/app_surface.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../chats/data/services/chat_socket_service.dart';
 import '../../../chats/data/services/messages_service.dart';
@@ -148,7 +152,13 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
       remoteCallerPubB64: incoming?['ephem_pub_b64']?.toString(),
       onChatMessage: (text) {
         unawaited(
-          _messagesService.sendMessage(chatId: widget.chatId, text: text).then(
+          _messagesService
+              .sendMessage(
+                chatId: widget.chatId,
+                text: text,
+                messageType: 'call_event',
+              )
+              .then(
                 (_) {},
                 onError: (_) {},
               ),
@@ -212,56 +222,101 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
       },
       child: Scaffold(
         backgroundColor: AppColors.background,
-        body: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(8, 4, 16, 0),
-                child: Row(
-                  children: [
-                    IconButton(
-                      onPressed: () => session?.hangUp(),
-                      icon: const Icon(
-                        AppIcons.close,
-                        color: AppColors.textMuted,
+        body: AppScreenBackground(
+          child: SafeArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'ЧТП ЧАТ',
+                          style: TextStyle(
+                            color: AppColors.accentBright,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
                       ),
-                    ),
-                    Expanded(
-                      child: Column(
+                      const SizedBox(height: 18),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            widget.peerTitle,
-                            textAlign: TextAlign.center,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: AppColors.textPrimary,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
+                          AppIconButtonSurface(
+                            icon: AppIcons.back,
+                            tooltip: 'Назад',
+                            onTap: () => session?.hangUp(),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              children: [
+                                Text(
+                                  widget.peerTitle,
+                                  textAlign: TextAlign.center,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: AppColors.textPrimary,
+                                    fontSize: 36,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: -1.0,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _status,
+                                  textAlign: TextAlign.center,
+                                  maxLines: 2,
+                                  style: const TextStyle(
+                                    color: AppColors.accentBright,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _status,
-                            textAlign: TextAlign.center,
-                            maxLines: 2,
-                            style: const TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
+                          AppSurface(
+                            radius: AppRadius.pill,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.shield_outlined,
+                                  size: 14,
+                                  color: AppColors.accentBright,
+                                ),
+                                SizedBox(width: 6),
+                                Text(
+                                  'Защищённый звонок',
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
-                    ),
-                    const SizedBox(width: 48),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Expanded(
-                child: session == null
+                const SizedBox(height: 4),
+                Expanded(
+                  child: session == null
                     ? const ColoredBox(color: AppColors.background)
                     : Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -291,70 +346,73 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
                           ],
                         ),
                       ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    IconButton.filled(
-                      style: IconButton.styleFrom(
-                        backgroundColor: AppColors.surfaceSoft,
-                        foregroundColor: AppColors.textPrimary,
-                      ),
-                      onPressed: session == null
-                          ? null
-                          : () {
-                              setState(() {
-                                _micOn = !_micOn;
-                                session.setMicEnabled(_micOn);
-                              });
-                            },
-                      icon: Icon(_micOn ? AppIcons.mic : AppIcons.micOff),
-                    ),
-                    const SizedBox(width: 16),
-                    IconButton.filled(
-                      style: IconButton.styleFrom(
-                        backgroundColor: AppColors.surfaceSoft,
-                        foregroundColor: AppColors.textPrimary,
-                      ),
-                      onPressed: session == null
-                          ? null
-                          : () async {
-                              final next = !_camOn;
-                              setState(() => _camOn = next);
-                              await session.setCameraEnabled(next);
-                              if (mounted) {
-                                setState(() => _camOn = session.isCameraOn);
-                              }
-                            },
-                      icon: Icon(_camOn ? Icons.videocam : Icons.videocam_off),
-                    ),
-                    const SizedBox(width: 16),
-                    IconButton.filled(
-                      style: IconButton.styleFrom(
-                        backgroundColor: AppColors.surfaceSoft,
-                        foregroundColor: AppColors.textPrimary,
-                      ),
-                      onPressed: (session == null || !_camOn)
-                          ? null
-                          : () => session.switchCamera(),
-                      icon: const Icon(Icons.cameraswitch),
-                    ),
-                    const SizedBox(width: 16),
-                    IconButton.filled(
-                      style: IconButton.styleFrom(
-                        backgroundColor: Colors.red.shade700,
-                        foregroundColor: Colors.white,
-                      ),
-                      onPressed:
-                          session == null ? null : () => session.hangUp(),
-                      icon: const Icon(AppIcons.callEnd),
-                    ),
-                  ],
                 ),
-              ),
-            ],
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+                  child: AppSurface(
+                    radius: AppRadius.pill,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        AppIconButtonSurface(
+                          icon: _micOn ? AppIcons.mic : AppIcons.micOff,
+                          active: _micOn,
+                          onTap: session == null
+                              ? null
+                              : () {
+                                  setState(() {
+                                    _micOn = !_micOn;
+                                    session.setMicEnabled(_micOn);
+                                  });
+                                },
+                        ),
+                        const SizedBox(width: 12),
+                        AppIconButtonSurface(
+                          icon: _camOn ? AppIcons.videocam : AppIcons.videocamOff,
+                          active: _camOn,
+                          onTap: session == null
+                              ? null
+                              : () async {
+                                  final next = !_camOn;
+                                  setState(() => _camOn = next);
+                                  await session.setCameraEnabled(next);
+                                  if (mounted) {
+                                    setState(() => _camOn = session.isCameraOn);
+                                  }
+                                },
+                        ),
+                        const SizedBox(width: 12),
+                        AppIconButtonSurface(
+                          icon: Icons.cameraswitch_rounded,
+                          onTap: (session == null || !_camOn)
+                              ? null
+                              : () => session.switchCamera(),
+                        ),
+                        const SizedBox(width: 12),
+                        Container(
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [Color(0xFFE34B3F), Color(0xFFB7201B)],
+                            ),
+                            shape: BoxShape.circle,
+                            boxShadow: AppShadows.primaryButton,
+                          ),
+                          child: IconButton(
+                            onPressed:
+                                session == null ? null : () => session.hangUp(),
+                            icon: const Icon(AppIcons.callEnd, color: Colors.white),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

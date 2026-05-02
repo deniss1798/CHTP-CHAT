@@ -1,11 +1,15 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_icons.dart';
 import '../../../../app/theme/app_shadows.dart';
 import '../../../../app/theme/design_tokens.dart';
+import '../../../../app/widgets/app_avatar.dart';
+import '../../../../app/widgets/app_screen_background.dart';
+import '../../../../app/widgets/app_surface.dart';
+import '../../../../app/widgets/app_text_field.dart';
 import '../../data/services/chats_service.dart';
 import '../../data/services/users_service.dart';
+import '../controllers/user_presentation_helpers.dart';
 
 class ChatMemberAddScreen extends StatefulWidget {
   final int chatId;
@@ -56,15 +60,7 @@ class _ChatMemberAddScreenState extends State<ChatMemberAddScreen> {
       final users = await _usersService.getUsers();
 
       final availableUsers = users.where((user) {
-        final rawId = user['id'];
-
-        int? userId;
-        if (rawId is int) {
-          userId = rawId;
-        } else {
-          userId = int.tryParse(rawId.toString());
-        }
-
+        final userId = userIdFromMap(user);
         return userId != null && !widget.existingMemberIds.contains(userId);
       }).toList();
 
@@ -79,7 +75,7 @@ class _ChatMemberAddScreenState extends State<ChatMemberAddScreen> {
       if (!mounted) return;
 
       setState(() {
-        _error = _extractErrorMessage(
+        _error = extractFeatureErrorMessage(
           e,
           fallback: 'Не удалось загрузить пользователей',
         );
@@ -105,15 +101,7 @@ class _ChatMemberAddScreenState extends State<ChatMemberAddScreen> {
   }
 
   Future<void> _addMember(Map<String, dynamic> user) async {
-    final rawId = user['id'];
-    int? userId;
-
-    if (rawId is int) {
-      userId = rawId;
-    } else {
-      userId = int.tryParse(rawId.toString());
-    }
-
+    final userId = userIdFromMap(user);
     if (userId == null || _isAdding) return;
 
     setState(() {
@@ -136,7 +124,7 @@ class _ChatMemberAddScreenState extends State<ChatMemberAddScreen> {
         SnackBar(
           backgroundColor: AppColors.surfaceSoft,
           content: Text(
-            _extractErrorMessage(
+            extractFeatureErrorMessage(
               e,
               fallback: 'Не удалось добавить участника',
             ),
@@ -144,34 +132,12 @@ class _ChatMemberAddScreenState extends State<ChatMemberAddScreen> {
         ),
       );
     } finally {
-      if (!mounted) return;
-
-      setState(() {
-        _isAdding = false;
-      });
-    }
-  }
-
-  String _extractErrorMessage(Object e, {required String fallback}) {
-    if (e is DioException) {
-      final data = e.response?.data;
-
-      if (data is Map<String, dynamic>) {
-        return data['detail']?.toString() ??
-            data['message']?.toString() ??
-            fallback;
-      }
-
-      if (data is String && data.isNotEmpty) {
-        return data;
-      }
-
-      if (e.message != null && e.message!.isNotEmpty) {
-        return e.message!;
+      if (mounted) {
+        setState(() {
+          _isAdding = false;
+        });
       }
     }
-
-    return e.toString().replaceFirst('Exception: ', '');
   }
 
   Widget _buildBody() {
@@ -243,41 +209,24 @@ class _ChatMemberAddScreenState extends State<ChatMemberAddScreen> {
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
       itemCount: _filteredUsers.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      separatorBuilder: (context, index) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final user = _filteredUsers[index];
         final username = (user['username'] ?? '').toString();
 
         return GestureDetector(
           onTap: _isAdding ? null : () => _addMember(user),
-          child: Container(
+          child: AppSurface(
+            radius: AppRadius.xl,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: Colors.white.withAlpha(10),
-              ),
-              boxShadow: AppShadows.lift,
-            ),
+            shadow: AppShadows.lift,
             child: Row(
               children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: AppColors.accent,
-                    borderRadius: BorderRadius.circular(13),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    username.isNotEmpty ? username[0].toUpperCase() : '?',
-                    style: const TextStyle(
-                      color: Colors.black,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
+                AppAvatar(
+                  title: username,
+                  size: AppSizes.listAvatar,
+                  square: true,
+                  radius: AppRadius.md,
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -316,32 +265,25 @@ class _ChatMemberAddScreenState extends State<ChatMemberAddScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: AppGradients.background,
-        ),
+      body: AppScreenBackground(
         child: SafeArea(
           child: Column(
             children: [
               Container(
-                padding: const EdgeInsets.fromLTRB(10, 10, 14, 10),
-                decoration: BoxDecoration(
-                  color: AppColors.background,
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+                decoration: const BoxDecoration(
                   border: Border(
-                    bottom: BorderSide(
-                      color: Colors.white.withAlpha(10),
-                    ),
+                    bottom: BorderSide(color: AppColors.strokeSoft),
                   ),
                 ),
                 child: Row(
                   children: [
-                    IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(
-                        AppIcons.back,
-                        color: AppColors.textPrimary,
-                      ),
+                    AppIconButtonSurface(
+                      icon: AppIcons.back,
+                      tooltip: 'Назад',
+                      onTap: () => Navigator.of(context).pop(),
                     ),
+                    const SizedBox(width: 10),
                     const Expanded(
                       child: Text(
                         'Добавить участника',
@@ -349,7 +291,7 @@ class _ChatMemberAddScreenState extends State<ChatMemberAddScreen> {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: AppColors.textPrimary,
-                          fontSize: 17,
+                          fontSize: 18,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -359,27 +301,9 @@ class _ChatMemberAddScreenState extends State<ChatMemberAddScreen> {
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
-                child: TextField(
+                child: AppSearchField(
                   controller: _searchController,
-                  style: const TextStyle(color: AppColors.textPrimary),
-                  decoration: InputDecoration(
-                    hintText: 'Поиск по имени',
-                    hintStyle: const TextStyle(color: AppColors.textMuted),
-                    prefixIcon: const Icon(
-                      AppIcons.search,
-                      color: AppColors.textMuted,
-                    ),
-                    filled: true,
-                    fillColor: AppColors.surfaceSoft,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 14,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(18),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
+                  hintText: 'Поиск по имени',
                 ),
               ),
               Expanded(child: _buildBody()),

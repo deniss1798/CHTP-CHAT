@@ -1,19 +1,24 @@
-from datetime import datetime, timedelta, timezone
-import random
-
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
-from app.core.security import hash_password, verify_password, create_access_token
+from app.application.auth import auth_commands
+from app.core.dependencies import get_current_user
+from app.core.rate_limit import (
+    AUTH_LOGIN_RULE,
+    AUTH_REQUEST_CODE_RULE,
+    AUTH_VERIFY_CODE_RULE,
+    client_ip,
+    normalize_rate_key,
+    rate_limiter,
+)
+from app.core.security import create_ws_token
 from app.db.database import get_db
-from app.models.pending_registration import PendingRegistration
-from app.models.user import User
-from app.core.email_service import send_verification_code_email
 from app.schemas.email_verification import (
     RequestEmailCodeRequest,
     VerifyEmailCodeRequest,
 )
-from app.schemas.user_schema import UserLogin, TokenResponse
+from app.models.user import User
+from app.schemas.user_schema import TokenResponse, UserLogin, WsTokenResponse
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -21,160 +26,48 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 @router.post("/request-email-code")
 def request_email_code(
     payload: RequestEmailCodeRequest,
+    request: Request,
     db: Session = Depends(get_db),
 ):
-    existing_user = db.query(User).filter(
-        (User.email == payload.email) | (User.username == payload.username)
-    ).first()
-
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User already exists",
-        )
-
-    code = f"{random.randint(100000, 999999)}"
-    expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
-
-    try:
-        password_hash_value = hash_password(payload.password)
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
-        )
-
-    pending = (
-        db.query(PendingRegistration)
-        .filter(PendingRegistration.email == payload.email)
-        .first()
+    rate_limiter.check(
+        f"{client_ip(request)}:{normalize_rate_key(payload.email)}",
+        AUTH_REQUEST_CODE_RULE,
     )
+    return auth_commands.request_email_code(db, payload)
 
-    if pending:
-        pending.username = payload.username
-        pending.password_hash = password_hash_value
-        pending.verification_code = code
-        pending.expires_at = expires_at
-        pending.attempts_count = 0
-    else:
-        pending = PendingRegistration(
-            username=payload.username,
-            email=payload.email,
-            password_hash=password_hash_value,
-            verification_code=code,
-            expires_at=expires_at,
-            attempts_count=0,
-        )
-        db.add(pending)
-
-    db.commit()
-
-    try:
-        send_verification_code_email(payload.email, code)
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to send verification email",
-        )
-
-    return {
-        "message": "Verification code sent to email",
-    }
 
 @router.post("/verify-email-code", response_model=TokenResponse)
 def verify_email_code(
     payload: VerifyEmailCodeRequest,
+    request: Request,
     db: Session = Depends(get_db),
 ):
-    pending = (
-        db.query(PendingRegistration)
-        .filter(PendingRegistration.email == payload.email)
-        .first()
+    rate_limiter.check(
+        f"{client_ip(request)}:{normalize_rate_key(payload.email)}",
+        AUTH_VERIFY_CODE_RULE,
     )
-
-    if not pending:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Verification request not found",
-        )
-
-    now = datetime.now(timezone.utc)
-    pending_expires_at = pending.expires_at
-
-    if pending_expires_at.tzinfo is None:
-        pending_expires_at = pending_expires_at.replace(tzinfo=timezone.utc)
-
-    if pending_expires_at < now:
-        db.delete(pending)
-        db.commit()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Verification code expired",
-        )
-
-    if pending.attempts_count >= 5:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Too many invalid attempts",
-        )
-
-    if pending.verification_code != payload.code:
-        pending.attempts_count += 1
-        db.commit()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid verification code",
-        )
-
-    existing_user_by_email = db.query(User).filter(User.email == pending.email).first()
-    if existing_user_by_email:
-        db.delete(pending)
-        db.commit()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered",
-        )
-
-    existing_user_by_username = (
-        db.query(User).filter(User.username == pending.username).first()
-    )
-    if existing_user_by_username:
-        db.delete(pending)
-        db.commit()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username already taken",
-        )
-
-    new_user = User(
-        username=pending.username,
-        email=pending.email,
-        password_hash=pending.password_hash,
-    )
-
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-
-    db.delete(pending)
-    db.commit()
-
-    access_token = create_access_token({"sub": str(new_user.id)})
-    return TokenResponse(access_token=access_token)
+    return auth_commands.verify_email_code(db, payload)
 
 
 @router.post("/login", response_model=TokenResponse)
 def login(
     user_data: UserLogin,
+    request: Request,
     db: Session = Depends(get_db),
 ):
-    user = db.query(User).filter(User.email == user_data.email).first()
+    rate_limiter.check(
+        f"{client_ip(request)}:{normalize_rate_key(user_data.email)}",
+        AUTH_LOGIN_RULE,
+    )
+    return auth_commands.login_user(db, user_data)
 
-    if not user or not verify_password(user_data.password, user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password",
-        )
 
-    access_token = create_access_token({"sub": str(user.id)})
-    return TokenResponse(access_token=access_token)
+@router.post("/ws-token", response_model=WsTokenResponse)
+def issue_ws_token(
+    current_user: User = Depends(get_current_user),
+):
+    expires_in = 60
+    return WsTokenResponse(
+        ws_token=create_ws_token(user_id=current_user.id, expires_seconds=expires_in),
+        expires_in=expires_in,
+    )

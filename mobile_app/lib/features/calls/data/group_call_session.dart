@@ -111,6 +111,8 @@ class GroupCallSession {
 
   bool _ended = false;
   bool _cameraOn = false;
+  bool _endedByRemote = false;
+  bool _endSignalSent = false;
 
   bool get cameraOn => _cameraOn;
 
@@ -677,6 +679,7 @@ class GroupCallSession {
 
   void _onCallEndedByRemote(Map<String, dynamic> msg) {
     if (_ended) return;
+    _endedByRemote = true;
     onStatus('Звонок завершён');
     _finish(notify: true);
   }
@@ -798,10 +801,14 @@ class GroupCallSession {
 
   void leave() {
     if (_ended) return;
-    send({
-      'type': 'group_call_leave',
-      'call_id': callId,
-    });
+    if (myUserId == startedByUserId) {
+      _sendGroupEnd();
+    } else {
+      send({
+        'type': 'group_call_leave',
+        'call_id': callId,
+      });
+    }
     _finish(notify: true);
   }
 
@@ -843,6 +850,9 @@ class GroupCallSession {
     }
     _peers.clear();
     _remoteUserIds.clear();
+    if (!_endedByRemote && myUserId == startedByUserId && notify) {
+      _sendGroupEnd();
+    }
 
     try {
       localRenderer.srcObject = null;
@@ -852,6 +862,15 @@ class GroupCallSession {
     if (notify) {
       onEnded();
     }
+  }
+
+  void _sendGroupEnd() {
+    if (_endSignalSent) return;
+    _endSignalSent = true;
+    send({
+      'type': 'group_call_end',
+      'call_id': callId,
+    });
   }
 
   Future<void> dispose() async {

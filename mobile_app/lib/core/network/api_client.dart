@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
+import 'api_config.dart';
+
 /// Глобальный `Content-Type: application/json` ломает multipart: boundary не подставляется,
 /// nginx/FastAPI могут ответить 405 / не распарсить тело. Для FormData не задаём Content-Type вручную.
 class _MultipartContentTypeInterceptor extends Interceptor {
@@ -14,15 +16,58 @@ class _MultipartContentTypeInterceptor extends Interceptor {
 }
 
 class ApiLoggerInterceptor extends Interceptor {
+  static const _sensitiveKeys = {
+    'authorization',
+    'access_token',
+    'refresh_token',
+    'token',
+    'password',
+    'verification_code',
+    'code',
+    'media_url',
+    'avatar_url',
+  };
+
+  Object? _redact(Object? value) {
+    if (value is Map) {
+      return value.map((key, item) {
+        final normalizedKey = key.toString().toLowerCase();
+        return MapEntry(
+          key,
+          _sensitiveKeys.contains(normalizedKey) ? '***' : _redact(item),
+        );
+      });
+    }
+
+    if (value is Iterable && value is! String) {
+      return value.map(_redact).toList();
+    }
+
+    if (value is String) {
+      return value
+          .replaceAll(RegExp(r'Bearer\s+[A-Za-z0-9._~+/=-]+'), 'Bearer ***')
+          .replaceAllMapped(
+            RegExp(r'([?&](?:token|access_token|refresh_token|password|code)=)[^&\s]+'),
+            (match) => '${match.group(1)}***',
+          )
+          .replaceAll(
+            RegExp(r'https?://[^\s]+(?:X-Amz-Signature|Signature|token|access_token)=[^\s]+'),
+            '***',
+          );
+    }
+
+    return value;
+  }
+
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     options.extra['start_time'] = DateTime.now().millisecondsSinceEpoch;
 
     debugPrint(
       '[API START] ${options.method} ${options.uri}\n'
-      'Headers: ${options.headers}\n'
-      'Query: ${options.queryParameters}\n'
-      'Data: ${options.data}',
+      'Headers: ${_redact(options.headers)}\n'
+      'Query: ${_redact(options.queryParameters)}\n'
+      'Data: ${_redact(options.data)}',
     );
 
     handler.next(options);
@@ -39,7 +84,7 @@ class ApiLoggerInterceptor extends Interceptor {
       '[API END] ${response.requestOptions.method} ${response.requestOptions.uri}\n'
       'Status: ${response.statusCode}\n'
       'Duration: $duration\n'
-      'Response: ${response.data}',
+      'Response: ${_redact(response.data)}',
     );
 
     handler.next(response);
@@ -55,8 +100,9 @@ class ApiLoggerInterceptor extends Interceptor {
     debugPrint(
       '[API ERROR] ${err.requestOptions.method} ${err.requestOptions.uri}\n'
       'Duration: $duration\n'
+      'Type: ${err.type}  status: ${err.response?.statusCode}\n'
       'Message: ${err.message}\n'
-      'Response: ${err.response?.data}',
+      'Response: ${_redact(err.response?.data)}',
     );
 
     handler.next(err);
@@ -64,30 +110,35 @@ class ApiLoggerInterceptor extends Interceptor {
 }
 
 class ApiClient {
-  /// Базовый URL REST API без завершающего `/`.
-  /// Сборка: `flutter run --dart-define=API_BASE_URL=https://example.com/api`
-  static String get baseUrl {
-    const env = String.fromEnvironment('API_BASE_URL');
-    final raw =
-        env.trim().isNotEmpty ? env.trim() : 'http://83.217.201.40';
-    if (raw.endsWith('/')) {
-      return raw.substring(0, raw.length - 1);
-    }
-    return raw;
-  }
+  /// См. [resolvedApiBaseUrl] — `dart-define`, затем `api_base_url.txt` рядом с exe (Windows/macOS/Linux).
+  static String get baseUrl => resolvedApiBaseUrl;
 
-  static final Dio dio = Dio(
-    BaseOptions(
-      baseUrl: baseUrl,
-      connectTimeout: const Duration(seconds: 15),
-      receiveTimeout: const Duration(seconds: 60),
-      // Загрузка фото/видео (до десятков МБ) по мобильной сети часто > 15 с
-      sendTimeout: const Duration(minutes: 5),
-    ),
-  )..interceptors.addAll([
-          _MultipartContentTypeInterceptor(),
-          ApiLoggerInterceptor(),
-        ]);
+  static Dio? _dio;
+  static Dio get dio {
+    final currentBase = baseUrl;
+    if (_dio != null) {
+      if (_dio!.options.baseUrl != currentBase) {
+        _dio!.options.baseUrl = currentBase;
+      }
+      return _dio!;
+    }
+    _dio = Dio(
+      BaseOptions(
+        baseUrl: currentBase,
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 60),
+        sendTimeout: const Duration(minutes: 5),
+      ),
+    );
+    _dio!.interceptors.addAll([
+      _MultipartContentTypeInterceptor(),
+      if (kDebugMode ||
+          kProfileMode ||
+          bool.fromEnvironment('API_LOG', defaultValue: false))
+        ApiLoggerInterceptor(),
+    ]);
+    return _dio!;
+  }
 
   /// Отдельный клиент для multipart: без `baseUrl`, запросы только через [Dio.postUri].
   /// Так надёжнее на Windows и не смешивается с опциями основного [dio].
@@ -101,7 +152,10 @@ class ApiClient {
       ),
     )..interceptors.addAll([
           _MultipartContentTypeInterceptor(),
-          ApiLoggerInterceptor(),
+          if (kDebugMode ||
+              kProfileMode ||
+              bool.fromEnvironment('API_LOG', defaultValue: false))
+            ApiLoggerInterceptor(),
         ]);
   }
 }

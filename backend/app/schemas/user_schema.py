@@ -22,6 +22,12 @@ class UserResponse(BaseModel):
         from_attributes = True
 
 
+class UserSearchPage(BaseModel):
+    users: list[UserResponse]
+    has_more: bool
+    next_cursor: str | None = None
+
+
 class UserPublicProfile(BaseModel):
     """Профиль другого пользователя (без email)."""
 
@@ -36,3 +42,8 @@ class UserPublicProfile(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+class WsTokenResponse(BaseModel):
+    ws_token: str
+    expires_in: int
