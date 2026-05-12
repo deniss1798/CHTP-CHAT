@@ -38,6 +38,14 @@ def upgrade() -> None:
     op.execute(text("DROP INDEX IF EXISTS idx_chat_members_chat_id"))
     op.execute(text("DROP INDEX IF EXISTS idx_chat_members_user_id"))
     op.create_index(op.f('ix_chat_members_id'), 'chat_members', ['id'], unique=False, if_not_exists=True)
+    # Старые БД могли оставить одноимённый unique-index без строки в pg_constraint —
+    # тогда IF по pg_constraint даёт false, а ADD CONSTRAINT падает с "relation already exists".
+    op.execute(
+        text(
+            "ALTER TABLE chat_members DROP CONSTRAINT IF EXISTS uq_chat_members_chat_user"
+        )
+    )
+    op.execute(text("DROP INDEX IF EXISTS uq_chat_members_chat_user"))
     op.execute(
         text(
             """

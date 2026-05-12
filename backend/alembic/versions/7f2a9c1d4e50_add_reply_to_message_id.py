@@ -8,7 +8,7 @@ Create Date: 2026-04-06
 from typing import Sequence, Union
 
 from alembic import op
-import sqlalchemy as sa
+from sqlalchemy import text
 
 
 revision: str = "7f2a9c1d4e50"
@@ -18,27 +18,54 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "messages",
-        sa.Column(
-            "reply_to_message_id",
-            sa.BigInteger(),
-            nullable=True,
-        ),
+    # Колонка могла быть добавлена вручную или старой схемой — не падаем.
+    op.execute(
+        text(
+            """
+            DO $body$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM information_schema.columns
+                    WHERE table_name = 'messages'
+                      AND column_name = 'reply_to_message_id'
+                ) THEN
+                    ALTER TABLE messages ADD COLUMN reply_to_message_id BIGINT;
+                END IF;
+            END
+            $body$ LANGUAGE plpgsql
+            """
+        )
     )
     op.create_index(
         op.f("ix_messages_reply_to_message_id"),
         "messages",
         ["reply_to_message_id"],
         unique=False,
+        if_not_exists=True,
     )
-    op.create_foreign_key(
-        "fk_messages_reply_to_message_id",
-        "messages",
-        "messages",
-        ["reply_to_message_id"],
-        ["id"],
-        ondelete="SET NULL",
+    op.execute(
+        text(
+            """
+            DO $body$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM pg_constraint c
+                    JOIN pg_class t ON c.conrelid = t.oid
+                    WHERE t.relname = 'messages'
+                      AND c.conname = 'fk_messages_reply_to_message_id'
+                ) THEN
+                    ALTER TABLE messages
+                    ADD CONSTRAINT fk_messages_reply_to_message_id
+                    FOREIGN KEY (reply_to_message_id)
+                    REFERENCES messages (id)
+                    ON DELETE SET NULL;
+                END IF;
+            END
+            $body$ LANGUAGE plpgsql
+            """
+        )
     )
 
 
