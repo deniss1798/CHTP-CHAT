@@ -57,6 +57,21 @@ class ChatDetailMessageMaps {
       }
     }
 
+    final mentionsRaw = raw['mention_user_ids'];
+    final mentionUserIds = <int>[];
+    if (mentionsRaw is List) {
+      for (final m in mentionsRaw) {
+        final id = intFromDynamic(m);
+        if (id != null) mentionUserIds.add(id);
+      }
+    }
+
+    Map<String, dynamic>? poll;
+    final pollRaw = raw['poll'];
+    if (pollRaw is Map) {
+      poll = Map<String, dynamic>.from(pollRaw);
+    }
+
     return {
       'id': raw['id'],
       'chat_id': raw['chat_id'],
@@ -77,6 +92,10 @@ class ChatDetailMessageMaps {
       'forwarded_from_user_id': intFromDynamic(raw['forwarded_from_user_id']),
       'delivery_status': raw['delivery_status']?.toString(),
       'reactions': reactions,
+      'pinned_at': raw['pinned_at'],
+      'pinned_by_user_id': intFromDynamic(raw['pinned_by_user_id']),
+      'mention_user_ids': mentionUserIds,
+      'poll': poll,
     };
   }
 }

@@ -4,8 +4,10 @@ from app.application.messages.reaction_service import reaction_groups_for_messag
 from app.application.realtime.event_payload import realtime_event
 from app.application.realtime.ws_event_names import (
     WS_EVENT_MESSAGE_DELETED,
+    WS_EVENT_MESSAGE_PIN_UPDATED,
     WS_EVENT_MESSAGE_REACTIONS_UPDATED,
     WS_EVENT_MESSAGE_UPDATED,
+    WS_EVENT_POLL_UPDATED,
     WS_TYPE_NEW_MESSAGE,
     WS_TYPE_READ_RECEIPT,
 )
@@ -68,3 +70,24 @@ async def publish_message_reactions_updated(
 
     await manager.broadcast_personalized(chat_id, build)
     await publish_reactions_refresh(chat_id, message_id)
+
+
+async def publish_message_pin_updated(chat_id: int, message: dict) -> None:
+    payload = realtime_event({
+        "event": WS_EVENT_MESSAGE_PIN_UPDATED,
+        "chat_id": chat_id,
+        "message": message,
+    })
+    await manager.broadcast(chat_id, payload)
+    await publish_chat_event(chat_id, payload)
+
+
+async def publish_poll_updated(chat_id: int, message_id: int, poll: dict) -> None:
+    payload = realtime_event({
+        "event": WS_EVENT_POLL_UPDATED,
+        "chat_id": chat_id,
+        "message_id": message_id,
+        "poll": poll,
+    })
+    await manager.broadcast(chat_id, payload)
+    await publish_chat_event(chat_id, payload)

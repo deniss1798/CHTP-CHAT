@@ -15,7 +15,7 @@ mixin _ChatDetailRealtimeAndCallsLogic
     unawaited(_drainTextOutbox());
   }
 
-  void _handleSocketEvent(Map<String, dynamic> incoming) {
+  Future<void> _handleSocketEvent(Map<String, dynamic> incoming) async {
     if (!_chatSocketEventController.shouldProcess(incoming)) return;
 
     if (_chatSocketEventController.isGroupCallInvite(incoming)) {
@@ -133,6 +133,16 @@ mixin _ChatDetailRealtimeAndCallsLogic
         ),
       );
 
+      return;
+    }
+
+    if (incoming['event'] == ChatWsContract.eventMessagePinUpdated) {
+      await _handlePinUpdated(incoming);
+      return;
+    }
+
+    if (incoming['event'] == ChatWsContract.eventPollUpdated) {
+      await _handlePollUpdated(incoming);
       return;
     }
 
@@ -408,6 +418,53 @@ mixin _ChatDetailRealtimeAndCallsLogic
     );
   }
 
+  Future<void> _handlePinUpdated(Map<String, dynamic> incoming) async {
+    final raw = incoming['message'];
+    if (raw is! Map) return;
+    final updated = ChatDetailMessageMaps.normalizeMessageMap(
+      Map<String, dynamic>.from(raw),
+    );
+    if (!mounted) return;
+    setState(() {
+      _messageListController.replaceUpdated(_messages, updated);
+    });
+    unawaited(_loadPinnedMessages());
+  }
+
+  Future<void> _handlePollUpdated(Map<String, dynamic> incoming) async {
+    final messageId = ChatDetailMessageMaps.intFromDynamic(
+      incoming['message_id'],
+    );
+    final pollRaw = incoming['poll'];
+    if (messageId == null || pollRaw is! Map) return;
+    if (!mounted) return;
+    setState(() {
+      final idx = _messages.indexWhere(
+        (m) => ChatDetailMessageMaps.intFromDynamic(m['id']) == messageId,
+      );
+      if (idx >= 0) {
+        final copy = Map<String, dynamic>.from(_messages[idx]);
+        copy['poll'] = Map<String, dynamic>.from(pollRaw);
+        _messages[idx] = copy;
+      }
+    });
+  }
+
+  Future<void> _loadPinnedMessages() async {
+    try {
+      final raw = await _messagesService.getPinnedMessages(widget.chatId);
+      if (!mounted) return;
+      setState(() {
+        _pinnedMessages = raw
+            .map(ChatDetailMessageMaps.normalizeMessageMap)
+            .toList(growable: false);
+        if (_pinnedCarouselIndex >= _pinnedMessages.length) {
+          _pinnedCarouselIndex = 0;
+        }
+      });
+    } catch (_) {}
+  }
+
   Future<void> _handleNewMessage(Map<String, dynamic> incoming) async {
     final raw = _chatSocketEventController.newMessage(incoming);
     if (raw == null) return;
@@ -422,6 +479,44 @@ mixin _ChatDetailRealtimeAndCallsLogic
         normalized['delivery_status'] = _computeDeliveryForOutgoing(mid);
       }
     }
+
+    if (_currentUserId != null &&
+        senderId != null &&
+        senderId == _currentUserId) {
+      var merged = false;
+      if (!mounted) return;
+      setState(() {
+        merged = _messageListController.replaceOptimisticMatchingClientMessageId(
+          _messages,
+          normalized,
+        );
+        if (merged) {
+          if (senderId == _typingUserId) {
+            _typingUserId = null;
+            _remoteTypingHideTimer?.cancel();
+          }
+          _messages.sort((a, b) {
+            final am = serverInstantMillis(a['created_at']?.toString());
+            final bm = serverInstantMillis(b['created_at']?.toString());
+            return (am ?? 0).compareTo(bm ?? 0);
+          });
+        }
+      });
+      if (merged) {
+        unawaited(
+          _localChatStateService.cacheMessages(
+            chatId: widget.chatId,
+            messages: _messages,
+          ),
+        );
+        await _markCurrentChatAsRead();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _scrollToBottom();
+        });
+        return;
+      }
+    }
+
     final exists =
         incomingId != null &&
         _messages.any(
@@ -540,6 +635,12 @@ mixin _ChatDetailRealtimeAndCallsLogic
         messageId: lastMessageId,
       );
     } catch (_) {}
+
+    if (LocalNotificationsService.supported) {
+      unawaited(
+        LocalNotificationsService.instance.cancelChatNotification(widget.chatId),
+      );
+    }
 
     await _localChatStateService.markChatAsRead(
       chatId: widget.chatId,

@@ -148,6 +148,12 @@ class LocalNotificationsService {
     );
   }
 
+  /// Убрать уведомление чата из шторки (тот же id, что при [showChatMessage]).
+  Future<void> cancelChatNotification(int chatId) async {
+    if (!supported || !_initialized) return;
+    await _plugin.cancel(chatId);
+  }
+
   /// Свой трей-превью, когда приложение было в фоне и FCM доставило только через isolate.
   Future<void> showIncomingCallTrayFromFcmStrings({
     required String title,

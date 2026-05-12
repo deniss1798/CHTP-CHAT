@@ -45,6 +45,9 @@ class Message(Base):
     is_updated = Column(Boolean, default=False)
     is_deleted = Column(Boolean, nullable=False, default=False)
 
+    pinned_at = Column(DateTime(timezone=False), nullable=True)
+    pinned_by_user_id = Column(BigInteger, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
     __table_args__ = (
         UniqueConstraint(
             "sender_id",
@@ -53,4 +56,9 @@ class Message(Base):
         ),
         Index("ix_messages_chat_id_id", "chat_id", "id"),
         Index("ix_messages_chat_id_created_at_id", "chat_id", "created_at", "id"),
+        Index(
+            "ix_messages_chat_pinned",
+            "chat_id",
+            "pinned_at",
+        ),
     )

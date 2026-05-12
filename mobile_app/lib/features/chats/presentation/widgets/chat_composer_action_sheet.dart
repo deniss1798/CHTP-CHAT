@@ -9,6 +9,7 @@ enum ChatComposerAttachmentAction {
   photo,
   videoGallery,
   document,
+  poll,
 }
 
 enum ChatComposerDesktopExtraAction {
@@ -106,6 +107,14 @@ class ChatComposerAttachmentSheet extends StatelessWidget {
                   'PDF, Office, ODF, RTF, текстовые документы — до 50 МБ',
               onTap: () => Navigator.of(context)
                   .pop(ChatComposerAttachmentAction.document),
+            ),
+            const SizedBox(height: 10),
+            _AttachmentChoice(
+              icon: Icons.poll_outlined,
+              title: 'Опрос',
+              subtitle: 'Создать голосование с несколькими вариантами',
+              onTap: () => Navigator.of(context)
+                  .pop(ChatComposerAttachmentAction.poll),
             ),
             const SizedBox(height: 16),
             Row(

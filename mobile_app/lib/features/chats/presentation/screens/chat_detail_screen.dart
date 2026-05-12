@@ -15,6 +15,8 @@ import '../../../../core/formatting/last_seen_label.dart';
 import '../../../../core/formatting/server_time.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/notifiers/open_chat_state_notifier.dart';
+import '../../../../core/push/local_notifications_service.dart';
+import '../../../../core/realtime/chat_ws_contract.dart';
 import '../../../../core/platform/desktop_layout.dart';
 import '../../../../core/notifiers/chats_list_refresh_notifier.dart';
 import '../../../../core/notifiers/open_chat_sync_notifier.dart';
@@ -28,6 +30,7 @@ import '../../data/services/local_chat_state_service.dart';
 import '../../data/models/chat_models.dart';
 import '../../data/services/messages_service.dart';
 import '../../data/services/presence_service.dart';
+import 'attachment_preview_screen.dart';
 import 'chat_member_add_screen.dart';
 import 'video_note_record_screen.dart';
 import 'package:image_picker/image_picker.dart';
@@ -47,8 +50,11 @@ import '../widgets/chat_composer_action_sheet.dart';
 import '../widgets/chat_detail_conversation_view.dart';
 import '../widgets/chat_detail_fullscreen_image_viewer.dart';
 import '../widgets/chat_detail_fullscreen_video_page.dart';
+import '../widgets/chat_detail_message_content.dart' show PollVoteBus;
+import '../widgets/chat_pinned_messages_banner.dart';
 import '../widgets/messenger_styled_dialogs.dart';
 import '../widgets/chat_message_actions_panel.dart';
+import '../widgets/poll_create_sheet.dart';
 
 part 'chat_detail_screen_logic.dart';
 part 'chat_detail_screen_lifecycle.dart';
@@ -121,6 +127,8 @@ abstract class _ChatDetailScreenStateBase extends State<ChatDetailScreen> {
 
   Map<String, dynamic>? _replyingTo;
   Map<String, dynamic>? _editingMessage;
+  List<Map<String, dynamic>> _pinnedMessages = const [];
+  int _pinnedCarouselIndex = 0;
 
   String _chatTitle = '';
   String? _chatAvatarUrl;
@@ -171,6 +179,11 @@ class _ChatDetailScreenState extends _ChatDetailScreenStateBase
     _chatTitle = widget.title;
     _chatAvatarUrl = widget.avatarUrl;
     markChatOpen(widget.chatId);
+    if (LocalNotificationsService.supported) {
+      unawaited(
+        LocalNotificationsService.instance.cancelChatNotification(widget.chatId),
+      );
+    }
     _messageController.addListener(_onMessageTextChanged);
     _scrollController.addListener(_onMessagesScroll);
     if (!_isGroupChat) {
@@ -181,10 +194,14 @@ class _ChatDetailScreenState extends _ChatDetailScreenStateBase
     }
     _initChat();
     openChatSyncNotifier.addListener(_onOpenChatSyncRequest);
+    PollVoteBus.setHandler((msgId, optId, multi) {
+      unawaited(_votePoll(msgId, optId, multi));
+    });
   }
 
   @override
   void dispose() {
+    PollVoteBus.setHandler(null);
     clearOpenChat(widget.chatId);
     openChatSyncNotifier.removeListener(_onOpenChatSyncRequest);
     _socketReconnectTimer?.cancel();
@@ -248,10 +265,63 @@ class _ChatDetailScreenState extends _ChatDetailScreenStateBase
             ? '${_senderNameForUserId(_typingUserId)} печатает…'
             : 'Печатает…');
 
-    return ChatDetailConversationView(
-      messages: _messages,
-      scrollController: _scrollController,
-      isGroupChat: _isGroupChat,
+    final mentionSuggestions = _isGroupChat
+        ? _computeMentionSuggestions(_messageController.text,
+            _messageController.selection.extentOffset)
+        : const <int>[];
+    final mentionWidget = mentionSuggestions.isEmpty
+        ? const SizedBox.shrink()
+        : Material(
+            color: Colors.transparent,
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceSoft,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppColors.accent.withValues(alpha: 0.18),
+                ),
+              ),
+              constraints: const BoxConstraints(maxHeight: 220),
+              child: ListView.separated(
+                shrinkWrap: true,
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                itemCount: mentionSuggestions.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 2),
+                itemBuilder: (_, i) {
+                  final uid = mentionSuggestions[i];
+                  final name = _memberNames[uid] ?? 'Участник $uid';
+                  return ListTile(
+                    dense: true,
+                    leading: CircleAvatar(
+                      radius: 14,
+                      backgroundColor: AppColors.accent.withValues(alpha: 0.2),
+                      child: Text(
+                        name.isNotEmpty ? name[0].toUpperCase() : '?',
+                        style: const TextStyle(
+                          color: AppColors.accent,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    title: Text(
+                      '@$name',
+                      style: const TextStyle(color: AppColors.textPrimary),
+                    ),
+                    onTap: () => _applyMentionSuggestion(uid),
+                  );
+                },
+              ),
+            ),
+          );
+
+    return Stack(
+      alignment: Alignment.bottomCenter,
+      children: [
+        ChatDetailConversationView(
+          messages: _messages,
+          scrollController: _scrollController,
+          isGroupChat: _isGroupChat,
       currentUserId: _currentUserId,
       memberNames: _memberNames,
       memberAvatarUrls: _memberAvatarUrls,
@@ -293,7 +363,64 @@ class _ChatDetailScreenState extends _ChatDetailScreenStateBase
       onSend: _sendMessage,
       onDesktopExtras: _showDesktopComposerExtras,
       onDesktopDocumentsDropped: _onDesktopDocumentsDropped,
+        ),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 78,
+          child: mentionWidget,
+        ),
+      ],
     );
+  }
+
+  List<int> _computeMentionSuggestions(String text, int cursor) {
+    if (!_isGroupChat) return const [];
+    if (text.isEmpty || cursor <= 0) return const [];
+    final clampedCursor = cursor.clamp(0, text.length);
+    final before = text.substring(0, clampedCursor);
+    final at = before.lastIndexOf('@');
+    if (at < 0) return const [];
+    if (at > 0) {
+      final prev = before[at - 1];
+      if (RegExp(r'[A-Za-z0-9_]').hasMatch(prev)) return const [];
+    }
+    final fragment = before.substring(at + 1);
+    if (fragment.contains(' ') || fragment.contains('\n')) return const [];
+    final query = fragment.toLowerCase();
+    final ids = <int>[];
+    for (final entry in _memberNames.entries) {
+      if (entry.key == _currentUserId) continue;
+      final name = entry.value.trim();
+      if (name.isEmpty) continue;
+      if (query.isEmpty || name.toLowerCase().startsWith(query)) {
+        ids.add(entry.key);
+      }
+    }
+    ids.sort((a, b) =>
+        (_memberNames[a] ?? '').compareTo(_memberNames[b] ?? ''));
+    return ids.take(6).toList();
+  }
+
+  void _applyMentionSuggestion(int userId) {
+    final name = (_memberNames[userId] ?? '').trim();
+    if (name.isEmpty) return;
+    final text = _messageController.text;
+    final cursor = _messageController.selection.extentOffset.clamp(
+      0,
+      text.length,
+    );
+    final before = text.substring(0, cursor);
+    final after = text.substring(cursor);
+    final at = before.lastIndexOf('@');
+    if (at < 0) return;
+    final insertion = '@$name ';
+    final next = before.substring(0, at) + insertion + after;
+    _messageController.value = TextEditingValue(
+      text: next,
+      selection: TextSelection.collapsed(offset: at + insertion.length),
+    );
+    setState(() {});
   }
 
   @override
@@ -377,6 +504,40 @@ class _ChatDetailScreenState extends _ChatDetailScreenStateBase
                     ? _showPrivateChatHeaderMenu
                     : null,
               ),
+              if (_pinnedMessages.isNotEmpty)
+                ChatPinnedMessagesBanner(
+                  messages: _pinnedMessages,
+                  currentIndex: _pinnedCarouselIndex,
+                  onTap: () {
+                    final m = _pinnedMessages[_pinnedCarouselIndex.clamp(
+                      0,
+                      _pinnedMessages.length - 1,
+                    )];
+                    final id =
+                        ChatDetailMessageMaps.intFromDynamic(m['id']);
+                    if (id != null) {
+                      _scrollToMessageById(id);
+                    }
+                  },
+                  onCycle: () {
+                    setState(() {
+                      _pinnedCarouselIndex =
+                          (_pinnedCarouselIndex + 1) %
+                              _pinnedMessages.length;
+                    });
+                  },
+                  onUnpin: () {
+                    final m = _pinnedMessages[_pinnedCarouselIndex.clamp(
+                      0,
+                      _pinnedMessages.length - 1,
+                    )];
+                    final id =
+                        ChatDetailMessageMaps.intFromDynamic(m['id']);
+                    if (id != null) {
+                      unawaited(_togglePin(id, pin: false));
+                    }
+                  },
+                ),
               Expanded(child: _buildBody()),
             ],
           ),

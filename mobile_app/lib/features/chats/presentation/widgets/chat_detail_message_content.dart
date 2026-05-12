@@ -8,6 +8,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../helpers/chat_attachment_opener.dart';
+
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/design_tokens.dart';
 import '../chat_detail_formatters.dart';
@@ -46,6 +48,10 @@ class ChatDetailMessageContent extends StatelessWidget {
       );
     }
 
+    if (messageType == 'poll') {
+      return _buildPollCard(context);
+    }
+
     if (messageType == 'call_event') {
       return Text(
         (message['text'] ?? 'Вызов').toString(),
@@ -63,7 +69,7 @@ class ChatDetailMessageContent extends StatelessWidget {
     }
 
     if ((messageType == 'document' || messageType == 'file') && mediaUrl.isNotEmpty) {
-      return _buildDocumentCard(mediaUrl);
+      return Builder(builder: (ctx) => _buildDocumentCard(ctx, mediaUrl));
     }
 
     if (messageType == 'video_note' && mediaUrl.isNotEmpty) {
@@ -189,7 +195,7 @@ class ChatDetailMessageContent extends StatelessWidget {
     );
   }
 
-  Widget _buildDocumentCard(String mediaUrl) {
+  Widget _buildDocumentCard(BuildContext context, String mediaUrl) {
     final name = (message['text'] ?? '').toString().trim();
     final sizeLabel = chatDetailFormatDocSize(message['media_size']);
 
@@ -198,13 +204,11 @@ class ChatDetailMessageContent extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () async {
-            final uri = Uri.tryParse(mediaUrl);
-            if (uri == null) return;
-            if (await canLaunchUrl(uri)) {
-              await launchUrl(uri, mode: LaunchMode.externalApplication);
-            }
-          },
+          onTap: () => openChatAttachmentUrl(
+            context,
+            mediaUrl: mediaUrl,
+            fallbackFileName: name,
+          ),
           borderRadius: BorderRadius.circular(AppRadius.md),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -265,6 +269,244 @@ class ChatDetailMessageContent extends StatelessWidget {
     );
   }
 
+  Widget _buildPollCard(BuildContext context) {
+    return _PollMessageWidget(message: message);
+  }
+}
+
+class _PollMessageWidget extends StatelessWidget {
+  const _PollMessageWidget({required this.message});
+
+  final Map<String, dynamic> message;
+
+  Map<String, dynamic>? get _poll {
+    final p = message['poll'];
+    if (p is Map) return Map<String, dynamic>.from(p);
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final poll = _poll;
+    final question = (message['text'] ?? '').toString().trim();
+    if (poll == null) {
+      return Text(
+        question.isEmpty ? 'Опрос' : question,
+        style: const TextStyle(color: AppColors.textPrimary),
+      );
+    }
+
+    final messageId = message['id'];
+    final isAnonymous = poll['is_anonymous'] == true;
+    final isClosed = poll['is_closed'] == true;
+    final allowsMultiple = poll['allows_multiple'] == true;
+    final totalVotes = (poll['total_votes'] as int?) ?? 0;
+    final options = (poll['options'] as List? ?? [])
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (question.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Text(
+              question,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                height: 1.3,
+              ),
+            ),
+          ),
+        Text(
+          isAnonymous ? 'Анонимный опрос' : 'Открытый опрос',
+          style: const TextStyle(
+            color: AppColors.textMuted,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        for (final opt in options)
+          _PollOptionTile(
+            messageId: messageId is int
+                ? messageId
+                : int.tryParse('$messageId') ?? 0,
+            option: opt,
+            totalVotes: totalVotes,
+            allowsMultiple: allowsMultiple,
+            isClosed: isClosed,
+          ),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            Text(
+              _votesLabel(totalVotes),
+              style: const TextStyle(
+                color: AppColors.textMuted,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            if (isClosed) ...[
+              const SizedBox(width: 8),
+              const Text(
+                '• Завершён',
+                style: TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+
+  String _votesLabel(int total) {
+    if (total == 0) return 'Голосов пока нет';
+    final mod10 = total % 10;
+    final mod100 = total % 100;
+    if (mod10 == 1 && mod100 != 11) return '$total голос';
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+      return '$total голоса';
+    }
+    return '$total голосов';
+  }
+}
+
+class _PollOptionTile extends StatelessWidget {
+  const _PollOptionTile({
+    required this.messageId,
+    required this.option,
+    required this.totalVotes,
+    required this.allowsMultiple,
+    required this.isClosed,
+  });
+
+  final int messageId;
+  final Map<String, dynamic> option;
+  final int totalVotes;
+  final bool allowsMultiple;
+  final bool isClosed;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = (option['text'] ?? '').toString();
+    final votes = (option['votes'] as int?) ?? 0;
+    final votedByMe = option['voted_by_me'] == true;
+    final share = totalVotes > 0 ? votes / totalVotes : 0.0;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: isClosed
+            ? null
+            : () {
+                final cb = _PollTapBus.instance.handler;
+                cb?.call(messageId, (option['id'] as int?) ?? 0, allowsMultiple);
+              },
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    return Stack(
+                      children: [
+                        Container(color: AppColors.surfaceSoft),
+                        Container(
+                          width: constraints.maxWidth * share,
+                          decoration: BoxDecoration(
+                            color: AppColors.accent.withValues(alpha: 0.22),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 8,
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    votedByMe
+                        ? (allowsMultiple
+                            ? Icons.check_box_rounded
+                            : Icons.radio_button_checked)
+                        : (allowsMultiple
+                            ? Icons.check_box_outline_blank_rounded
+                            : Icons.radio_button_unchecked),
+                    color: votedByMe
+                        ? AppColors.accent
+                        : AppColors.textMuted,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      text,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    totalVotes == 0
+                        ? '0%'
+                        : '${((share * 100).round())}%',
+                    style: const TextStyle(
+                      color: AppColors.textMuted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+typedef PollVoteHandler = void Function(
+  int messageId,
+  int optionId,
+  bool allowsMultiple,
+);
+
+/// Лёгкая шина, чтобы передать обработчик тапа по варианту опроса
+/// из ChatDetailScreen в глубоко вложенный _PollOptionTile без
+/// расширения существующего API ChatDetailMessageContent.
+class _PollTapBus {
+  _PollTapBus._();
+  static final _PollTapBus instance = _PollTapBus._();
+  PollVoteHandler? handler;
+}
+
+class PollVoteBus {
+  PollVoteBus._();
+  static void setHandler(PollVoteHandler? handler) {
+    _PollTapBus.instance.handler = handler;
+  }
 }
 
 class _VoiceMessageBar extends StatefulWidget {

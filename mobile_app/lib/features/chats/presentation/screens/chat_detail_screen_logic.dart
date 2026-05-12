@@ -26,6 +26,9 @@ mixin _ChatDetailStateHelpers on _ChatDetailScreenStateBase {
   }
 
   void _onMessageTextChanged() {
+    if (mounted) {
+      setState(() {});
+    }
     final hasText = _messageController.text.isNotEmpty;
     if (!hasText) {
       _typingDebounce?.cancel();
@@ -81,10 +84,28 @@ mixin _ChatDetailStateHelpers on _ChatDetailScreenStateBase {
     });
   }
 
+  void _scrollToMessageById(int messageId) {
+    final idx = _messages.indexWhere(
+      (m) => ChatDetailMessageMaps.intFromDynamic(m['id']) == messageId,
+    );
+    if (idx < 0) return;
+    if (!_scrollController.hasClients) return;
+    final max = _scrollController.position.maxScrollExtent;
+    if (max <= 0 || _messages.isEmpty) return;
+    final progress = idx / _messages.length;
+    final target = (progress * max).clamp(0.0, max);
+    _scrollController.animateTo(
+      target,
+      duration: const Duration(milliseconds: 240),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
   void _scrollToBottom({bool jump = false}) {
     if (!_scrollController.hasClients) return;
 
-    final offset = _scrollController.position.maxScrollExtent + 120;
+    final maxExtent = _scrollController.position.maxScrollExtent;
+    final offset = maxExtent.clamp(0.0, double.infinity);
 
     if (jump) {
       _scrollController.jumpTo(offset);

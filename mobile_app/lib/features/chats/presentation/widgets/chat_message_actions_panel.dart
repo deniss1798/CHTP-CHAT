@@ -99,6 +99,16 @@ class _ChatMessageActionsPanelState extends State<ChatMessageActionsPanel> {
     if (!isFailed) {
       addTile(Icons.forward_rounded, 'Переслать', 'forward');
     }
+    final isPinned = widget.message['pinned_at'] != null;
+    final messageId = widget.message['id'];
+    if (!isFailed && messageId != null) {
+      items.add(_menuLine());
+      addTile(
+        isPinned ? Icons.push_pin : Icons.push_pin_outlined,
+        isPinned ? 'Открепить' : 'Закрепить',
+        isPinned ? 'unpin' : 'pin',
+      );
+    }
     if (text.isNotEmpty) {
       items.add(_menuLine());
       addTile(AppIcons.copy, 'Копировать', 'copy');

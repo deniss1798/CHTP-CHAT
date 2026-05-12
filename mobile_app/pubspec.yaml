@@ -39,6 +39,7 @@ dependencies:
   flutter_linkify: ^6.0.0
   # 19+ тянет flutter_local_notifications_windows (FFI) — gen_snapshot падает на Windows AOT.
   flutter_local_notifications: ^18.0.1
+  open_file: ^3.5.11
 dev_dependencies:
   flutter_test:
     sdk: flutter

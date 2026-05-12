@@ -36,7 +36,8 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   if (LocalNotificationsService.supported) {
     await LocalNotificationsService.instance.init();
     final data = message.data;
-    if (data['type']?.toString() == 'incoming_call') {
+    final type = data['type']?.toString();
+    if (type == 'incoming_call') {
       final ij = data['invite_json']?.toString();
       if (ij != null && ij.isNotEmpty) {
         final title = (message.notification?.title ??
@@ -50,6 +51,27 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
           inviteJson: ij,
         );
       }
+    } else if (type == 'chat_message') {
+      if (!await NotificationPreferences.areEnabled()) return;
+      final chatId = int.tryParse(data['chat_id']?.toString() ?? '');
+      if (chatId == null) return;
+      final title = (message.notification?.title ??
+              data['sender_name']?.toString() ??
+              'Чат')
+          .trim();
+      final body = (message.notification?.body ??
+              data['body']?.toString() ??
+              'Новое сообщение')
+          .trim();
+      final avatar = data['chat_avatar_url']?.toString();
+      await LocalNotificationsService.instance.showChatMessage(
+        notificationId: chatId,
+        title: title.isNotEmpty ? title : 'Чат',
+        body: body.isNotEmpty ? body : 'Новое сообщение',
+        avatarUrl: avatar,
+        chatId: chatId,
+        avatarUrlForOpen: avatar,
+      );
     }
   }
 }

@@ -7,6 +7,10 @@ from sqlalchemy.orm import Session
 from app.application.media.constants import PRIVATE_MEDIA_MESSAGE_TYPES
 from app.application.messages.chat_recipients import recipient_user_ids_excluding_sender
 from app.application.messages.document_rules import push_preview_for_message
+from app.application.messages.mention_service import (
+    replace_message_mentions,
+    resolve_chat_mentions,
+)
 from app.application.messages.message_projection import (
     build_message_payload,
     DELETED_MESSAGE_TEXT,
@@ -129,6 +133,18 @@ async def send_text_message(
         if existing is None:
             raise
         return message_to_response(existing, db, viewer_user_id=current_user.id)
+
+    mention_user_ids = resolve_chat_mentions(
+        db,
+        chat_id=new_message.chat_id,
+        text=new_message.text,
+        explicit_user_ids=payload.mention_user_ids,
+    )
+    if mention_user_ids:
+        replace_message_mentions(
+            db, message_id=new_message.id, user_ids=mention_user_ids
+        )
+        db.commit()
 
     await _notify_new_message(
         db,

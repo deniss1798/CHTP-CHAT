@@ -253,6 +253,7 @@ class MessagesService {
     int? replyToMessageId,
     String messageType = 'text',
     String? clientMessageId,
+    List<int>? mentionUserIds,
   }) async {
     final requestData = <String, dynamic>{
       'chat_id': chatId,
@@ -264,6 +265,9 @@ class MessagesService {
     }
     if (replyToMessageId != null) {
       requestData['reply_to_message_id'] = replyToMessageId;
+    }
+    if (mentionUserIds != null && mentionUserIds.isNotEmpty) {
+      requestData['mention_user_ids'] = mentionUserIds;
     }
 
     final response = await _dio.post(
@@ -339,6 +343,83 @@ class MessagesService {
       '/messages/$messageId',
       options: await _authorizedOptions(),
     );
+  }
+
+  Future<Map<String, dynamic>> pinMessage(int messageId) async {
+    final response = await _dio.post(
+      '/messages/$messageId/pin',
+      options: await _authorizedOptions(),
+    );
+    return _responseMap(response);
+  }
+
+  Future<Map<String, dynamic>> unpinMessage(int messageId) async {
+    final response = await _dio.delete(
+      '/messages/$messageId/pin',
+      options: await _authorizedOptions(),
+    );
+    return _responseMap(response);
+  }
+
+  Future<List<Map<String, dynamic>>> getPinnedMessages(int chatId) async {
+    final response = await _dio.get(
+      '/messages/chats/$chatId/pinned',
+      options: await _authorizedOptions(),
+    );
+    final data = response.data;
+    if (data is List) {
+      return data
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+    }
+    return [];
+  }
+
+  Future<Map<String, dynamic>> createPoll({
+    required int chatId,
+    required String question,
+    required List<String> options,
+    bool allowsMultiple = false,
+    bool isAnonymous = false,
+    String? clientMessageId,
+  }) async {
+    final body = <String, dynamic>{
+      'chat_id': chatId,
+      'question': question,
+      'options': options,
+      'allows_multiple': allowsMultiple,
+      'is_anonymous': isAnonymous,
+    };
+    if (clientMessageId != null && clientMessageId.isNotEmpty) {
+      body['client_message_id'] = clientMessageId;
+    }
+    final response = await _dio.post(
+      '/messages/polls',
+      data: body,
+      options: await _authorizedOptions(),
+    );
+    return _responseMap(response);
+  }
+
+  Future<Map<String, dynamic>> votePoll({
+    required int messageId,
+    required List<int> optionIds,
+  }) async {
+    final response = await _dio.post(
+      '/messages/$messageId/poll/vote',
+      data: {'option_ids': optionIds},
+      options: await _authorizedOptions(),
+    );
+    return _responseMap(response);
+  }
+
+  Future<Map<String, dynamic>> closePoll(int messageId) async {
+    final response = await _dio.post(
+      '/messages/$messageId/poll/close',
+      options: await _authorizedOptions(),
+    );
+    return _responseMap(response);
   }
 
   Future<Map<String, dynamic>> sendPhotoMessage({

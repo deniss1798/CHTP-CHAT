@@ -183,22 +183,25 @@ class _ChatDetailVideoMessageWidgetState
           );
 
     if (widget.isVideoNote) {
-      return GestureDetector(
-        onTap: _togglePlayback,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Center(child: videoChild),
-            AnimatedOpacity(
-              opacity: _showOverlay ? 1 : 0,
-              duration: const Duration(milliseconds: 150),
+      // Сам круг не ловит тап — пусть всплывает к bubble (реакции).
+      // Только overlay-кнопка переключает воспроизведение.
+      return Stack(
+        alignment: Alignment.center,
+        children: [
+          Center(child: videoChild),
+          AnimatedOpacity(
+            opacity: _showOverlay ? 1 : 0,
+            duration: const Duration(milliseconds: 150),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _togglePlayback,
               child: _buildOverlayButton(
                 icon:
                     controller.value.isPlaying ? AppIcons.pause : AppIcons.play,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       );
     }
 

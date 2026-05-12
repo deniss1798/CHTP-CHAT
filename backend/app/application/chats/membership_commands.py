@@ -50,8 +50,7 @@ def add_chat_member(
         db.query(Chat).filter(Chat.id == chat_id).first(),
         detail="You can add members only to group chats",
     )
-    membership = require_chat_member(db, chat_id, current_user)
-    require_group_owner(chat, membership)
+    require_chat_member(db, chat_id, current_user)
 
     if payload.user_id == current_user.id:
         raise HTTPException(

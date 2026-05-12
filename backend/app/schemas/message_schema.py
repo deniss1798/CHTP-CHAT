@@ -15,6 +15,40 @@ class MessageCreate(BaseModel):
     reply_to_message_id: int | None = None
     message_type: str = Field(default="text", max_length=32)
     client_message_id: str | None = Field(default=None, min_length=1, max_length=128)
+    mention_user_ids: list[int] | None = Field(default=None, max_length=64)
+
+
+class PollCreate(BaseModel):
+    chat_id: int
+    question: str = Field(..., min_length=1, max_length=255)
+    options: list[str] = Field(..., min_length=2, max_length=10)
+    allows_multiple: bool = False
+    is_anonymous: bool = False
+    client_message_id: str | None = Field(default=None, min_length=1, max_length=128)
+
+
+class PollVoteRequest(BaseModel):
+    option_ids: list[int] = Field(..., min_length=0, max_length=10)
+
+
+class PollOptionResponse(BaseModel):
+    id: int
+    position: int
+    text: str
+    votes: int
+    voted_by_me: bool
+    voter_user_ids: list[int] = Field(default_factory=list)
+
+
+class PollResponse(BaseModel):
+    id: int
+    message_id: int
+    question: str
+    allows_multiple: bool
+    is_anonymous: bool
+    is_closed: bool
+    total_votes: int
+    options: list[PollOptionResponse] = Field(default_factory=list)
 
 
 class ReactionGroup(BaseModel):
@@ -78,6 +112,13 @@ class MessageResponse(BaseModel):
     delivery_status: Literal["sent", "read"] | None = None
 
     reactions: list[ReactionGroup] = Field(default_factory=list)
+
+    pinned_at: datetime | None = None
+    pinned_by_user_id: int | None = None
+
+    mention_user_ids: list[int] = Field(default_factory=list)
+
+    poll: PollResponse | None = None
 
     class Config:
         from_attributes = True

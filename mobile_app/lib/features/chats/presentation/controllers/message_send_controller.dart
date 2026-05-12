@@ -16,12 +16,34 @@ class MessageSendController {
     required String text,
     int? replyToMessageId,
     String? clientMessageId,
+    List<int>? mentionUserIds,
   }) async {
     return _normalize(
       await _messagesService.sendMessage(
         chatId: chatId,
         text: text,
         replyToMessageId: replyToMessageId,
+        clientMessageId: clientMessageId,
+        mentionUserIds: mentionUserIds,
+      ),
+    );
+  }
+
+  Future<Map<String, dynamic>> createPoll({
+    required int chatId,
+    required String question,
+    required List<String> options,
+    bool allowsMultiple = false,
+    bool isAnonymous = false,
+    String? clientMessageId,
+  }) async {
+    return _normalize(
+      await _messagesService.createPoll(
+        chatId: chatId,
+        question: question,
+        options: options,
+        allowsMultiple: allowsMultiple,
+        isAnonymous: isAnonymous,
         clientMessageId: clientMessageId,
       ),
     );

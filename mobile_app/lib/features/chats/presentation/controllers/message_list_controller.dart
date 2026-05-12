@@ -1,6 +1,59 @@
 import '../chat_detail_message_maps.dart';
 
 class MessageListController {
+  void _dedupeByServerId(List<Map<String, dynamic>> messages, int serverId) {
+    var kept = false;
+    for (var i = messages.length - 1; i >= 0; i--) {
+      final mid = ChatDetailMessageMaps.intFromDynamic(messages[i]['id']);
+      if (mid != serverId) continue;
+      if (!kept) {
+        kept = true;
+        continue;
+      }
+      messages.removeAt(i);
+    }
+  }
+
+  int? _indexByClientTempKey(
+    List<Map<String, dynamic>> messages,
+    String clientTempId,
+  ) {
+    final idx = messages.indexWhere(
+      (m) =>
+          m['client_temp_id'] == clientTempId ||
+          m['client_message_id'] == clientTempId,
+    );
+    return idx >= 0 ? idx : null;
+  }
+
+  /// Входящее своё сообщение с сервера заменяет строку без [id] с тем же [client_message_id].
+  bool replaceOptimisticMatchingClientMessageId(
+    List<Map<String, dynamic>> messages,
+    Map<String, dynamic> incoming,
+  ) {
+    final cmid = incoming['client_message_id']?.toString().trim();
+    if (cmid == null || cmid.isEmpty) return false;
+    final sid = ChatDetailMessageMaps.intFromDynamic(incoming['id']);
+    if (sid == null) return false;
+
+    var replacedIdx = -1;
+    for (var i = 0; i < messages.length; i++) {
+      final m = messages[i];
+      final mid = ChatDetailMessageMaps.intFromDynamic(m['id']);
+      if (mid != null) continue;
+      final mcmid =
+          m['client_message_id']?.toString() ?? m['client_temp_id']?.toString();
+      if (mcmid != cmid) continue;
+      messages[i] = Map<String, dynamic>.from(incoming);
+      replacedIdx = i;
+      break;
+    }
+    if (replacedIdx < 0) return false;
+
+    _dedupeByServerId(messages, sid);
+    return true;
+  }
+
   bool appendIfMissing(
     List<Map<String, dynamic>> messages,
     Map<String, dynamic> message,
@@ -18,8 +71,8 @@ class MessageListController {
     required String clientTempId,
     required Map<String, dynamic> replacement,
   }) {
-    final idx = messages.indexWhere((m) => m['client_temp_id'] == clientTempId);
-    if (idx < 0) return false;
+    final idx = _indexByClientTempKey(messages, clientTempId);
+    if (idx == null) return false;
     final replacementId = ChatDetailMessageMaps.intFromDynamic(replacement['id']);
     if (replacementId != null) {
       final existingIdx = messages.indexWhere(
@@ -27,10 +80,14 @@ class MessageListController {
       );
       if (existingIdx >= 0 && existingIdx != idx) {
         messages.removeAt(idx);
+        _dedupeByServerId(messages, replacementId);
         return true;
       }
     }
     messages[idx] = replacement;
+    if (replacementId != null) {
+      _dedupeByServerId(messages, replacementId);
+    }
     return true;
   }
 
@@ -39,8 +96,8 @@ class MessageListController {
     required String clientTempId,
     required String error,
   }) {
-    final idx = messages.indexWhere((m) => m['client_temp_id'] == clientTempId);
-    if (idx < 0) return false;
+    final idx = _indexByClientTempKey(messages, clientTempId);
+    if (idx == null) return false;
     final copy = Map<String, dynamic>.from(messages[idx]);
     copy['delivery_status'] = 'failed';
     copy['error'] = error;
@@ -52,8 +109,8 @@ class MessageListController {
     List<Map<String, dynamic>> messages, {
     required String clientTempId,
   }) {
-    final idx = messages.indexWhere((m) => m['client_temp_id'] == clientTempId);
-    if (idx < 0) return false;
+    final idx = _indexByClientTempKey(messages, clientTempId);
+    if (idx == null) return false;
     final copy = Map<String, dynamic>.from(messages[idx]);
     copy['delivery_status'] = 'sending';
     copy.remove('error');

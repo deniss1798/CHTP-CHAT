@@ -48,12 +48,15 @@ mixin _ChatDetailComposerAndActionsLogic
       _scrollToBottom();
     });
 
+    final mentionUserIds = _extractMentionUserIdsFromText(text);
+
     try {
       final createdMessage = await _messageSendController.sendText(
         chatId: widget.chatId,
         text: text,
         replyToMessageId: replyId,
         clientMessageId: clientMessageId,
+        mentionUserIds: mentionUserIds.isEmpty ? null : mentionUserIds,
       );
 
       if (!mounted) return;
@@ -114,6 +117,29 @@ mixin _ChatDetailComposerAndActionsLogic
         ),
       );
     }
+  }
+
+  List<int> _extractMentionUserIdsFromText(String text) {
+    if (text.isEmpty) return const [];
+    final regex = RegExp(r'(?<![\w@])@([A-Za-z0-9_.\-]{2,32})');
+    final matches = regex.allMatches(text);
+    if (matches.isEmpty) return const [];
+    final byLower = <String, int>{};
+    for (final entry in _memberNames.entries) {
+      final name = entry.value.trim();
+      if (name.isEmpty) continue;
+      byLower[name.toLowerCase()] = entry.key;
+    }
+    final out = <int>{};
+    for (final m in matches) {
+      final name = m.group(1)?.toLowerCase();
+      if (name == null) continue;
+      final id = byLower[name];
+      if (id != null && id != _currentUserId) {
+        out.add(id);
+      }
+    }
+    return out.toList();
   }
 
   Future<void> _retryFailedMessage(Map<String, dynamic> message) async {
@@ -228,6 +254,106 @@ mixin _ChatDetailComposerAndActionsLogic
       case ChatComposerAttachmentAction.document:
         await _pickAndSendDocument();
         break;
+      case ChatComposerAttachmentAction.poll:
+        await _createPollFlow();
+        break;
+    }
+  }
+
+  Future<void> _createPollFlow() async {
+    final result = await showPollCreateSheet(context);
+    if (result == null || !mounted) return;
+    try {
+      final raw = await _messageSendController.createPoll(
+        chatId: widget.chatId,
+        question: result.question,
+        options: result.options,
+        allowsMultiple: result.allowsMultiple,
+        isAnonymous: result.isAnonymous,
+      );
+      final normalized = ChatDetailMessageMaps.normalizeMessageMap(
+        Map<String, dynamic>.from(raw),
+      );
+      if (!mounted) return;
+      setState(() {
+        if (!_messageListController.appendIfMissing(_messages, normalized)) {
+          _messageListController.replaceUpdated(_messages, normalized);
+        }
+      });
+      _scrollToBottom();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            chatDetailExtractErrorMessage(
+              e,
+              fallback: 'Не удалось создать опрос',
+            ),
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _votePoll(
+    int messageId,
+    int optionId,
+    bool allowsMultiple,
+  ) async {
+    final idx = _messages.indexWhere(
+      (m) => ChatDetailMessageMaps.intFromDynamic(m['id']) == messageId,
+    );
+    if (idx < 0) return;
+    final pollRaw = _messages[idx]['poll'];
+    if (pollRaw is! Map) return;
+    final poll = Map<String, dynamic>.from(pollRaw);
+    if (poll['is_closed'] == true) return;
+
+    final options = (poll['options'] as List? ?? [])
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+    final myVotes = options
+        .where((o) => o['voted_by_me'] == true)
+        .map((o) => (o['id'] as int?) ?? 0)
+        .toList();
+
+    final List<int> newSelection;
+    if (allowsMultiple) {
+      if (myVotes.contains(optionId)) {
+        newSelection = myVotes.where((id) => id != optionId).toList();
+      } else {
+        newSelection = [...myVotes, optionId];
+      }
+    } else {
+      newSelection = myVotes.contains(optionId) ? <int>[] : [optionId];
+    }
+
+    try {
+      final raw = await _messagesService.votePoll(
+        messageId: messageId,
+        optionIds: newSelection,
+      );
+      final normalized = ChatDetailMessageMaps.normalizeMessageMap(
+        Map<String, dynamic>.from(raw),
+      );
+      if (!mounted) return;
+      setState(() {
+        _messageListController.replaceUpdated(_messages, normalized);
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            chatDetailExtractErrorMessage(
+              e,
+              fallback: 'Не удалось проголосовать',
+            ),
+          ),
+        ),
+      );
     }
   }
 
@@ -337,6 +463,19 @@ mixin _ChatDetailComposerAndActionsLogic
     final name = picked.name.trim().isNotEmpty
         ? picked.name
         : path.split(RegExp(r'[/\\]')).last;
+
+    if (!mounted) return;
+    final preview = await showAttachmentPreviewScreen(
+      context,
+      filePath: path,
+      fileName: name,
+      kind: AttachmentPreviewKind.document,
+      submitLabel: 'Отправить файл',
+      showCaptionField: false,
+      fileSizeBytes: picked.size,
+    );
+    if (preview == null || !mounted) return;
+
     await _sendDocumentFromLocalPath(path, displayName: name);
   }
 
@@ -351,6 +490,16 @@ mixin _ChatDetailComposerAndActionsLogic
       );
 
       if (picked == null) return;
+      if (!mounted) return;
+      final preview = await showAttachmentPreviewScreen(
+        context,
+        filePath: picked.path,
+        fileName: picked.name,
+        kind: AttachmentPreviewKind.image,
+        submitLabel: 'Отправить фото',
+        fileSizeBytes: await File(picked.path).length(),
+      );
+      if (preview == null || !mounted) return;
 
       setState(() {
         _isSendingImage = true;
@@ -412,6 +561,16 @@ mixin _ChatDetailComposerAndActionsLogic
       );
 
       if (picked == null) return;
+      if (!mounted) return;
+      final preview = await showAttachmentPreviewScreen(
+        context,
+        filePath: picked.path,
+        fileName: picked.name,
+        kind: AttachmentPreviewKind.video,
+        submitLabel: 'Отправить видео',
+        fileSizeBytes: await File(picked.path).length(),
+      );
+      if (preview == null || !mounted) return;
 
       setState(() {
         _isSendingVideo = true;
@@ -665,6 +824,48 @@ mixin _ChatDetailComposerAndActionsLogic
     if (action == 'delete') {
       if (messageId == null) return;
       await _confirmDeleteMessage(messageId);
+      return;
+    }
+
+    if (action == 'pin' || action == 'unpin') {
+      if (messageId == null) return;
+      await _togglePin(messageId, pin: action == 'pin');
+      return;
+    }
+  }
+
+  Future<void> _togglePin(int messageId, {required bool pin}) async {
+    try {
+      final raw = pin
+          ? await _messagesService.pinMessage(messageId)
+          : await _messagesService.unpinMessage(messageId);
+      final updated = ChatDetailMessageMaps.normalizeMessageMap(
+        Map<String, dynamic>.from(raw),
+      );
+      if (!mounted) return;
+      setState(() {
+        _messageListController.replaceUpdated(_messages, updated);
+      });
+      unawaited(_loadPinnedMessages());
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(pin ? 'Сообщение закреплено' : 'Сообщение откреплено'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            chatDetailExtractErrorMessage(
+              e,
+              fallback: pin ? 'Не удалось закрепить' : 'Не удалось открепить',
+            ),
+          ),
+        ),
+      );
     }
   }
 

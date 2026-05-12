@@ -170,28 +170,24 @@ def send_chat_message_push(
                 if raw and str(raw).strip():
                     avatar_url = str(raw).strip()
 
+            # Только data-push: на Android клиент сам показывает локальное
+            # уведомление, чтобы не было дублей (FCM `notification` + локальное).
             data: dict[str, str] = {
                 "type": "chat_message",
                 "chat_id": str(chat_id),
+                "sender_name": sender_name,
+                "body": body,
             }
             if avatar_url:
                 data["chat_avatar_url"] = avatar_url
 
             android_cfg = messaging.AndroidConfig(priority="high")
-            if avatar_url:
-                android_cfg = messaging.AndroidConfig(
-                    priority="high",
-                    notification=messaging.AndroidNotification(
-                        title=sender_name,
-                        body=body,
-                        image=avatar_url,
-                    ),
-                )
 
             if avatar_url:
                 apns_cfg = messaging.APNSConfig(
                     payload=messaging.APNSPayload(
                         aps=messaging.Aps(
+                            alert=messaging.ApsAlert(title=sender_name, body=body),
                             sound="default",
                             mutable_content=True,
                         ),
@@ -201,16 +197,15 @@ def send_chat_message_push(
             else:
                 apns_cfg = messaging.APNSConfig(
                     payload=messaging.APNSPayload(
-                        aps=messaging.Aps(sound="default"),
+                        aps=messaging.Aps(
+                            alert=messaging.ApsAlert(title=sender_name, body=body),
+                            sound="default",
+                        ),
                     ),
                 )
 
             msg = messaging.Message(
                 token=item.token,
-                notification=messaging.Notification(
-                    title=sender_name,
-                    body=body,
-                ),
                 data=data,
                 android=android_cfg,
                 apns=apns_cfg,

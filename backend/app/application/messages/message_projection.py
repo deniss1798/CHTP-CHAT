@@ -3,11 +3,19 @@ from collections.abc import Callable
 from sqlalchemy.orm import Session
 
 from app.application.media.constants import PRIVATE_MEDIA_MESSAGE_TYPES
+from app.application.messages.mention_service import load_message_mentions_map
+from app.application.messages.poll_service import serialize_poll
 from app.models.chat_member import ChatMember
 from app.models.message import Message
+from app.models.poll import Poll
 from app.application.messages.reaction_service import reaction_groups_for_messages
 from app.core.config import get_settings
-from app.schemas.message_schema import MessageReplyPreview, MessageResponse, ReactionGroup
+from app.schemas.message_schema import (
+    MessageReplyPreview,
+    MessageResponse,
+    PollResponse,
+    ReactionGroup,
+)
 from app.infrastructure.storage.s3_storage import S3StorageService, is_private_s3_ready
 
 DELETED_MESSAGE_TEXT = "Сообщение удалено"
@@ -164,6 +172,18 @@ def message_to_response(
         rmap = reaction_groups_for_messages(db, [message.id], viewer_user_id)
         rlist = rmap.get(message.id, [])
 
+    mention_user_ids = load_message_mentions_map(db, message_ids=[message.id]).get(
+        message.id, []
+    )
+
+    poll_payload: PollResponse | None = None
+    if mtype_single == "poll":
+        poll_row = db.query(Poll).filter(Poll.message_id == message.id).first()
+        if poll_row is not None:
+            poll_payload = serialize_poll(
+                db, poll=poll_row, viewer_user_id=viewer_user_id
+            )
+
     return MessageResponse(
         id=message.id,
         chat_id=message.chat_id,
@@ -184,6 +204,10 @@ def message_to_response(
         forwarded_from_user_id=message.forwarded_from_user_id,
         delivery_status=delivery_status,
         reactions=rlist,
+        pinned_at=message.pinned_at,
+        pinned_by_user_id=message.pinned_by_user_id,
+        mention_user_ids=mention_user_ids,
+        poll=poll_payload,
     )
 
 
@@ -221,6 +245,17 @@ def message_to_response_batched(
             db, message.chat_id, message, viewer_user_id
         )
 
+    mention_user_ids = load_message_mentions_map(db, message_ids=[message.id]).get(
+        message.id, []
+    )
+    poll_payload: PollResponse | None = None
+    if mtype == "poll":
+        poll_row = db.query(Poll).filter(Poll.message_id == message.id).first()
+        if poll_row is not None:
+            poll_payload = serialize_poll(
+                db, poll=poll_row, viewer_user_id=viewer_user_id
+            )
+
     return MessageResponse(
         id=message.id,
         chat_id=message.chat_id,
@@ -241,6 +276,10 @@ def message_to_response_batched(
         forwarded_from_user_id=message.forwarded_from_user_id,
         delivery_status=delivery_status,
         reactions=reactions or [],
+        pinned_at=message.pinned_at,
+        pinned_by_user_id=message.pinned_by_user_id,
+        mention_user_ids=mention_user_ids,
+        poll=poll_payload,
     )
 
 
@@ -270,6 +309,17 @@ def build_message_payload(
             expires_in=get_settings().private_media_url_ttl_seconds,
         )
 
+    mention_user_ids = load_message_mentions_map(db, message_ids=[message.id]).get(
+        message.id, []
+    )
+    poll_dict: dict | None = None
+    if mtype_payload == "poll":
+        poll_row = db.query(Poll).filter(Poll.message_id == message.id).first()
+        if poll_row is not None:
+            poll_dict = serialize_poll(
+                db, poll=poll_row, viewer_user_id=None
+            ).model_dump(mode="json")
+
     return {
         "id": message.id,
         "chat_id": message.chat_id,
@@ -289,6 +339,10 @@ def build_message_payload(
         "reply_to": reply_to_dict,
         "forwarded_from_user_id": message.forwarded_from_user_id,
         "reactions": [],
+        "pinned_at": message.pinned_at.isoformat() if message.pinned_at else None,
+        "pinned_by_user_id": message.pinned_by_user_id,
+        "mention_user_ids": mention_user_ids,
+        "poll": poll_dict,
     }
 
 

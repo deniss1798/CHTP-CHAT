@@ -135,6 +135,7 @@ mixin _ChatDetailLifecycleLogic
       } catch (_) {}
 
       await _loadMessages();
+      unawaited(_loadPinnedMessages());
       await _connectSocket();
       _startSocketReconnectLoop();
       _startSocketHeartbeat();
@@ -489,6 +490,9 @@ mixin _ChatDetailLifecycleLogic
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _scrollToBottom(jump: true);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _scrollToBottom(jump: true);
+        });
       });
     } catch (e) {
       if (!mounted) return;

@@ -6,7 +6,7 @@ import 'package:video_player/video_player.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../data/stories_service.dart';
 
-const Duration _kImageStoryDuration = Duration(seconds: 5);
+const Duration _kImageStoryDuration = Duration(seconds: 7);
 
 class StoryViewerScreen extends StatefulWidget {
   const StoryViewerScreen({
@@ -14,11 +14,15 @@ class StoryViewerScreen extends StatefulWidget {
     required this.authorId,
     this.initialUsername,
     this.initialAvatarUrl,
+    this.isSelf = false,
+    this.onAddStoryRequested,
   });
 
   final int authorId;
   final String? initialUsername;
   final String? initialAvatarUrl;
+  final bool isSelf;
+  final Future<void> Function()? onAddStoryRequested;
 
   @override
   State<StoryViewerScreen> createState() => _StoryViewerScreenState();
@@ -38,6 +42,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
 
   AnimationController? _imageProgress;
   double _videoProgressNorm = 0;
+  bool _paused = false;
 
   @override
   void initState() {
@@ -170,6 +175,20 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
     }
   }
 
+  void _onLongPressStart() {
+    setState(() => _paused = true);
+    _imageProgress?.stop(canceled: false);
+  }
+
+  void _onLongPressEnd() {
+    if (!_paused) return;
+    setState(() => _paused = false);
+    final ctrl = _imageProgress;
+    if (ctrl != null && !ctrl.isAnimating) {
+      ctrl.forward();
+    }
+  }
+
   void _onVideoTick(double normalized) {
     if (!mounted) return;
     setState(() => _videoProgressNorm = normalized);
@@ -294,6 +313,18 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
                         ),
                         onPressed: () => Navigator.of(context).pop(),
                       ),
+                      if (widget.isSelf && widget.onAddStoryRequested != null)
+                        IconButton(
+                          tooltip: 'Добавить историю',
+                          icon: const Icon(
+                            Icons.add_photo_alternate_outlined,
+                            color: Colors.white,
+                          ),
+                          onPressed: () async {
+                            Navigator.of(context).pop();
+                            await widget.onAddStoryRequested!();
+                          },
+                        ),
                       CircleAvatar(
                         radius: 18,
                         backgroundImage:
@@ -336,6 +367,9 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
                   child: GestureDetector(
                     behavior: HitTestBehavior.translucent,
                     onTapUp: _onTap,
+                    onLongPressStart: (_) => _onLongPressStart(),
+                    onLongPressEnd: (_) => _onLongPressEnd(),
+                    onLongPressCancel: _onLongPressEnd,
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
                       child: DecoratedBox(
@@ -524,7 +558,8 @@ class _StoryVideoPageState extends State<_StoryVideoPage> {
 
     if (!_endedNotified &&
         dur > Duration.zero &&
-        ctrl.value.position >= dur - const Duration(milliseconds: 160)) {
+        ctrl.value.position >= dur - const Duration(milliseconds: 200) &&
+        ctrl.value.position >= const Duration(milliseconds: 450)) {
       _endedNotified = true;
       widget.onEnded?.call();
     }

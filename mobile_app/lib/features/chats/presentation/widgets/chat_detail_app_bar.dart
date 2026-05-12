@@ -143,7 +143,7 @@ class ChatDetailAppBar extends StatelessWidget {
             ],
             if (isGroupChat) ...[
               AppIconButtonSurface(
-                icon: Icons.groups_rounded,
+                icon: AppIcons.call,
                 tooltip: 'Групповой звонок',
                 onTap: onGroupCall,
                 active: true,
@@ -226,7 +226,7 @@ class ChatDetailAppBar extends StatelessWidget {
             if (isGroupChat) ...[
               const SizedBox(width: 8),
               AppIconButtonSurface(
-                icon: Icons.groups_rounded,
+                icon: AppIcons.call,
                 tooltip: 'Групповой звонок',
                 onTap: onGroupCall,
                 active: true,

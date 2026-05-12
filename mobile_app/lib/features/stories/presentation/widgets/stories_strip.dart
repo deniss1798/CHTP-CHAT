@@ -60,6 +60,9 @@ class StoriesStrip extends StatelessWidget {
           authorId: e.userId,
           initialUsername: e.username,
           initialAvatarUrl: e.avatarUrl,
+          isSelf: e.isSelf,
+          onAddStoryRequested:
+              e.isSelf ? () => _pickAndUpload(context) : null,
         ),
       ),
     );

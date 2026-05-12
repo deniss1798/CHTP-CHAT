@@ -23,9 +23,13 @@ class _VideoNoteRecordScreenState extends State<VideoNoteRecordScreen> {
   CameraController? _controller;
   bool _ready = false;
   bool _recording = false;
+  bool _switching = false;
   Timer? _maxDurationTimer;
   Timer? _recordTicker;
   DateTime? _recordStartedAt;
+
+  List<CameraDescription> _cameras = const [];
+  int _activeCameraIndex = 0;
 
   @override
   void initState() {
@@ -58,11 +62,18 @@ class _VideoNoteRecordScreenState extends State<VideoNoteRecordScreen> {
       return;
     }
 
-    final description = cameras.firstWhere(
+    _cameras = cameras;
+    final frontIndex = cameras.indexWhere(
       (camera) => camera.lensDirection == CameraLensDirection.front,
-      orElse: () => cameras.first,
     );
+    _activeCameraIndex = frontIndex >= 0 ? frontIndex : 0;
+    await _attachController(_cameras[_activeCameraIndex], popOnError: true);
+  }
 
+  Future<void> _attachController(
+    CameraDescription description, {
+    bool popOnError = false,
+  }) async {
     final controller = CameraController(
       description,
       ResolutionPreset.medium,
@@ -76,7 +87,7 @@ class _VideoNoteRecordScreenState extends State<VideoNoteRecordScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Камера: $e')),
       );
-      Navigator.of(context).pop();
+      if (popOnError) Navigator.of(context).pop();
       return;
     }
 
@@ -85,10 +96,26 @@ class _VideoNoteRecordScreenState extends State<VideoNoteRecordScreen> {
       return;
     }
 
+    final previous = _controller;
     setState(() {
       _controller = controller;
       _ready = true;
     });
+    await previous?.dispose();
+  }
+
+  Future<void> _switchCamera() async {
+    if (_recording || _switching || _cameras.length < 2) return;
+    _switching = true;
+    try {
+      _activeCameraIndex = (_activeCameraIndex + 1) % _cameras.length;
+      setState(() {
+        _ready = false;
+      });
+      await _attachController(_cameras[_activeCameraIndex]);
+    } finally {
+      _switching = false;
+    }
   }
 
   Future<void> _onPointerDown() async {
@@ -192,6 +219,12 @@ class _VideoNoteRecordScreenState extends State<VideoNoteRecordScreen> {
                       onTap: () => Navigator.of(context).pop(),
                     ),
                     const Spacer(),
+                    if (_cameras.length > 1)
+                      AppIconButtonSurface(
+                        icon: Icons.cameraswitch_rounded,
+                        tooltip: 'Сменить камеру',
+                        onTap: (_recording || _switching) ? null : _switchCamera,
+                      ),
                   ],
                 ),
                 const SizedBox(height: 18),
@@ -260,7 +293,7 @@ class _VideoNoteRecordScreenState extends State<VideoNoteRecordScreen> {
                       ),
                       child: ClipOval(
                         child: _ready && _controller != null
-                            ? CameraPreview(_controller!)
+                            ? _CircularCameraPreview(controller: _controller!)
                             : Container(
                                 color: AppColors.surfaceSoft,
                                 alignment: Alignment.center,
@@ -337,5 +370,39 @@ class _VideoNoteRecordScreenState extends State<VideoNoteRecordScreen> {
     final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
     final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
     return '$minutes:$seconds';
+  }
+}
+
+/// Превью камеры обрезается до квадрата, чтобы [ClipOval] не растягивал кадр.
+class _CircularCameraPreview extends StatelessWidget {
+  const _CircularCameraPreview({required this.controller});
+
+  final CameraController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final value = controller.value;
+    final aspect = value.aspectRatio == 0 ? 1.0 : value.aspectRatio;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final size = constraints.biggest.shortestSide;
+        final isPortrait = aspect <= 1.0;
+        final previewWidth = isPortrait ? size : size * aspect;
+        final previewHeight = isPortrait ? size / aspect : size;
+
+        return ClipRect(
+          child: OverflowBox(
+            maxWidth: previewWidth,
+            maxHeight: previewHeight,
+            child: SizedBox(
+              width: previewWidth,
+              height: previewHeight,
+              child: CameraPreview(controller),
+            ),
+          ),
+        );
+      },
+    );
   }
 }

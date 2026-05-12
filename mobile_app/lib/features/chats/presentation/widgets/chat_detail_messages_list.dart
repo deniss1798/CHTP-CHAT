@@ -113,7 +113,9 @@ class ChatDetailMessagesList extends StatelessWidget {
 
           children.add(
             Slidable(
-              key: ValueKey('slidable-${message['id']}'),
+              key: ValueKey(
+                'slidable-${message['id'] ?? message['client_temp_id'] ?? message['client_message_id'] ?? index}',
+              ),
               startActionPane: ActionPane(
                 motion: const DrawerMotion(),
                 extentRatio: 0.22,
