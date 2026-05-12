@@ -6,6 +6,28 @@ import '../../../../core/storage/secure_storage_service.dart';
 class StoriesService {
   final Dio _dio = ApiClient.dio;
 
+  String _trimRightSlash(String s) {
+    var t = s.trim();
+    while (t.endsWith('/')) {
+      t = t.substring(0, t.length - 1);
+    }
+    return t;
+  }
+
+  /// Как в [MessagesService]: при 405 пробуем базу без суффикса `/api` или с `/api`.
+  String _alternateOriginFor405(String root) {
+    final r = _trimRightSlash(root);
+    final uri = Uri.parse(r);
+    final segs = uri.pathSegments.where((s) => s.isNotEmpty).toList();
+    if (segs.isNotEmpty && segs.last == 'api') {
+      final parent = uri.replace(
+        pathSegments: segs.sublist(0, segs.length - 1),
+      );
+      return _trimRightSlash(parent.toString());
+    }
+    return '$r/api';
+  }
+
   Future<Map<String, dynamic>> _authHeaders() async {
     final token = await SecureStorageService.getAccessToken();
     if (token == null || token.isEmpty) {
@@ -51,25 +73,53 @@ class StoriesService {
     required String mediaType,
     String? caption,
   }) async {
-    final form = FormData.fromMap({
-      'media_type': mediaType,
-      if (caption != null && caption.trim().isNotEmpty) 'caption': caption.trim(),
-      'file': MultipartFile.fromBytes(bytes, filename: filename),
-    });
-
-    final response = await _dio.post<Map<String, dynamic>>(
-      '/stories/upload',
-      data: form,
-      options: Options(
-        headers: await _authHeaders(),
-        sendTimeout: const Duration(minutes: 5),
-      ),
-    );
-    final data = response.data;
-    if (data == null) {
-      throw Exception('Пустой ответ загрузки стори');
+    Future<FormData> buildForm() async {
+      return FormData.fromMap({
+        'media_type': mediaType,
+        if (caption != null && caption.trim().isNotEmpty)
+          'caption': caption.trim(),
+        'file': MultipartFile.fromBytes(bytes, filename: filename),
+      });
     }
-    return data;
+
+    final opts = Options(
+      headers: await _authHeaders(),
+      sendTimeout: const Duration(minutes: 5),
+    );
+    final root = _trimRightSlash(ApiClient.baseUrl);
+    const rel = '/stories/upload';
+
+    Future<Response<Map<String, dynamic>>> postUpload(String origin) async {
+      final fd = await buildForm();
+      final uri = Uri.parse('$origin$rel');
+      return ApiClient.multipartDio.postUri<Map<String, dynamic>>(
+        uri,
+        data: fd,
+        options: opts,
+      );
+    }
+
+    try {
+      final response = await postUpload(root);
+      final data = response.data;
+      if (data == null) {
+        throw Exception('Пустой ответ загрузки стори');
+      }
+      return data;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 405) {
+        final alt = _alternateOriginFor405(root);
+        if (alt != root) {
+          final response = await postUpload(alt);
+          final data = response.data;
+          if (data == null) {
+            throw Exception('Пустой ответ загрузки стори');
+          }
+          return data;
+        }
+      }
+      rethrow;
+    }
   }
 
   Future<void> deleteStory(int storyId) async {

@@ -74,6 +74,21 @@ class _VideoNoteRecordScreenState extends State<VideoNoteRecordScreen> {
     CameraDescription description, {
     bool popOnError = false,
   }) async {
+    if (mounted) {
+      setState(() {
+        _ready = false;
+      });
+    }
+
+    final previous = _controller;
+    _controller = null;
+    try {
+      await previous?.dispose();
+    } catch (_) {}
+    if (previous != null) {
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+    }
+
     final controller = CameraController(
       description,
       ResolutionPreset.medium,
@@ -88,6 +103,7 @@ class _VideoNoteRecordScreenState extends State<VideoNoteRecordScreen> {
         SnackBar(content: Text('Камера: $e')),
       );
       if (popOnError) Navigator.of(context).pop();
+      await controller.dispose();
       return;
     }
 
@@ -96,12 +112,10 @@ class _VideoNoteRecordScreenState extends State<VideoNoteRecordScreen> {
       return;
     }
 
-    final previous = _controller;
     setState(() {
       _controller = controller;
       _ready = true;
     });
-    await previous?.dispose();
   }
 
   Future<void> _switchCamera() async {
@@ -109,12 +123,11 @@ class _VideoNoteRecordScreenState extends State<VideoNoteRecordScreen> {
     _switching = true;
     try {
       _activeCameraIndex = (_activeCameraIndex + 1) % _cameras.length;
-      setState(() {
-        _ready = false;
-      });
       await _attachController(_cameras[_activeCameraIndex]);
     } finally {
-      _switching = false;
+      if (mounted) {
+        _switching = false;
+      }
     }
   }
 
@@ -373,7 +386,7 @@ class _VideoNoteRecordScreenState extends State<VideoNoteRecordScreen> {
   }
 }
 
-/// Превью камеры обрезается до квадрата, чтобы [ClipOval] не растягивал кадр.
+/// Круглое превью: [BoxFit.cover] по натуральному размеру кадра — без горизонтального растягивания.
 class _CircularCameraPreview extends StatelessWidget {
   const _CircularCameraPreview({required this.controller});
 
@@ -382,27 +395,23 @@ class _CircularCameraPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final value = controller.value;
-    final aspect = value.aspectRatio == 0 ? 1.0 : value.aspectRatio;
+    if (!value.isInitialized) {
+      return const ColoredBox(color: Colors.black);
+    }
+    final ps = value.previewSize;
+    if (ps == null) {
+      return CameraPreview(controller);
+    }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final size = constraints.biggest.shortestSide;
-        final isPortrait = aspect <= 1.0;
-        final previewWidth = isPortrait ? size : size * aspect;
-        final previewHeight = isPortrait ? size / aspect : size;
-
-        return ClipRect(
-          child: OverflowBox(
-            maxWidth: previewWidth,
-            maxHeight: previewHeight,
-            child: SizedBox(
-              width: previewWidth,
-              height: previewHeight,
-              child: CameraPreview(controller),
-            ),
-          ),
-        );
-      },
+    return FittedBox(
+      fit: BoxFit.cover,
+      alignment: Alignment.center,
+      clipBehavior: Clip.hardEdge,
+      child: SizedBox(
+        width: ps.width,
+        height: ps.height,
+        child: CameraPreview(controller),
+      ),
     );
   }
 }
