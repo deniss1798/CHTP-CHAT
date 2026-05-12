@@ -16,11 +16,13 @@ RUN pyinstaller --onefile \
     --hidden-import uvicorn.protocols.http.auto \
     app/main.py
 
-FROM alpine:3.23.4
-RUN apk add --no-cache ffmpeg libstdc++
+# PyInstaller-бинарник собран на Debian (glibc); на Alpine (musl) он не запускается (часто exit 255).
+FROM python:3.14-slim
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=builder /app/dist/app .
-RUN chmod +x ./app && adduser -D -u 1000 appuser && chown appuser:appuser /app
+RUN chmod +x ./app && useradd --create-home --uid 1000 appuser && chown -R appuser:appuser /app
 USER appuser
 EXPOSE 8000
 CMD ["./app"]
