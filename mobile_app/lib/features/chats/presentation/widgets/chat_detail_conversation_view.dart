@@ -15,6 +15,7 @@ class ChatDetailConversationView extends StatelessWidget {
     required this.currentUserId,
     required this.memberNames,
     required this.memberAvatarUrls,
+    required this.lastReadByUserId,
     required this.onRefresh,
     required this.onSwipeReply,
     required this.onMessageActions,
@@ -50,6 +51,7 @@ class ChatDetailConversationView extends StatelessWidget {
   final int? currentUserId;
   final Map<int, String> memberNames;
   final Map<int, String?> memberAvatarUrls;
+  final Map<int, int> lastReadByUserId;
   final Future<void> Function() onRefresh;
   final void Function(Map<String, dynamic> message) onSwipeReply;
   final void Function(Map<String, dynamic> message, Offset? menuPosition)
@@ -93,6 +95,7 @@ class ChatDetailConversationView extends StatelessWidget {
             currentUserId: currentUserId,
             memberNames: memberNames,
             memberAvatarUrls: memberAvatarUrls,
+            lastReadByUserId: lastReadByUserId,
             onRefresh: onRefresh,
             onSwipeReply: onSwipeReply,
             onMessageActions: onMessageActions,

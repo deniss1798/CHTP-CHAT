@@ -1,8 +1,10 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/design_tokens.dart';
+import '../../../../app/widgets/app_surface.dart';
 import '../../../../app/widgets/app_avatar.dart';
 import '../../../../core/notifiers/chats_list_refresh_notifier.dart';
 import '../../../chats/presentation/controllers/user_presentation_helpers.dart';
@@ -73,32 +75,7 @@ class StoriesStrip extends StatelessWidget {
     final messenger = ScaffoldMessenger.maybeOf(context);
     try {
       final picker = ImagePicker();
-      final action = await showModalBottomSheet<String>(
-        context: context,
-        backgroundColor: AppColors.surfaceRaised,
-        builder: (ctx) => SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.photo_library_rounded),
-                title: const Text('Фото из галереи'),
-                onTap: () => Navigator.pop(ctx, 'g_photo'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.video_library_rounded),
-                title: const Text('Видео из галереи'),
-                onTap: () => Navigator.pop(ctx, 'g_video'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_camera_rounded),
-                title: const Text('Камера'),
-                onTap: () => Navigator.pop(ctx, 'camera'),
-              ),
-            ],
-          ),
-        ),
-      );
+      final action = await _showStoryAddSheet(context);
       if (action == null || !context.mounted) return;
 
       XFile? file;
@@ -129,14 +106,111 @@ class StoriesStrip extends StatelessWidget {
       }
     } catch (e) {
       if (!context.mounted) return;
+      var msg = extractFeatureErrorMessage(
+        e,
+        fallback: 'Не удалось опубликовать сторис',
+      );
+      if (e is DioException && e.response?.statusCode == 413) {
+        msg =
+            'Файл слишком большой (413). На сервере в nginx для /api нужно: client_max_body_size 100m; и reload.';
+      }
       messenger?.showSnackBar(
-        SnackBar(
-          content: Text(
-            extractFeatureErrorMessage(e, fallback: 'Не удалось опубликовать сторис'),
-          ),
-        ),
+        SnackBar(content: Text(msg)),
       );
     }
+  }
+
+  Future<String?> _showStoryAddSheet(BuildContext context) {
+    return showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => SafeArea(
+        minimum: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+        child: AppSurface(
+          tone: AppSurfaceTone.elevated,
+          radius: AppRadius.xxl,
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(AppRadius.md),
+                      gradient: LinearGradient(
+                        colors: [
+                          AppColors.accentBright.withValues(alpha: 0.35),
+                          AppColors.accent.withValues(alpha: 0.2),
+                        ],
+                      ),
+                      border: Border.all(
+                        color: AppColors.accentBorder.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.auto_stories_rounded,
+                      color: AppColors.accentBright,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Новая история',
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 17,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          'Три варианта — как при вложении в чат',
+                          style: TextStyle(
+                            color: AppColors.textMuted.withValues(alpha: 0.95),
+                            fontSize: 13,
+                            height: 1.25,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              _StoryPickRow(
+                icon: Icons.photo_library_rounded,
+                title: 'Фото из галереи',
+                subtitle: 'JPEG, PNG, WebP',
+                onTap: () => Navigator.pop(ctx, 'g_photo'),
+              ),
+              const SizedBox(height: 10),
+              _StoryPickRow(
+                icon: Icons.video_library_rounded,
+                title: 'Видео из галереи',
+                subtitle: 'Ролик для истории',
+                onTap: () => Navigator.pop(ctx, 'g_video'),
+              ),
+              const SizedBox(height: 10),
+              _StoryPickRow(
+                icon: Icons.photo_camera_rounded,
+                title: 'Камера',
+                subtitle: 'Снять фото',
+                onTap: () => Navigator.pop(ctx, 'camera'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -203,7 +277,7 @@ class StoriesStrip extends StatelessWidget {
             padding: EdgeInsets.zero,
             clipBehavior: Clip.none,
             itemCount: merged.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            separatorBuilder: (_, _) => const SizedBox(width: 10),
             itemBuilder: (context, i) {
               final e = merged[i];
               return _StoryBubble(
@@ -214,6 +288,81 @@ class StoriesStrip extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _StoryPickRow extends StatelessWidget {
+  const _StoryPickRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.md + 4),
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadius.md + 4),
+            color: AppColors.surface.withValues(alpha: 0.92),
+            border: Border.all(
+              color: AppColors.strokeAccent.withValues(alpha: 0.55),
+              width: 1,
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 44,
+                height: 44,
+                child: Icon(icon, color: AppColors.accentBright, size: 26),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15.5,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        color: AppColors.textSecondary.withValues(alpha: 0.95),
+                        fontSize: 12.5,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.textMuted.withValues(alpha: 0.85),
+                size: 24,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

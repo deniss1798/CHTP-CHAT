@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_icons.dart';
@@ -30,74 +32,76 @@ class _ChatMemberAddScreenState extends State<ChatMemberAddScreen> {
   final ChatsService _chatsService = ChatsService();
   final TextEditingController _searchController = TextEditingController();
 
-  bool _isLoading = true;
+  Timer? _searchDebounce;
+  bool _isSearching = false;
   bool _isAdding = false;
   String? _error;
 
-  List<Map<String, dynamic>> _allUsers = [];
   List<Map<String, dynamic>> _filteredUsers = [];
 
   @override
   void initState() {
     super.initState();
-    _loadUsers();
-    _searchController.addListener(_applySearch);
+    _searchController.addListener(_onSearchChanged);
   }
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadUsers() async {
+  void _onSearchChanged() {
+    _searchDebounce?.cancel();
+    final q = _searchController.text.trim();
+    if (q.length < 2) {
+      setState(() {
+        _filteredUsers = [];
+        _error = null;
+        _isSearching = false;
+      });
+      return;
+    }
     setState(() {
-      _isLoading = true;
+      _isSearching = true;
+      _error = null;
+    });
+    _searchDebounce = Timer(const Duration(milliseconds: 400), _performSearch);
+  }
+
+  Future<void> _performSearch() async {
+    final q = _searchController.text.trim();
+    if (q.length < 2) return;
+
+    setState(() {
+      _isSearching = true;
       _error = null;
     });
 
     try {
-      final users = await _usersService.getUsers();
-
-      final availableUsers = users.where((user) {
+      final users = await _usersService.searchUsers(q);
+      if (!mounted) return;
+      final filtered = users.where((user) {
         final userId = userIdFromMap(user);
         return userId != null && !widget.existingMemberIds.contains(userId);
       }).toList();
 
-      if (!mounted) return;
-
       setState(() {
-        _allUsers = availableUsers;
-        _filteredUsers = [];
-        _isLoading = false;
+        _filteredUsers = filtered;
+        _isSearching = false;
       });
     } catch (e) {
       if (!mounted) return;
-
       setState(() {
         _error = extractFeatureErrorMessage(
           e,
-          fallback: 'Не удалось загрузить пользователей',
+          fallback: 'Не удалось выполнить поиск',
         );
-        _isLoading = false;
+        _isSearching = false;
       });
     }
-  }
-
-  void _applySearch() {
-    final query = _searchController.text.trim().toLowerCase();
-
-    setState(() {
-      if (query.isEmpty) {
-        _filteredUsers = [];
-        return;
-      }
-
-      _filteredUsers = _allUsers.where((user) {
-        final username = (user['username'] ?? '').toString().toLowerCase();
-        return username.contains(query);
-      }).toList();
-    });
   }
 
   Future<void> _addMember(Map<String, dynamic> user) async {
@@ -141,14 +145,6 @@ class _ChatMemberAddScreenState extends State<ChatMemberAddScreen> {
   }
 
   Widget _buildBody() {
-    if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(
-          color: AppColors.accent,
-        ),
-      );
-    }
-
     if (_error != null) {
       return Center(
         child: Padding(
@@ -167,7 +163,7 @@ class _ChatMemberAddScreenState extends State<ChatMemberAddScreen> {
               ),
               const SizedBox(height: 16),
               ElevatedButton(
-                onPressed: _loadUsers,
+                onPressed: _performSearch,
                 child: const Text('Повторить'),
               ),
             ],
@@ -176,12 +172,12 @@ class _ChatMemberAddScreenState extends State<ChatMemberAddScreen> {
       );
     }
 
-    if (_searchController.text.trim().isEmpty) {
+    if (_searchController.text.trim().length < 2) {
       return const Center(
         child: Padding(
           padding: EdgeInsets.symmetric(horizontal: 24),
           child: Text(
-            'Введите имя пользователя, чтобы добавить его в чат',
+            'Введите минимум 2 символа username — поиск на сервере (как в контактах).',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: AppColors.textSecondary,
@@ -189,6 +185,14 @@ class _ChatMemberAddScreenState extends State<ChatMemberAddScreen> {
               fontWeight: FontWeight.w600,
             ),
           ),
+        ),
+      );
+    }
+
+    if (_isSearching) {
+      return const Center(
+        child: CircularProgressIndicator(
+          color: AppColors.accent,
         ),
       );
     }
@@ -300,10 +304,21 @@ class _ChatMemberAddScreenState extends State<ChatMemberAddScreen> {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
                 child: AppSearchField(
                   controller: _searchController,
-                  hintText: 'Поиск по имени',
+                  hintText: 'Поиск по username',
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(22, 0, 22, 8),
+                child: Text(
+                  'Не менее 2 символов; регистр не важен.',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
               Expanded(child: _buildBody()),

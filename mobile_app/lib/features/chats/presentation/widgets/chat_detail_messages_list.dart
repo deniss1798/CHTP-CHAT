@@ -5,6 +5,7 @@ import '../../../../app/theme/app_colors.dart';
 import '../chat_detail_formatters.dart';
 import 'chat_detail_date_divider.dart';
 import 'chat_detail_message_bubble.dart';
+import '../chat_detail_message_maps.dart';
 
 class ChatDetailMessagesList extends StatelessWidget {
   const ChatDetailMessagesList({
@@ -15,6 +16,7 @@ class ChatDetailMessagesList extends StatelessWidget {
     required this.currentUserId,
     required this.memberNames,
     required this.memberAvatarUrls,
+    required this.lastReadByUserId,
     required this.onRefresh,
     required this.onSwipeReply,
     required this.onMessageActions,
@@ -30,6 +32,7 @@ class ChatDetailMessagesList extends StatelessWidget {
   final int? currentUserId;
   final Map<int, String> memberNames;
   final Map<int, String?> memberAvatarUrls;
+  final Map<int, int> lastReadByUserId;
   final Future<void> Function() onRefresh;
   final void Function(Map<String, dynamic> message) onSwipeReply;
   final void Function(Map<String, dynamic> message, Offset? menuPosition)
@@ -77,6 +80,23 @@ class ChatDetailMessagesList extends StatelessWidget {
     return memberNames[userId] ?? 'Пользователь';
   }
 
+  List<int> _readReceiptReaderIds(Map<String, dynamic> message) {
+    if (!isGroupChat || currentUserId == null || !_isMine(message)) {
+      return const [];
+    }
+    final mid = ChatDetailMessageMaps.intFromDynamic(message['id']);
+    if (mid == null) return const [];
+    final out = <int>[];
+    for (final e in lastReadByUserId.entries) {
+      if (e.key == currentUserId) continue;
+      if (e.value >= mid) out.add(e.key);
+    }
+    out.sort(
+      (a, b) => _senderNameForUserId(a).compareTo(_senderNameForUserId(b)),
+    );
+    return out;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (messages.isEmpty) {
@@ -118,7 +138,11 @@ class ChatDetailMessagesList extends StatelessWidget {
               ),
               startActionPane: ActionPane(
                 motion: const DrawerMotion(),
-                extentRatio: 0.22,
+                extentRatio: 0.26,
+                dismissible: DismissiblePane(
+                  dismissThreshold: 0.55,
+                  onDismissed: () => onSwipeReply(message),
+                ),
                 children: [
                   SlidableAction(
                     onPressed: (_) => onSwipeReply(message),
@@ -136,6 +160,8 @@ class ChatDetailMessagesList extends StatelessWidget {
                 senderName: _senderName(message),
                 senderAvatarUrl: _senderAvatarUrl(message),
                 senderNameForUserId: _senderNameForUserId,
+                memberAvatarUrls: memberAvatarUrls,
+                readReceiptReaderIds: _readReceiptReaderIds(message),
                 isMine: _isMine(message),
                 onOpenActions: (pos) => onMessageActions(message, pos),
                 onOpenFullscreenImage: onOpenFullscreenImage,

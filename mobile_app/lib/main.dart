@@ -51,10 +51,10 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
           inviteJson: ij,
         );
       }
-    } else if (type == 'chat_message') {
-      if (!await NotificationPreferences.areEnabled()) return;
+    } else {
       final chatId = int.tryParse(data['chat_id']?.toString() ?? '');
       if (chatId == null) return;
+      if (!await NotificationPreferences.areEnabled()) return;
       final title = (message.notification?.title ??
               data['sender_name']?.toString() ??
               'Чат')
@@ -123,15 +123,15 @@ Future<void> _initPush() async {
 
   FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
     requestChatsListRefresh();
-    if (defaultTargetPlatform != TargetPlatform.android) {
-      return;
-    }
     if (!await NotificationPreferences.areEnabled()) {
       return;
     }
     final data = message.data;
 
     if (data['type']?.toString() == 'incoming_call') {
+      if (defaultTargetPlatform != TargetPlatform.android) {
+        return;
+      }
       final ij = data['invite_json']?.toString();
       if (ij != null && ij.isNotEmpty) {
         final title = (message.notification?.title ??

@@ -325,6 +325,7 @@ class _ChatDetailScreenState extends _ChatDetailScreenStateBase
       currentUserId: _currentUserId,
       memberNames: _memberNames,
       memberAvatarUrls: _memberAvatarUrls,
+      lastReadByUserId: _lastReadByUserId,
       onRefresh: _loadMessages,
       onSwipeReply: (m) {
         setState(() {
@@ -493,9 +494,7 @@ class _ChatDetailScreenState extends _ChatDetailScreenStateBase
                     unawaited(_leaveGroup());
                   }
                 },
-                menuShowMembersItem: _groupCreatedBy != null &&
-                    _currentUserId != null &&
-                    _groupCreatedBy == _currentUserId,
+                menuShowMembersItem: _isGroupChat,
                 onSearchInChat: isDesktopMessengerLayout ? _showInChatSearch : null,
                 onVideoCall: isDesktopMessengerLayout && !_isGroupChat
                     ? _startVoiceCall

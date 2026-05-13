@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../app/theme/app_icons.dart';
 import '../../../../app/theme/app_shadows.dart';
@@ -378,29 +379,47 @@ class _DesktopMessageComposerRow extends StatelessWidget {
             radius: AppRadius.xl,
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
             shadow: AppShadows.lift,
-            child: TextField(
-              controller: messageController,
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.w600,
-              ),
-              minLines: 1,
-              maxLines: 5,
-              textInputAction: TextInputAction.newline,
-              decoration: InputDecoration(
-                hintText: isEditing
-                    ? 'Новый текст сообщения...'
-                    : 'Введите сообщение...',
-                hintStyle: const TextStyle(color: AppColors.textMuted),
-                filled: true,
-                fillColor: Colors.transparent,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
+            child: Focus(
+              onKeyEvent: (node, event) {
+                if (event is! KeyDownEvent) return KeyEventResult.ignored;
+                if (event.logicalKey != LogicalKeyboardKey.enter) {
+                  return KeyEventResult.ignored;
+                }
+                final hw = HardwareKeyboard.instance;
+                if (hw.isShiftPressed ||
+                    hw.isControlPressed ||
+                    hw.isAltPressed ||
+                    hw.isMetaPressed) {
+                  return KeyEventResult.ignored;
+                }
+                if (isSending) return KeyEventResult.handled;
+                onSend();
+                return KeyEventResult.handled;
+              },
+              child: TextField(
+                controller: messageController,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w600,
                 ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppRadius.lg),
-                  borderSide: BorderSide.none,
+                minLines: 1,
+                maxLines: 5,
+                textInputAction: TextInputAction.newline,
+                decoration: InputDecoration(
+                  hintText: isEditing
+                      ? 'Новый текст сообщения...'
+                      : 'Введите сообщение...',
+                  hintStyle: const TextStyle(color: AppColors.textMuted),
+                  filled: true,
+                  fillColor: Colors.transparent,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
+                    borderSide: BorderSide.none,
+                  ),
                 ),
               ),
             ),

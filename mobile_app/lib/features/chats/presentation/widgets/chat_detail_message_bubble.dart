@@ -25,6 +25,8 @@ class ChatDetailMessageBubble extends StatelessWidget {
     required this.senderName,
     required this.senderAvatarUrl,
     required this.senderNameForUserId,
+    required this.memberAvatarUrls,
+    required this.readReceiptReaderIds,
     required this.isMine,
     required this.onOpenActions,
     required this.onOpenFullscreenImage,
@@ -39,6 +41,8 @@ class ChatDetailMessageBubble extends StatelessWidget {
   final String senderName;
   final String? senderAvatarUrl;
   final String Function(int? userId) senderNameForUserId;
+  final Map<int, String?> memberAvatarUrls;
+  final List<int> readReceiptReaderIds;
   final bool isMine;
   /// [menuPosition] — глобальные координаты для меню у курсора (ПКМ); `null` — снизу (тап на телефоне).
   final void Function(Offset? menuPosition) onOpenActions;
@@ -211,6 +215,23 @@ class ChatDetailMessageBubble extends StatelessWidget {
     );
   }
 
+  Widget _deliveryStatusWidget(String? status, double iconSize) {
+    if (!isMine) return const SizedBox.shrink();
+    if (isGroupChat && readReceiptReaderIds.isNotEmpty) {
+      return _ChatGroupReadReceiptStack(
+        userIds: readReceiptReaderIds,
+        memberAvatarUrls: memberAvatarUrls,
+        senderNameForUserId: senderNameForUserId,
+        diameter: iconSize + 1,
+      );
+    }
+    return Icon(
+      _deliveryIcon(status),
+      size: iconSize,
+      color: _deliveryColor(status),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final time = chatDetailFormatTime(message['created_at']?.toString());
@@ -264,12 +285,9 @@ class ChatDetailMessageBubble extends StatelessWidget {
                         ),
                       ),
                     if (isMine) ...[
-                      Icon(
-                        _deliveryIcon(message['delivery_status']?.toString()),
-                        size: 14,
-                        color: _deliveryColor(
-                          message['delivery_status']?.toString(),
-                        ),
+                      _deliveryStatusWidget(
+                        message['delivery_status']?.toString(),
+                        14,
                       ),
                       const SizedBox(width: 4),
                     ],
@@ -397,12 +415,9 @@ class ChatDetailMessageBubble extends StatelessWidget {
                         ),
                       ),
                     if (isMine) ...[
-                      Icon(
-                        _deliveryIcon(message['delivery_status']?.toString()),
-                        size: 15,
-                        color: _deliveryColor(
-                          message['delivery_status']?.toString(),
-                        ),
+                      _deliveryStatusWidget(
+                        message['delivery_status']?.toString(),
+                        15,
                       ),
                       const SizedBox(width: AppSpacing.xs),
                     ],
@@ -476,6 +491,58 @@ class ChatDetailMessageBubble extends StatelessWidget {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ChatGroupReadReceiptStack extends StatelessWidget {
+  const _ChatGroupReadReceiptStack({
+    required this.userIds,
+    required this.memberAvatarUrls,
+    required this.senderNameForUserId,
+    required this.diameter,
+  });
+
+  final List<int> userIds;
+  final Map<int, String?> memberAvatarUrls;
+  final String Function(int? userId) senderNameForUserId;
+  final double diameter;
+
+  @override
+  Widget build(BuildContext context) {
+    if (userIds.isEmpty) return const SizedBox.shrink();
+    final step = diameter * 0.52;
+    final width = diameter + (userIds.length - 1) * step;
+
+    return SizedBox(
+      width: width,
+      height: diameter,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          for (var i = 0; i < userIds.length; i++)
+            Positioned(
+              left: i * step,
+              child: Tooltip(
+                message: senderNameForUserId(userIds[i]),
+                child: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.black.withValues(alpha: 0.35),
+                      width: 1,
+                    ),
+                  ),
+                  child: ChatDetailCircleAvatar(
+                    title: senderNameForUserId(userIds[i]),
+                    avatarUrl: memberAvatarUrls[userIds[i]],
+                    size: diameter - 2,
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

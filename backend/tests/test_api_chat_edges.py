@@ -72,6 +72,13 @@ def test_group_add_remove_rename_and_non_owner_remove_denied(
     assert members.status_code == 200
     assert {row["id"] for row in members.json()} == {1, bob_id, charlie_id}
 
+    members_bob = api_client.get(
+        f"/chats/{chat_id}/members",
+        headers=auth_header(bob),
+    )
+    assert members_bob.status_code == 200
+    assert {row["id"] for row in members_bob.json()} == {1, bob_id, charlie_id}
+
     removed = api_client.delete(
         f"/chats/{chat_id}/members/{charlie_id}",
         headers=auth_header(alice),

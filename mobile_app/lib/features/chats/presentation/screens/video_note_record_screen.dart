@@ -386,7 +386,8 @@ class _VideoNoteRecordScreenState extends State<VideoNoteRecordScreen> {
   }
 }
 
-/// Круглое превью: [BoxFit.cover] по натуральному размеру кадра — без горизонтального растягивания.
+/// Превью при записи: буфер камеры часто в ориентации сенсора (w>h), а экран — портрет;
+/// без подгонки кадр в круге визуально «плющит». После записи файл уже с нормальным aspect.
 class _CircularCameraPreview extends StatelessWidget {
   const _CircularCameraPreview({required this.controller});
 
@@ -403,15 +404,42 @@ class _CircularCameraPreview extends StatelessWidget {
       return CameraPreview(controller);
     }
 
-    return FittedBox(
-      fit: BoxFit.cover,
-      alignment: Alignment.center,
-      clipBehavior: Clip.hardEdge,
-      child: SizedBox(
-        width: ps.width,
-        height: ps.height,
-        child: CameraPreview(controller),
-      ),
+    final o = MediaQuery.orientationOf(context);
+    final swap = (o == Orientation.portrait && ps.width > ps.height) ||
+        (o == Orientation.landscape && ps.height > ps.width);
+    final boxW = swap ? ps.height : ps.width;
+    final boxH = swap ? ps.width : ps.height;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final side = constraints.biggest.shortestSide;
+        if (side <= 0) {
+          return FittedBox(
+            fit: BoxFit.cover,
+            alignment: Alignment.center,
+            clipBehavior: Clip.hardEdge,
+            child: SizedBox(
+              width: boxW,
+              height: boxH,
+              child: CameraPreview(controller),
+            ),
+          );
+        }
+        return SizedBox(
+          width: side,
+          height: side,
+          child: FittedBox(
+            fit: BoxFit.cover,
+            alignment: Alignment.center,
+            clipBehavior: Clip.hardEdge,
+            child: SizedBox(
+              width: boxW,
+              height: boxH,
+              child: CameraPreview(controller),
+            ),
+          ),
+        );
+      },
     );
   }
 }

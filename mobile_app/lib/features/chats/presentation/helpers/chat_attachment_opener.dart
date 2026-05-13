@@ -17,24 +17,36 @@ Future<void> openChatAttachmentUrl(
   required String mediaUrl,
   String? fallbackFileName,
 }) async {
-  final uri = Uri.tryParse(mediaUrl.trim());
-  if (uri == null || !uri.hasScheme) {
-    _toast(context, 'Некорректная ссылка на файл');
+  final raw = mediaUrl.trim();
+  var resolved = (raw.startsWith('http://') || raw.startsWith('https://'))
+      ? raw
+      : (UrlHelper.absoluteMediaUrl(raw) ?? raw);
+  resolved = UrlHelper.rewriteStaticMediaToApiOrigin(resolved);
+
+  final uri = Uri.tryParse(resolved);
+  if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
+    if (context.mounted) {
+      _toast(context, 'Некорректная ссылка на файл');
+    }
     return;
   }
 
-  if (!UrlHelper.isSameServerAsApi(mediaUrl)) {
+  if (!UrlHelper.isSameServerAsApi(resolved)) {
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } else {
-      _toast(context, 'Не удалось открыть файл');
+      if (context.mounted) {
+        _toast(context, 'Не удалось открыть файл');
+      }
     }
     return;
   }
 
   final token = await SecureStorageService.getAccessToken();
   if (token == null || token.isEmpty) {
-    _toast(context, 'Нужна авторизация');
+    if (context.mounted) {
+      _toast(context, 'Нужна авторизация');
+    }
     return;
   }
 
@@ -47,7 +59,7 @@ Future<void> openChatAttachmentUrl(
     );
 
     final response = await ApiClient.dio.get<List<int>>(
-      mediaUrl,
+      resolved,
       options: Options(
         headers: {'Authorization': 'Bearer $token'},
         responseType: ResponseType.bytes,
@@ -62,13 +74,12 @@ Future<void> openChatAttachmentUrl(
     final f = File(path);
     await f.writeAsBytes(bytes, flush: true);
     final result = await OpenFile.open(path);
-    if (result.type != ResultType.done && context.mounted) {
+    if (!context.mounted) return;
+    if (result.type != ResultType.done) {
       _toast(context, 'Не удалось открыть файл');
     }
   } catch (_) {
-    if (context.mounted) {
-      _toast(context, 'Не удалось скачать файл');
-    }
+    if (context.mounted) _toast(context, 'Не удалось скачать файл');
   }
 }
 

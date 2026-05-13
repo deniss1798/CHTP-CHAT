@@ -68,7 +68,7 @@ mixin _ChatDetailLifecycleLogic
       if (!mounted) return;
       await _presenceService.ping();
       try {
-        await _loadChatMembers();
+        await _loadChatDetails();
         if (mounted) setState(() {});
       } catch (_) {}
     });
@@ -130,9 +130,6 @@ mixin _ChatDetailLifecycleLogic
         await _loadChatDetails();
       } catch (_) {}
 
-      try {
-        await _loadChatMembers();
-      } catch (_) {}
 
       await _loadMessages();
       unawaited(_loadPinnedMessages());
@@ -178,6 +175,8 @@ mixin _ChatDetailLifecycleLogic
 
     final isGroup = detail.type == 'group';
 
+    _applyMembersFromChatDetail(detail);
+
     setState(() {
       if (title.isNotEmpty) {
         _chatTitle = title;
@@ -187,13 +186,12 @@ mixin _ChatDetailLifecycleLogic
     });
   }
 
-  Future<void> _loadChatMembers() async {
-    final rows = await _chatsService.fetchChatMembers(widget.chatId);
+  void _applyMembersFromChatDetail(ChatDetail detail) {
     _memberNames.clear();
     _memberAvatarUrls.clear();
     _memberLastSeen.clear();
 
-    for (final member in rows) {
+    for (final member in detail.members) {
       if (member.username.isNotEmpty) {
         _memberNames[member.id] = member.username;
       }
@@ -220,7 +218,6 @@ mixin _ChatDetailLifecycleLogic
     if (!mounted || result != true) return;
 
     try {
-      await _loadChatMembers();
       await _loadChatDetails();
 
       if (!mounted) return;
@@ -335,7 +332,6 @@ mixin _ChatDetailLifecycleLogic
       ),
     );
     if (!mounted) return;
-    await _loadChatMembers();
     await _loadChatDetails();
   }
 
